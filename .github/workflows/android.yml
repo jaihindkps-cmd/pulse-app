@@ -1,0 +1,31 @@
+name: Pulse APK banao
+on:
+  workflow_dispatch: {}          # GitHub par "Run workflow" button se chalta hai
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21 }
+      - name: Server ka link jodo
+        env:
+          PULSE_URL: ${{ vars.PULSE_URL }}
+        run: |
+          if [ -z "$PULSE_URL" ] || [ "${PULSE_URL#https://}" = "$PULSE_URL" ]; then
+            echo "Repo ke Settings > Secrets and variables > Actions > Variables me PULSE_URL daalo (https:// se shuru)"; exit 1
+          fi
+          cd mobile
+          node -e 'const fs=require("fs");const c=JSON.parse(fs.readFileSync("capacitor.config.json"));c.server.url=process.env.PULSE_URL.replace(/\/$/,"");fs.writeFileSync("capacitor.config.json",JSON.stringify(c,null,2))'
+      - name: Install aur sync
+        run: cd mobile && npm ci && npx cap sync android
+      - name: Android licenses
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+      - name: APK build
+        run: cd mobile/android && chmod +x gradlew && ./gradlew assembleDebug --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pulse-apk
+          path: mobile/android/app/build/outputs/apk/debug/app-debug.apk
