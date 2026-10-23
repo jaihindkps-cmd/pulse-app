@@ -28,25 +28,23 @@ Kaise chalta hai: `public/` folder me bani-banayi website hai (`app.js` pehle se
 7. Firebase console > **Build > Firestore Database > Rules** tab.
    Repo ki `firestore.rules` file kholo, poora text copy karo, Rules box me purana sab hata kar paste karo, **Publish** dabao.
 
-**Website live karne ke 2 tareeke (koi ek):**
+**Website live karne ka tareeka: GitHub Pages (free, koi chaabi nahi chahiye).**
+8. Repo ko **Public** karo: GitHub repo **Settings > General > sabse neeche Danger Zone > Change visibility > Public**.
+   (Free GitHub account me Pages ke liye ye zaroori hai. Repo me koi secret nahi hai; Firebase ki web keys public hi hoti hain, asli suraksha `firestore.rules` se aati hai.)
+9. Repo **Settings > Pages > Build and deployment > Source = GitHub Actions**.
+10. **Actions > "Website live karo (GitHub Pages)" > Run workflow**. 1-2 minute baad link: `https://<github-naam>.github.io/pulse-app/`
+11. Firebase console > **Authentication > Settings > Authorized domains > Add domain** me `<github-naam>.github.io` jodo, warna signup par "unauthorized domain" error aayega.
 
-**Tareeka 1 (aasan, recommended): Netlify.** Netlify free hai aur Claude me connected hai.
-8. Firebase ki 6 values (Part 1 ka step 5) Claude ko bhej do. Claude `public/firebase-config.json` bhar dega aur Netlify par deploy kar dega. Aapko koi chaabi/secret nahi banana.
-9. Claude jo link de (`https://<naam>.netlify.app`) wahi sabko bhejo.
-   Dhyan: Netlify me site ko **Public** rakhna hai (Project configuration > Access & security me "Visitor access" ko public/none rakho), warna visitors ko Netlify login maangega.
-10. Agar signup par "unauthorized domain" jaisa error aaye: Firebase > **Authentication > Settings > Authorized domains > Add domain** me apna netlify domain jodo.
+Kuch badla to `public/` me commit karte hi website apne-aap dobara live ho jaati hai.
 
-**Tareeka 2: Firebase Hosting (GitHub apne-aap).**
-- Firebase console: **Project settings > Service accounts > Generate new private key**. Download hui `.json` ko text me kholo, poora copy karo. **Ye file kisi ko bhejna nahi, chat me bhi nahi.**
-- GitHub repo **Settings > Secrets and variables > Actions**: Secret `FIREBASE_SERVICE_ACCOUNT` (wo JSON) aur Variable `FIREBASE_PROJECT_ID` (project id).
-- **Actions > Firebase par deploy karo > Run workflow**. Link: `https://<project-id>.web.app`. Rules bhi isi se lag jaate hain.
-
-Kuch badla to Tareeka 1 me Claude se kaho "dobara deploy", Tareeka 2 me dobara **Run workflow**.
+**Dusra tareeka (optional): Firebase Hosting** (GitHub Action `Firebase par deploy karo`, service account secret chahiye; rules bhi isi se lagte hain).
+- Firebase console: **Project settings > Service accounts > Generate new private key**. Wo `.json` kisi ko bhejna nahi, chat me bhi nahi.
+- GitHub **Settings > Secrets and variables > Actions**: Secret `FIREBASE_SERVICE_ACCOUNT` (wo JSON), Variable `FIREBASE_PROJECT_ID`.
 
 ## Part 3: Mobile app
 
 - **Turant (bina APK):** link phone par kholo. Android Chrome: menu (⋮) > **Install app**. iPhone Safari: Share > **Add to Home Screen**.
-- **APK file:** repo **Settings > Secrets and variables > Actions > Variables** me `PULSE_URL` = aapka website link (netlify.app ya web.app) daalo,
+- **APK file:** repo **Settings > Secrets and variables > Actions > Variables** me `PULSE_URL` = aapka website link (github.io ya web.app) daalo,
   phir **Actions > Pulse APK banao > Run workflow**. 5-10 minute baad run ke neeche **Artifacts** me `pulse-apk` milega (zip, andar `app-debug.apk`).
   Phone me install karte waqt "Unknown source" allow karna hoga. Location ki permission Allow karna.
 

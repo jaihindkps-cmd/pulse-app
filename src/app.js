@@ -361,7 +361,7 @@ import {
 
   // ---- boot ----
   setMode("login");
-  fetch("/firebase-config.json", { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (cfg) {
+  fetch("firebase-config.json", { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (cfg) {
     if (!cfg.apiKey || /PASTE|YOUR/i.test(cfg.apiKey)) { $("authErr").textContent = "Setup baaki hai: public/firebase-config.json me Firebase ki details bharo."; return; }
     init(cfg);
   }).catch(function () { $("authErr").textContent = "Config nahi mili (firebase-config.json)."; });
