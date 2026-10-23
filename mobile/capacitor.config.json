@@ -2,6 +2,6 @@
   "appId": "com.pulse.app",
   "appName": "Pulse",
   "webDir": "www",
-  "server": { "url": "https://YOUR-PULSE-URL.onrender.com", "cleartext": false },
+  "server": { "url": "https://YOUR-PROJECT-ID.web.app", "cleartext": false },
   "android": { "allowMixedContent": false }
 }

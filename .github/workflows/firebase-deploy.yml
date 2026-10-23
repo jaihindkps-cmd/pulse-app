@@ -1,0 +1,21 @@
+name: Firebase par deploy karo
+on:
+  workflow_dispatch: {}          # GitHub par "Run workflow" button se chalta hai
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Firebase ki chaabi (service account) lagao
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          PID: ${{ vars.FIREBASE_PROJECT_ID }}
+        run: |
+          if [ -z "$SA" ]; then echo "Secret FIREBASE_SERVICE_ACCOUNT nahi mila (README dekho)"; exit 1; fi
+          if [ -z "$PID" ]; then echo "Variable FIREBASE_PROJECT_ID nahi mila (README dekho)"; exit 1; fi
+          printf '%s' "$SA" > "$RUNNER_TEMP/sa.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/sa.json" >> "$GITHUB_ENV"
+      - name: Rules + website deploy
+        run: npx --yes firebase-tools@15.34.1 deploy --only hosting,firestore --project "${{ vars.FIREBASE_PROJECT_ID }}" --non-interactive

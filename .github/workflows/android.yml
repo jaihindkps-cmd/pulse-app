@@ -15,7 +15,7 @@ jobs:
           PULSE_URL: ${{ vars.PULSE_URL }}
         run: |
           if [ -z "$PULSE_URL" ] || [ "${PULSE_URL#https://}" = "$PULSE_URL" ]; then
-            echo "Repo ke Settings > Secrets and variables > Actions > Variables me PULSE_URL daalo (https:// se shuru)"; exit 1
+            echo "Repo ke Settings > Secrets and variables > Actions > Variables me PULSE_URL daalo (https://aapka-project-id.web.app)"; exit 1
           fi
           cd mobile
           node -e 'const fs=require("fs");const c=JSON.parse(fs.readFileSync("capacitor.config.json"));c.server.url=process.env.PULSE_URL.replace(/\/$/,"");fs.writeFileSync("capacitor.config.json",JSON.stringify(c,null,2))'
