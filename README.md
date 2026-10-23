@@ -22,24 +22,31 @@ Kaise chalta hai: `public/` folder me bani-banayi website hai (`app.js` pehle se
 6. GitHub me apne repo me `public/firebase-config.json` kholo, pencil (edit) dabao, `PASTE_...` waali jagah ye 6 values daalo, **Commit changes**.
    (Ye keys public hoti hain, inme chhupane layak kuch nahi. Asli suraksha `firestore.rules` se aati hai.)
 
-## Part 2: Website live karo (GitHub apne-aap karega)
+## Part 2: Rules lagao aur website live karo
 
-7. Firebase console: **Project settings > Service accounts > Generate new private key > Generate key**.
-   Ek `.json` file download hogi. Use text me kholo aur **poora** copy karo.
-   **Ye file kisi ko bhejna nahi, chat me bhi nahi.** Sirf agle step me GitHub secret me daalni hai.
-8. GitHub repo: **Settings > Secrets and variables > Actions**
-   - **Secrets** tab > New repository secret: Name `FIREBASE_SERVICE_ACCOUNT`, Value = wo poora JSON.
-   - **Variables** tab > New repository variable: Name `FIREBASE_PROJECT_ID`, Value = aapka project id (Project settings me likha hai, jaise `pulse-ab12c`).
-9. Repo ke **Actions** tab > **Firebase par deploy karo** > **Run workflow**. 2-3 minute me ho jaata hai.
-10. Aapka link: `https://<project-id>.web.app`. Phone par kholo, **Account banao**, dost ko bhejo. Wo bhi khud signup karke join ho jaayega.
+**Rules (suraksha ke niyam), console se, 2 minute:**
+7. Firebase console > **Build > Firestore Database > Rules** tab.
+   Repo ki `firestore.rules` file kholo, poora text copy karo, Rules box me purana sab hata kar paste karo, **Publish** dabao.
 
-Agar deploy me dikkat aaye: Firestore ke **Rules** tab me `firestore.rules` ka poora text paste karke **Publish** kar do (website ka part phir bhi Actions se chalega).
-Kuch badla (jaise `public/` me) to dobara **Run workflow** dabao.
+**Website live karne ke 2 tareeke (koi ek):**
+
+**Tareeka 1 (aasan, recommended): Netlify.** Netlify free hai aur Claude me connected hai.
+8. Firebase ki 6 values (Part 1 ka step 5) Claude ko bhej do. Claude `public/firebase-config.json` bhar dega aur Netlify par deploy kar dega. Aapko koi chaabi/secret nahi banana.
+9. Claude jo link de (`https://<naam>.netlify.app`) wahi sabko bhejo.
+   Dhyan: Netlify me site ko **Public** rakhna hai (Project configuration > Access & security me "Visitor access" ko public/none rakho), warna visitors ko Netlify login maangega.
+10. Agar signup par "unauthorized domain" jaisa error aaye: Firebase > **Authentication > Settings > Authorized domains > Add domain** me apna netlify domain jodo.
+
+**Tareeka 2: Firebase Hosting (GitHub apne-aap).**
+- Firebase console: **Project settings > Service accounts > Generate new private key**. Download hui `.json` ko text me kholo, poora copy karo. **Ye file kisi ko bhejna nahi, chat me bhi nahi.**
+- GitHub repo **Settings > Secrets and variables > Actions**: Secret `FIREBASE_SERVICE_ACCOUNT` (wo JSON) aur Variable `FIREBASE_PROJECT_ID` (project id).
+- **Actions > Firebase par deploy karo > Run workflow**. Link: `https://<project-id>.web.app`. Rules bhi isi se lag jaate hain.
+
+Kuch badla to Tareeka 1 me Claude se kaho "dobara deploy", Tareeka 2 me dobara **Run workflow**.
 
 ## Part 3: Mobile app
 
 - **Turant (bina APK):** link phone par kholo. Android Chrome: menu (⋮) > **Install app**. iPhone Safari: Share > **Add to Home Screen**.
-- **APK file:** repo **Settings > Secrets and variables > Actions > Variables** me `PULSE_URL` = `https://<project-id>.web.app` daalo,
+- **APK file:** repo **Settings > Secrets and variables > Actions > Variables** me `PULSE_URL` = aapka website link (netlify.app ya web.app) daalo,
   phir **Actions > Pulse APK banao > Run workflow**. 5-10 minute baad run ke neeche **Artifacts** me `pulse-apk` milega (zip, andar `app-debug.apk`).
   Phone me install karte waqt "Unknown source" allow karna hoga. Location ki permission Allow karna.
 
