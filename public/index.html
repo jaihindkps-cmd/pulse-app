@@ -410,7 +410,15 @@
     <div class="auth-card">
       <div class="brand" style="justify-content:center;margin-bottom:6px"><div class="dot"></div><h1>Pulse</h1></div>
       <p class="auth-sub">Asli log, asli baatein. Sirf 18+ ke liye.</p>
-      <div class="seg"><button id="segLogin" class="on">Login</button><button id="segSignup">Naya account</button></div>
+      <div id="verifyBox" style="display:none;text-align:center">
+        <h2 style="margin:8px 0 6px">Email verify karo</h2>
+        <p class="auth-sub" id="vMsg">Aapko ek verification mail bheji hai. Mail me link par click karo (Spam folder bhi dekho).</p>
+        <button class="btn-grad" id="vDone" type="button" style="width:100%;padding:13px">Maine verify kar liya</button>
+        <button class="btn-outline" id="vResend" type="button" style="width:100%;padding:12px;margin-top:10px">Mail dobara bhejo</button>
+        <button class="btn-outline" id="vOut" type="button" style="width:100%;padding:12px;margin-top:10px">Logout / doosra account</button>
+        <div class="auth-err" id="vErr" role="alert"></div>
+      </div>
+      <div class="seg" id="segBox"><button id="segLogin" class="on">Login</button><button id="segSignup">Naya account</button></div>
       <form id="authForm" class="form" autocomplete="on">
         <label>Email<input id="aUser" type="email" required maxlength="80" autocapitalize="none" autocomplete="email" inputmode="email" placeholder="aap@example.com"></label>
         <div id="signupOnly">

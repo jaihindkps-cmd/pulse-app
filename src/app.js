@@ -1,6 +1,6 @@
 // Pulse (Firebase version): Auth + Firestore + Hosting, sab free (Spark) plan par.
 import { initializeApp } from "firebase/app";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, deleteUser } from "firebase/auth";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, deleteUser, sendEmailVerification } from "firebase/auth";
 import {
   initializeFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, collection, addDoc, query, where, orderBy, limit,
   getDocs, onSnapshot, serverTimestamp, arrayUnion, arrayRemove, Timestamp, writeBatch
@@ -75,7 +75,7 @@ import {
       signingUp = true;
       p = createUserWithEmailAndPassword(auth, email, pw).then(function (cred) {
         var prof = { name: name, age: age, city: clean($("aCity").value, 40), work: "", about: "", looking: $("aLooking").value, createdAt: serverTimestamp() };
-        return setDoc(doc(db, "users", cred.user.uid), prof).then(function () { UID = cred.user.uid; ME = Object.assign({}, prof, { uid: UID }); signingUp = false; start(); })
+        return setDoc(doc(db, "users", cred.user.uid), prof).then(function () { UID = cred.user.uid; ME = Object.assign({}, prof, { uid: UID }); signingUp = false; lastSent = Date.now(); return sendEmailVerification(cred.user).catch(function () { lastSent = 0; }).then(function () { return afterAuth(cred.user); }); })
           .catch(function (err) { return deleteUser(cred.user).catch(function () {}).then(function () { throw err; }); });
       });
     }
@@ -102,15 +102,40 @@ import {
     onAuthStateChanged(auth, function (u) {
       if (u) {
         if (signingUp) return;
-        getDoc(doc(db, "users", u.uid)).then(function (s) {
-          if (!s.exists()) { signOut(auth); $("auth").hidden = false; $("authErr").textContent = "Profile nahi mili. Naya account banao."; return; }
-          UID = u.uid; ME = Object.assign({}, s.data(), { uid: UID }); start();
-        }).catch(function (e) { $("auth").hidden = false; $("authErr").textContent = errMsg(e); });
+        afterAuth(u);
       } else {
-        stopAll(); UID = null; ME = null; $("auth").hidden = false; $("convo").classList.remove("open"); activeChat = null;
+        stopAll(); UID = null; ME = null; showForms(); $("auth").hidden = false; $("convo").classList.remove("open"); activeChat = null;
       }
     });
   }
+
+  // ---- email verification (asli insaan ka saboot) ----
+  function showForms() { $("verifyBox").style.display = "none"; $("authForm").style.display = ""; $("segBox").style.display = ""; $("vErr").textContent = ""; }
+  function showVerify(u) {
+    $("auth").hidden = false; $("authForm").style.display = "none"; $("segBox").style.display = "none"; $("verifyBox").style.display = "";
+    $("vMsg").textContent = "Verification mail " + u.email + " par bheji hai. Mail me link par click karo (Spam folder bhi dekho), phir niche button dabao.";
+  }
+  function afterAuth(u) {
+    if (!u.emailVerified) { showVerify(u); return Promise.resolve(); }
+    return getDoc(doc(db, "users", u.uid)).then(function (s) {
+      if (!s.exists()) { signOut(auth); showForms(); $("auth").hidden = false; $("authErr").textContent = "Profile nahi mili. Naya account banao."; return; }
+      showForms(); UID = u.uid; ME = Object.assign({}, s.data(), { uid: UID }); start();
+    }).catch(function (e) { showForms(); $("auth").hidden = false; $("authErr").textContent = errMsg(e); });
+  }
+  var lastSent = 0;
+  function sendVerify(u) {
+    if (Date.now() - lastSent < 60000) { $("vErr").textContent = "Thodi der ruko (1 minute), phir dobara bhejo."; return Promise.resolve(); }
+    lastSent = Date.now();
+    return sendEmailVerification(u).then(function () { $("vErr").textContent = "Mail bhej di gayi."; }).catch(function (e) { lastSent = 0; $("vErr").textContent = errMsg(e); });
+  }
+  $("vDone").addEventListener("click", function () {
+    var u = auth && auth.currentUser; if (!u) return; $("vErr").textContent = "";
+    u.reload().then(function () { return u.getIdToken(true); }).then(function () {
+      if (u.emailVerified) afterAuth(u); else $("vErr").textContent = "Abhi verify nahi hua. Mail ka link kholo, phir dobara dabao.";
+    }).catch(function (e) { $("vErr").textContent = errMsg(e); });
+  });
+  $("vResend").addEventListener("click", function () { if (auth && auth.currentUser) sendVerify(auth.currentUser); });
+  $("vOut").addEventListener("click", function () { signOut(auth); });
 
   // ---- tabs ----
   var titles = { feed: "Pulse", discover: "Discover", nearby: "Nearby", chats: "Messages", profile: "Profile" };

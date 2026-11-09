@@ -3,7 +3,9 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function signedIn() { return request.auth != null; }
+    function loggedIn() { return request.auth != null; }
+    // Asli insaan ka saboot: email verify hona zaroori (link par click). Bina verify ke sirf apni profile ban/dikh sakti hai.
+    function signedIn() { return request.auth != null && request.auth.token.email_verified == true; }
     function me() { return request.auth.uid; }
     function inPair(id) { return me() in id.split('_'); }
     function otherOf(id) { return id.split('_')[0] == me() ? id.split('_')[1] : id.split('_')[0]; }
@@ -15,14 +17,14 @@ service cloud.firestore {
 
     // Profile: sab logged-in log dekh sakte hain, sirf apni badal sakte hain. 18+ zaroori.
     match /users/{uid} {
-      allow read: if signedIn();
-      allow create: if signedIn() && uid == me()
+      allow read: if loggedIn() && (uid == me() || signedIn());
+      allow create: if loggedIn() && uid == me()
         && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 40
         && request.resource.data.age is number && request.resource.data.age >= 18 && request.resource.data.age <= 99
         && request.resource.data.get('city', '').size() <= 40
         && request.resource.data.get('work', '').size() <= 60
         && request.resource.data.get('about', '').size() <= 300;
-      allow update: if signedIn() && uid == me()
+      allow update: if loggedIn() && uid == me()
         && request.resource.data.age == resource.data.age
         && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 40
         && request.resource.data.get('city', '').size() <= 40
