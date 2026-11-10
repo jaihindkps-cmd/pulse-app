@@ -1,8 +1,8 @@
 {
-  "apiKey": "PASTE_API_KEY",
-  "authDomain": "PASTE_PROJECT_ID.firebaseapp.com",
-  "projectId": "PASTE_PROJECT_ID",
-  "storageBucket": "PASTE_PROJECT_ID.firebasestorage.app",
-  "messagingSenderId": "PASTE_SENDER_ID",
-  "appId": "PASTE_APP_ID"
+  "apiKey": "AIzaSyB2mlyUACsp38Gal7TsUFbet42y3EEh0EE",
+  "authDomain": "pulse-704e7.firebaseapp.com",
+  "projectId": "pulse-704e7",
+  "storageBucket": "pulse-704e7.firebasestorage.app",
+  "messagingSenderId": "985338252699",
+  "appId": "1:985338252699:web:b001a501828594d81a653e"
 }
