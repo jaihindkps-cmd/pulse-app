@@ -14,11 +14,12 @@ jobs:
         env:
           PULSE_URL: ${{ vars.PULSE_URL }}
         run: |
-          if [ -z "$PULSE_URL" ] || [ "${PULSE_URL#https://}" = "$PULSE_URL" ]; then
-            echo "Repo ke Settings > Secrets and variables > Actions > Variables me PULSE_URL daalo (https://aapka-project-id.web.app)"; exit 1
+          # PULSE_URL variable diya ho to wahi, warna capacitor.config.json me likha link chalega
+          if [ -n "$PULSE_URL" ]; then
+            cd mobile
+            node -e 'const fs=require("fs");const c=JSON.parse(fs.readFileSync("capacitor.config.json"));c.server.url=process.env.PULSE_URL;fs.writeFileSync("capacitor.config.json",JSON.stringify(c,null,2))'
           fi
-          cd mobile
-          node -e 'const fs=require("fs");const c=JSON.parse(fs.readFileSync("capacitor.config.json"));c.server.url=process.env.PULSE_URL.replace(/\/$/,"");fs.writeFileSync("capacitor.config.json",JSON.stringify(c,null,2))'
+          grep url mobile/capacitor.config.json 2>/dev/null || grep url capacitor.config.json
       - name: Install aur sync
         run: cd mobile && npm ci && npx cap sync android
       - name: Android licenses
