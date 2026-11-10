@@ -61,6 +61,7 @@ Wo baad ka kadam hai.
 ## Privacy aur suraksha (jo bana hai)
 - **Email verify zaroori:** signup ke baad Firebase ek mail bhejta hai. Link par click kiye bina koi post, chat, swipe ya nearby nahi kar sakta. Ye rules me bhi laga hai (`email_verified`), sirf screen par nahi. Mail Spam me ja sakti hai; Firebase console > Authentication > Templates me mail ka text/naam badal sakte ho.
 - Sirf 18+ (rules me bhi check hai). Umar sirf user ke likhne par based hai, asli ID verification abhi nahi.
+- **Live chat:** "likh raha hai...", "✓✓ Dekha", bina padhe message ka nishaan, aur upar Live/Offline ka pill.
 - Match ke bina koi message nahi bhej sakta (rules rokte hain). Block karne par dono taraf message band.
 - Nearby: location tabhi save hoti hai jab user khud ON kare, aur ~1 km ke daayre me mota-mota (rounded). Doosron ki location wahi padh sakta hai jisne khud bhi share ki ho. Band karte hi record hat jaata hai.
 - Report ke record Firestore me `reports` collection me jama hote hain (console me dekh sakte ho).

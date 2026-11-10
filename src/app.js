@@ -92,7 +92,7 @@ import {
     $("pName").textContent = ME.name; $("pHandle").textContent = ME.city || "";
     $("eName").value = ME.name || ""; $("eCity").value = ME.city || ""; $("eWork").value = ME.work || ""; $("eAbout").value = ME.about || ""; $("eLooking").value = ME.looking || "Dosti";
     getDocs(query(collection(db, "blocks"), where("blocker", "==", UID))).then(function (s) { blocked = new Set(); s.forEach(function (d) { blocked.add(d.data().blocked); }); }).catch(function () {}).then(function () {
-      listenFeed(); listenMatches(); refreshLocToggle(); showTab("feed");
+      listenFeed(); listenMatches(); refreshLocToggle(); showTab("feed"); setLive();
     });
   }
   function init(cfg) {
@@ -104,7 +104,7 @@ import {
         if (signingUp) return;
         afterAuth(u);
       } else {
-        stopAll(); UID = null; ME = null; showForms(); $("auth").hidden = false; $("convo").classList.remove("open"); activeChat = null;
+        stopAll(); UID = null; ME = null; $("livePill").hidden = true; showForms(); $("auth").hidden = false; $("convo").classList.remove("open"); activeChat = null;
       }
     });
   }
@@ -293,14 +293,54 @@ import {
           var m = snapData(ch.doc), other = m.users.filter(function (x) { return x !== UID; })[0];
           if (blocked.has(other) || (ch.doc.metadata && ch.doc.metadata.hasPendingWrites)) return;
           if (ch.type === "added" && !matchWith) { userName(other).then(function (n) { toast("🎉 Naya match: " + n); }); $("chatDot").hidden = false; }
-          else if (ch.type === "modified" && m.lastFrom && m.lastFrom !== UID && !(activeChat && activeChat.mid === ch.doc.id)) { userName(other).then(function (n) { toast("💬 " + n + ": " + String(m.lastText).slice(0, 40)); }); $("chatDot").hidden = false; }
+          else if (ch.type === "modified" && m.lastFrom && m.lastFrom !== UID && ms(m.lastAt) !== lastSeenAt[ch.doc.id] && !(activeChat && activeChat.mid === ch.doc.id)) { userName(other).then(function (n) { toast("💬 " + n + ": " + String(m.lastText).slice(0, 40)); }); $("chatDot").hidden = false; }
         });
       }
       firstMatches = false;
-      matchDocs = snap.docs.map(function (d) { var m = snapData(d); return { mid: d.id, id: m.users.filter(function (x) { return x !== UID; })[0], last: m.lastText, at: ms(m.lastAt) }; }).filter(function (c) { return !blocked.has(c.id); }).sort(function (a, b) { return b.at - a.at; });
-      renderChats();
+      snap.docs.forEach(function (d) { var m = snapData(d); lastSeenAt[d.id] = ms(m.lastAt); });
+      matchDocs = snap.docs.map(function (d) {
+        var m = snapData(d), o = m.users.filter(function (x) { return x !== UID; })[0];
+        var ty = m["typing_" + o] ? ms(m["typing_" + o]) : 0;
+        if (ty && typingSeen[d.id] !== undefined && typingSeen[d.id] !== ty) typingUntil[d.id] = Date.now() + 6000;
+        if (!ty) typingUntil[d.id] = 0;
+        typingSeen[d.id] = ty;
+        var mySeen = m["seen_" + UID] ? ms(m["seen_" + UID]) : 0, theirSeen = m["seen_" + o] ? ms(m["seen_" + o]) : 0;
+        return { mid: d.id, id: o, last: m.lastText, at: ms(m.lastAt), lastFrom: m.lastFrom, theirSeen: theirSeen, unread: !!(m.lastFrom && m.lastFrom !== UID && ms(m.lastAt) > mySeen) };
+      }).filter(function (c) { return !blocked.has(c.id); }).sort(function (a, b) { return b.at - a.at; });
+      renderChats(); liveStatus();
     }, function (e) { toast(errMsg(e)); }));
   }
+  // ---- connection pill: Live / Offline ----
+  function setLive() { var on = navigator.onLine !== false, p = $("livePill"); p.hidden = !UID; p.classList.toggle("off", !on); $("liveTxt").textContent = on ? "Live" : "Offline"; }
+  window.addEventListener("online", function () { setLive(); toast("Wapas online 🟢"); }); window.addEventListener("offline", function () { setLive(); toast("Internet nahi hai. Message wapas aate hi chale jaayenge."); });
+  // ---- live status: "likh raha hai...", "Dekha", unread ----
+  var lastSeenAt = {}, typingSeen = {}, typingUntil = {}, typingT = null, lastTypingSent = 0, typingOn = false;
+  function curMatch() { if (!activeChat || activeChat.ai) return null; for (var i = 0; i < matchDocs.length; i++) if (matchDocs[i].mid === activeChat.mid) return matchDocs[i]; return null; }
+  function liveStatus() {
+    var c = curMatch(); if (!c) return;
+    var left = (typingUntil[c.mid] || 0) - Date.now(), typing = left > 0;
+    $("convoStatus").textContent = typing ? "likh raha hai..." : "";
+    var body = $("convoBody"), dots = body.querySelector(".typing");
+    if (typing && !dots) { body.appendChild(el('<div class="typing"><i></i><i></i><i></i></div>')); body.scrollTop = body.scrollHeight; }
+    if (!typing && dots) dots.remove();
+    clearTimeout(typingT); if (typing) typingT = setTimeout(liveStatus, left + 50);
+    markSeenTick(c);
+    if (c.unread && !document.hidden) updateDoc(doc(db, "matches", c.mid), obj("seen_" + UID, serverTimestamp())).catch(function () {});
+  }
+  function obj(k, v) { var o = {}; o[k] = v; return o; }
+  function markSeenTick(c) {
+    var old = $("convoBody").querySelector(".seen-tick"); if (old) old.remove();
+    var mine = $("convoBody").querySelectorAll(".bubble.me"); if (!mine.length || !c || c.lastFrom !== UID) return;
+    if (c.theirSeen && c.theirSeen >= c.at) mine[mine.length - 1].insertAdjacentHTML("afterend", '<div class="seen-tick">✓✓ Dekha</div>');
+  }
+  function setTyping(on) {
+    var c = curMatch(); if (!c) return;
+    if (on && Date.now() - lastTypingSent < 4000) return;
+    if (!on && !typingOn) return;
+    typingOn = on; lastTypingSent = on ? Date.now() : 0;
+    updateDoc(doc(db, "matches", c.mid), obj("typing_" + UID, on ? serverTimestamp() : null)).catch(function () {});
+  }
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) liveStatus(); });
   function renderChats() {
     var l = $("chatList"); l.innerHTML = "";
     function row(c, last, sub, ai) {
@@ -311,9 +351,11 @@ import {
     row(SAATHI, "Dil ki baat karo. Main AI hoon, sunne ke liye yahin hoon 💜", "", true);
     var shown = matchDocs.filter(function (c) { return !blocked.has(c.id); });
     shown.forEach(function (c) {
-      var r = row({ id: c.id, mid: c.mid, name: nameCache[c.id] || "..." }, c.last || "Match ho gaya! Hi bolo 👋", c.last ? hm(c.at) : "");
+      var r = row({ id: c.id, mid: c.mid, name: nameCache[c.id] || "..." }, c.last ? ((c.lastFrom === UID ? "Aap: " : "") + c.last) : "Match ho gaya! Hi bolo 👋", c.last ? hm(c.at) : "");
+      if (c.unread && !(activeChat && activeChat.mid === c.mid)) { r.querySelector(".prev").classList.add("unread"); r.appendChild(el('<span class="unread-dot">•</span>')); }
       if (!nameCache[c.id]) userName(c.id).then(function (n) { r.querySelector(".nm").textContent = n; r.querySelector(".av-sm").textContent = n.charAt(0).toUpperCase(); });
     });
+    $("chatDot").hidden = !shown.some(function (c) { return c.unread && !(activeChat && activeChat.mid === c.mid); });
     if (!shown.length) l.appendChild(el('<div class="empty">Abhi koi chat nahi. Discover me swipe karo. Match hote hi chat yahan khulegi.</div>'));
   }
 
@@ -341,11 +383,12 @@ import {
         body.innerHTML = "";
         if (s.empty) body.appendChild(el('<div class="sys">Match ho gaya! Pehla message aap bhejo 👋</div>'));
         s.forEach(function (d) { var m = snapData(d); addBubble({ mine: m.from === UID, text: m.text, at: ms(m.createdAt) }); });
+        liveStatus();
       }, function (e) { toast(errMsg(e)); });
     }
     $("convo").classList.add("open");
   }
-  $("convoBack").addEventListener("click", function () { $("convo").classList.remove("open"); closeMsgListener(); activeChat = null; });
+  $("convoBack").addEventListener("click", function () { setTyping(false); $("convo").classList.remove("open"); closeMsgListener(); activeChat = null; renderChats(); });
 
   var FALLBACK = ["Sunke accha laga. Aur batao, aap kaisa mehsoos kar rahe ho? 💜", "Main samajh sakta hoon. Aap akele nahi ho is me. 🤝", "Ye to badhiya hai! Thoda aur batao 😊", "Thoda ruk ke gehri saans lo. Aap bahut kuch sambhaal rahe ho, wo himmat ki baat hai.", "Kabhi kabhi din bhaari lagte hain. Ek kadam kaafi hai. 🌱"];
   function sendMsg() {
@@ -364,11 +407,14 @@ import {
     }
     var b = writeBatch(db), mref = doc(collection(db, "matches", c.mid, "messages"));
     b.set(mref, { from: UID, text: t, createdAt: serverTimestamp() });
-    b.update(doc(db, "matches", c.mid), { lastText: t, lastAt: serverTimestamp(), lastFrom: UID });
+    var upd = { lastText: t, lastAt: serverTimestamp(), lastFrom: UID }; upd["typing_" + UID] = null; typingOn = false; lastTypingSent = 0;
+    b.update(doc(db, "matches", c.mid), upd);
     b.commit().catch(function (e) { toast(e && e.code === "permission-denied" ? "Ye user available nahi hai" : errMsg(e)); });
   }
   $("sendBtn").addEventListener("click", sendMsg);
   $("msgInput").addEventListener("keydown", function (e) { if (e.key === "Enter") sendMsg(); });
+  var idleT = null;
+  $("msgInput").addEventListener("input", function () { if (!this.value.trim()) { setTyping(false); return; } setTyping(true); clearTimeout(idleT); idleT = setTimeout(function () { setTyping(false); }, 5000); });
 
   $("moreBtn").addEventListener("click", function () {
     if (!activeChat || activeChat.ai) return;

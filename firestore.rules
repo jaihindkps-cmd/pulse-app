@@ -85,8 +85,10 @@ service cloud.firestore {
         && swipeLike(request.resource.data.users[0], request.resource.data.users[1])
         && swipeLike(request.resource.data.users[1], request.resource.data.users[0]);
       allow update: if signedIn() && me() in resource.data.users
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastText', 'lastAt', 'lastFrom'])
-        && request.resource.data.lastFrom == me();
+        // sirf aakhri message ki jaankari, ya apna "likh raha hoon" / "dekh liya" nishaan
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastText', 'lastAt', 'lastFrom', 'typing_' + me(), 'seen_' + me()])
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['lastText', 'lastAt', 'lastFrom'])
+            || request.resource.data.lastFrom == me());
 
       // Messages: sirf match ke dono log, aur koi block na kare.
       match /messages/{msgId} {
