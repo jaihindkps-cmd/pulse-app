@@ -54,9 +54,11 @@ Kuch badla to `public/` me commit karte hi website apne-aap dobara live ho jaati
 Firestore: roz ~50,000 reads, ~20,000 writes, 1 GB data. Hosting: 10 GB. Login (email) free.
 Chhote group (kuch sau log) ke liye kaafi hai. Console me **Usage** tab me dekhte raho. Hadd paar hone par us din ke liye app rukta hai, paisa nahi katta (card jodna padta hi nahi).
 
-## Saathi AI kaisa hai
-Abhi Saathi kuch tay kiye hue pyaar bhare jawab deta hai (hamesha "AI" likha rehta hai). Asli AI jawab ke liye server chahiye (Firebase ka paid Blaze plan, card chahiye).
-Wo baad ka kadam hai.
+## Naye features (AI, Gaana, Call)
+- **Saathi (asli AI):** Firebase AI Logic (Gemini) se live jawab. Chalane ke liye ek baar: Firebase console > **AI Logic** > Get started > **Gemini Developer API**. Jab tak ON nahi, Saathi simple (alag-alag) jawab deta hai. Crisis wale shabdon par helpline (Tele-MANAS 14416) dikhata hai. Hamesha "AI" label.
+- **Gaana Studio:** idea likho, AI bol likhta hai, dhun phone me hi banti hai (7 genre), lyrics sync, WAV download, feed pe post. Ye asli gayak ki awaaz nahi hai: dhun instrumental hai, bol phone ki awaaz se padh sakte ho. AI band ho to template se bhi bana deta hai.
+- **Voice call + Walkie-talkie:** matched dost ke chat me upar ke icons. Awaaz seedhi dono phone ke beech (WebRTC). Koi server nahi, isliye kuch network (jaise kuch mobile data) par call na jud paaye to wahi limit hai. Call tabhi ring hoti hai jab doosre ka app khula ho (push notification nahi).
+- **Nearby live:** list apne aap update hoti hai. Profile me "Doston ko bulao" se invite link.
 
 ## Privacy aur suraksha (jo bana hai)
 - **Email verify zaroori:** signup ke baad Firebase ek mail bhejta hai. Link par click kiye bina koi post, chat, swipe ya nearby nahi kar sakta. Ye rules me bhi laga hai (`email_verified`), sirf screen par nahi. Mail Spam me ja sakti hai; Firebase console > Authentication > Templates me mail ka text/naam badal sakte ho.
@@ -67,7 +69,7 @@ Wo baad ka kadam hai.
 - Report ke record Firestore me `reports` collection me jama hote hain (console me dekh sakte ho).
 
 ## Abhi nahi hai
-Phone OTP, photo upload, ID verification badge, spam rokne ki limit, moderation page, asli AI Saathi, push notification, Play Store release.
+Phone OTP, photo upload, ID verification badge, spam rokne ki limit, moderation page, push notification, Play Store release.
 
 ## Developer ke liye
 `src/app.js` me app ka code hai. Badalne ke baad `npm install` aur `npm run build` chalao (ye `public/app.js` banata hai), phir commit karo.

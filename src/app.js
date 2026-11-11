@@ -5,6 +5,9 @@ import {
   initializeFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, collection, addDoc, query, where, orderBy, limit,
   getDocs, onSnapshot, serverTimestamp, arrayUnion, arrayRemove, Timestamp, writeBatch
 } from "firebase/firestore";
+import { initAI, chat as aiChat, json as aiJson, aiWorking } from "./ai.js";
+import { buildSong, Player, renderWav, GENRES } from "./music.js";
+import * as Call from "./call.js";
 
 (function () {
   "use strict";
@@ -83,7 +86,7 @@ import {
   });
   $("logoutBtn").addEventListener("click", function () { signOut(auth).then(function () { toast("Logout ho gaye"); }); });
 
-  function stopAll() { unsubs.forEach(function (u) { try { u(); } catch (e) {} }); unsubs = []; }
+  function stopAll() { stopNearby(); endCall(false); player.stop(); unsubs.forEach(function (u) { try { u(); } catch (e) {} }); unsubs = []; }
 
   // ---- start / stop ----
   function start() {
@@ -99,6 +102,7 @@ import {
     var app = initializeApp(cfg);
     auth = getAuth(app);
     db = initializeFirestore(app, { experimentalAutoDetectLongPolling: true });
+    initAI(app);
     onAuthStateChanged(auth, function (u) {
       if (u) {
         if (signingUp) return;
@@ -138,13 +142,13 @@ import {
   $("vOut").addEventListener("click", function () { signOut(auth); });
 
   // ---- tabs ----
-  var titles = { feed: "Pulse", discover: "Discover", nearby: "Nearby", chats: "Messages", profile: "Profile" };
-  var screens = ["feed", "discover", "nearby", "chats", "profile"];
+  var titles = { feed: "Pulse", discover: "Discover", nearby: "Nearby", studio: "Gaana Studio", chats: "Messages", profile: "Profile" };
+  var screens = ["feed", "discover", "nearby", "studio", "chats", "profile"];
   function showTab(name) {
     screens.forEach(function (s) { $("screen-" + s).hidden = s !== name; });
     document.querySelectorAll(".tab").forEach(function (t) { t.classList.toggle("active", t.getAttribute("data-tab") === name); });
     $("screenTitle").textContent = titles[name];
-    if (name === "discover") loadDeck(); if (name === "nearby") loadNearby(); if (name === "chats") $("chatDot").hidden = true;
+    if (name === "discover") loadDeck(); if (name === "nearby") loadNearby(); else stopNearby(); if (name === "studio") renderLib(); if (name === "chats") $("chatDot").hidden = true;
   }
   document.querySelectorAll(".tab").forEach(function (t) { t.addEventListener("click", function () { if (UID) showTab(t.getAttribute("data-tab")); }); });
 
@@ -240,7 +244,17 @@ import {
   }
   function stopShare() { return deleteDoc(doc(db, "presence", UID)).then(function () { $("locToggle").classList.remove("on"); toast("Location sharing band"); }).catch(function (e) { toast(errMsg(e)); }); }
   function refreshLocToggle() { getDoc(doc(db, "presence", UID)).then(function (s) { $("locToggle").classList.toggle("on", s.exists()); }).catch(function () {}); }
+  var nearUnsub = null, nearTimer = null;
+  function stopNearby() { if (nearUnsub) { nearUnsub(); nearUnsub = null; } clearInterval(nearTimer); nearTimer = null; }
+  function invite() {
+    var url = location.origin + location.pathname, text = "Pulse pe aao: dosti, dating, gaana aur live chat. Join karo:";
+    if (navigator.share) navigator.share({ title: "Pulse", text: text, url: url }).catch(function () {});
+    else if (navigator.clipboard) navigator.clipboard.writeText(text + " " + url).then(function () { toast("Invite link copy ho gaya 📋"); }).catch(function () { toast(url); });
+    else toast(url);
+  }
+  $("inviteBtn").addEventListener("click", invite);
   function loadNearby() {
+    stopNearby();
     getDoc(doc(db, "presence", UID)).then(function (mine) {
       var box = $("nearbyBox"); box.innerHTML = "";
       if (!mine.exists()) {
@@ -248,25 +262,32 @@ import {
         $("shareLoc").addEventListener("click", shareLocation); return;
       }
       var me = mine.data();
-      getPos(function (lat, lng) { publishPresence(lat, lng).catch(function () {}); me = { lat: round2(lat), lng: round2(lng) }; render(me); }, function () { render(me); });
+      function go(m) { me = m; render(m); }
+      getPos(function (lat, lng) { publishPresence(lat, lng).catch(function () {}); go({ lat: round2(lat), lng: round2(lng) }); }, function () { go(me); });
       function render(m) {
         box.innerHTML = "";
-        box.appendChild(el('<div class="nearby-banner">Aapki location ON hai. Sirf opt-in log dikh rahe hain.<button id="stopShare">Band karo</button></div>'));
-        $("stopShare").addEventListener("click", function () { stopShare().then(loadNearby); });
+        box.appendChild(el('<div class="nearby-banner">🟢 Live: aapki location ON hai. Sirf opt-in log dikh rahe hain.<button id="stopShare">Band karo</button></div>'));
+        $("stopShare").addEventListener("click", function () { stopNearby(); stopShare().then(loadNearby); });
+        var list = el('<div></div>'); box.appendChild(list);
         var since = Timestamp.fromMillis(Date.now() - 6 * 3600e3);
-        getDocs(query(collection(db, "presence"), where("updatedAt", ">", since), limit(200))).then(function (s) {
+        nearUnsub = onSnapshot(query(collection(db, "presence"), where("updatedAt", ">", since), limit(200)), function (s) {
           var rows = [];
-          s.forEach(function (d) { if (d.id === UID || blocked.has(d.id)) return; var p = d.data(); var k = distKm(m.lat, m.lng, p.lat, p.lng); if (k <= 50) rows.push({ id: d.id, p: p, km: k }); });
+          s.forEach(function (d) { if (d.id === UID || blocked.has(d.id)) return; var p = snapData(d); var k = distKm(m.lat, m.lng, p.lat, p.lng); if (k <= 50) rows.push({ id: d.id, p: p, km: k }); });
           rows.sort(function (a, b) { return a.km - b.km; });
-          if (!rows.length) { box.appendChild(el('<div class="empty">Abhi aas-paas (50 km) koi aur opt-in user nahi. Doston ko bulao! 👋</div>')); return; }
-          box.appendChild(el('<div class="section-title">Abhi aas-paas</div>'));
+          list.innerHTML = "";
+          if (!rows.length) { var em = el('<div class="empty">Abhi aas-paas (50 km) koi aur opt-in user nahi. Doston ko bulao! 👋<br><button class="btn-grad" id="nearInvite" style="margin-top:12px;padding:11px 18px">📨 Invite bhejo</button></div>'); list.appendChild(em); em.querySelector("#nearInvite").addEventListener("click", invite); return; }
+          list.appendChild(el('<div class="section-title">Abhi aas-paas · ' + rows.length + ' log (live)</div>'));
           rows.slice(0, 50).forEach(function (r) {
             var dist = r.km < 1 ? "1 km se kam" : "~" + Math.round(r.km) + " km";
             var row = el('<div class="nearby-row"><div class="av-sm" style="width:50px;height:50px;font-size:18px;background:' + g(r.id) + '">' + ini(r.p.name) + '</div><div class="body"><div class="nm">' + esc(r.p.name) + (r.p.age ? ", " + esc(r.p.age) : "") + '</div><div class="meta">📍 ' + dist + ' · ' + esc(r.p.work || r.p.city || "Pulse member") + '</div></div><button class="wave">💬 Chat</button></div>');
-            row.querySelector(".wave").addEventListener("click", function () { toast("Pehle Discover me match karo, phir chat khulega 💜"); });
-            box.appendChild(row);
+            row.querySelector(".wave").addEventListener("click", function () {
+              var mt = matchDocs.filter(function (x) { return x.id === r.id; })[0];
+              if (mt) { showTab("chats"); openChat({ id: r.id, mid: mt.mid, name: r.p.name }); } else toast("Pehle Discover me match karo, phir chat khulega 💜");
+            });
+            list.appendChild(row);
           });
-        }).catch(function (e) { toast(errMsg(e)); });
+        }, function (e) { toast(errMsg(e)); });
+        nearTimer = setInterval(function () { if (document.hidden) return; getPos(function (lat, lng) { publishPresence(lat, lng).catch(function () {}); }, function () {}); }, 300000);
       }
     }).catch(function (e) { toast(errMsg(e)); });
   }
@@ -292,6 +313,7 @@ import {
         snap.docChanges().forEach(function (ch) {
           var m = snapData(ch.doc), other = m.users.filter(function (x) { return x !== UID; })[0];
           if (blocked.has(other) || (ch.doc.metadata && ch.doc.metadata.hasPendingWrites)) return;
+          if (ch.type === "modified" && m.lastFrom && m.lastFrom !== UID) maybeIncoming(ch.doc.id, m, other);
           if (ch.type === "added" && !matchWith) { userName(other).then(function (n) { toast("🎉 Naya match: " + n); }); $("chatDot").hidden = false; }
           else if (ch.type === "modified" && m.lastFrom && m.lastFrom !== UID && ms(m.lastAt) !== lastSeenAt[ch.doc.id] && !(activeChat && activeChat.mid === ch.doc.id)) { userName(other).then(function (n) { toast("💬 " + n + ": " + String(m.lastText).slice(0, 40)); }); $("chatDot").hidden = false; }
         });
@@ -361,28 +383,30 @@ import {
 
   function addBubble(m) {
     var sys = $("convoBody").querySelector(".sys"); if (sys) sys.remove();
-    $("convoBody").appendChild(el('<div class="bubble ' + (m.mine ? "me" : "them") + '">' + esc(m.text) + '<span class="t">' + hm(m.at) + '</span></div>'));
-    $("convoBody").scrollTop = $("convoBody").scrollHeight;
+    var b = el('<div class="bubble ' + (m.mine ? "me" : "them") + '">' + esc(m.text) + '<span class="t">' + hm(m.at) + '</span></div>');
+    $("convoBody").appendChild(b); $("convoBody").scrollTop = $("convoBody").scrollHeight; return b;
   }
   function closeMsgListener() { if (msgUnsub) { msgUnsub(); msgUnsub = null; } }
   function openChat(c) {
-    closeMsgListener(); activeChat = c;
+    closeMsgListener(); if (!c.ai && nameCache[c.id]) c.name = nameCache[c.id]; activeChat = c;
+    if (!c.ai && (!c.name || c.name === "...")) userName(c.id).then(function (n) { c.name = n; if (activeChat === c) { $("convoName").textContent = n; $("convoAv").textContent = ini(n); } });
     var av = $("convoAv"); av.textContent = c.ai ? "✦" : ini(c.name); av.style.background = g(c.id);
     $("convoName").innerHTML = esc(c.name) + (c.ai ? '<span class="ai-pill">AI</span>' : ""); $("convoStatus").textContent = c.ai ? "Hamesha online" : "";
-    $("moreBtn").hidden = !!c.ai;
+    $("moreBtn").hidden = !!c.ai; $("callBtn").hidden = $("wtBtn").hidden = !!c.ai;
     var body = $("convoBody"); body.innerHTML = "";
     if (c.ai) {
       body.appendChild(el('<div class="ai-note">✦ Saathi ek AI companion hai, asli insaan nahi. Ye baat karne aur sunne ke liye hai, doctor ya counsellor ka vikalp nahi. Zyada pareshan ho to kisi apne se ya helpline se zaroor baat karo.</div>'));
       getDocs(query(collection(db, "users", UID, "saathi"), orderBy("createdAt", "asc"), limit(60))).then(function (s) {
         if (activeChat !== c) return;
+        saathiHist = [];
         if (s.empty) addBubble({ mine: false, text: "Namaste " + ME.name + " 🙏 Main Saathi hoon, ek AI. Din kaisa raha?", at: Date.now() });
-        s.forEach(function (d) { var m = snapData(d); addBubble({ mine: m.role === "user", text: m.text, at: ms(m.createdAt) }); });
+        s.forEach(function (d) { var m = snapData(d); addBubble({ mine: m.role === "user", text: m.text, at: ms(m.createdAt) }); saathiHist.push({ role: m.role === "user" ? "user" : "model", text: m.text }); });
       }).catch(function () {});
     } else {
       msgUnsub = onSnapshot(query(collection(db, "matches", c.mid, "messages"), orderBy("createdAt", "asc"), limit(200)), function (s) {
         body.innerHTML = "";
         if (s.empty) body.appendChild(el('<div class="sys">Match ho gaya! Pehla message aap bhejo 👋</div>'));
-        s.forEach(function (d) { var m = snapData(d); addBubble({ mine: m.from === UID, text: m.text, at: ms(m.createdAt) }); });
+        s.forEach(function (d) { var m = snapData(d); if (m.call && m.call.k === "answer") return; addBubble({ mine: m.from === UID, text: m.text, at: ms(m.createdAt) }); });
         liveStatus();
       }, function (e) { toast(errMsg(e)); });
     }
@@ -390,21 +414,41 @@ import {
   }
   $("convoBack").addEventListener("click", function () { setTyping(false); $("convo").classList.remove("open"); closeMsgListener(); activeChat = null; renderChats(); });
 
-  var FALLBACK = ["Sunke accha laga. Aur batao, aap kaisa mehsoos kar rahe ho? 💜", "Main samajh sakta hoon. Aap akele nahi ho is me. 🤝", "Ye to badhiya hai! Thoda aur batao 😊", "Thoda ruk ke gehri saans lo. Aap bahut kuch sambhaal rahe ho, wo himmat ki baat hai.", "Kabhi kabhi din bhaari lagte hain. Ek kadam kaafi hai. 🌱"];
+  var saathiHist = [], fbIdx = 0, saathiBusy = false;
+  var SAATHI_SYS = "Tum 'Saathi' ho, Pulse app ka AI companion. Tum ek AI ho, insaan nahi: kabhi insaan hone ka, asli girlfriend/boyfriend hone ka ya bhavnayein 'mehsoos' karne ka dava mat karo; agar koi puche to saaf batao ki tum AI ho. Hinglish me (Roman Hindi) chhote, garm, natural jawab do: 2-4 vakya, kabhi-kabhi ek emoji. Pehle suno aur samjho, phir ek halka sawaal ya chhota sujhaav do. Har baar alag shabdon me bolo, pichhla jawab dohrao mat. Tum doctor/therapist nahi ho; dawa, diagnosis ya kanooni salaah mat do. Gaali, hinsa, nafrat ya vayask-yaun baatein nahi. Koi phone number, address ya doosre logon ki niji jaankari mat maango ya dedo. Agar user khud ko nuksan pahunchane ki baat kare to pyaar se kaho ki kisi apne se ya helpline se turant baat kare.";
+  var CRISIS = /(suicide|sucide|khudkushi|khud\s*kushi|mar\s*jana|marna\s*chahta|marna\s*chahti|jaan\s*de|jeena\s*nahi|jeene\s*ka\s*mann\s*nahi|zindagi\s*khatam|khud\s*ko\s*(khatam|nuksan|hurt|maar)|end\s*my\s*life|kill\s*myself|self[\s-]*harm)/i;
+  var CRISIS_REPLY = "Mujhe aapki fikr ho rahi hai, aur aap ye baat share kar paaye, ye zaroori hai. 💜 Main AI hoon aur is waqt aapko asli insaan ki madad chahiye. Abhi kisi apne ko phone karo ya paas baitho. India me Tele-MANAS (free, 24x7): 14416 ya 1-800-891-4416. Khatre me ho to 112. Kya aap abhi surakshit jagah par ho?";
+  var OFFLINE = [
+    function (t) { return "Aapne kaha: \"" + t.slice(0, 40) + (t.length > 40 ? "..." : "") + "\". Ye sunke dhyaan aaya. Is baat me sabse bhaari kya lag raha hai? 💜"; },
+    function () { return "Main samajh raha hoon. Chalo ek chhoti si cheez: abhi 3 gehri saansein lo, phir mujhe bataao kya sabse pehle theek karna chahoge? 🌱"; },
+    function () { return "Bilkul, aap jaldi mein nahi ho. Is baat ka koi ek pal batao jab sab thoda halka laga tha? ✨"; },
+    function () { return "Ye bahut kuch hai sambhalne ko. Isme se kaunsi cheez aapke control me hai aur kaunsi nahi? 🤝"; },
+    function () { return "Sun raha hoon. Thoda aur khol ke bataoge? Kab se aisa lag raha hai? 🙂"; }
+  ];
+  function offlineReply(t) { var r = OFFLINE[fbIdx++ % OFFLINE.length](t); return r; }
+  function saathiTalk(c, t) {
+    var col = collection(db, "users", UID, "saathi");
+    addBubble({ mine: true, text: t, at: Date.now() });
+    addDoc(col, { role: "user", text: t, createdAt: serverTimestamp() }).catch(function () {});
+    saathiHist.push({ role: "user", text: t });
+    function finish(txt) { saathiHist.push({ role: "model", text: txt }); saathiHist = saathiHist.slice(-14); addDoc(col, { role: "assistant", text: txt, createdAt: serverTimestamp() }).catch(function () {}); saathiBusy = false; }
+    if (CRISIS.test(t)) { setTimeout(function () { if (activeChat === c) addBubble({ mine: false, text: CRISIS_REPLY, at: Date.now() }); finish(CRISIS_REPLY); }, 500); return; }
+    if (saathiBusy) return; saathiBusy = true;
+    var typing = el('<div class="typing"><i></i><i></i><i></i></div>'); $("convoBody").appendChild(typing); $("convoBody").scrollTop = 1e9;
+    var bub = null;
+    aiChat(SAATHI_SYS + " User ka naam: " + ME.name + ".", saathiHist.slice(-12), function (part) {
+      if (activeChat !== c) return; typing.remove();
+      if (!bub) bub = addBubble({ mine: false, text: part, at: Date.now() });
+      else { bub.firstChild.nodeValue = part; $("convoBody").scrollTop = 1e9; }
+    }).then(function (full) { typing.remove(); $("convoStatus").textContent = "AI online ✦"; if (activeChat === c && !bub) addBubble({ mine: false, text: full, at: Date.now() }); finish(full); })
+      .catch(function () {
+        typing.remove(); var r = offlineReply(t); $("convoStatus").textContent = "AI band: simple jawab";
+        if (activeChat === c) { if (bub) bub.remove(); addBubble({ mine: false, text: r, at: Date.now() }); } finish(r);
+      });
+  }
   function sendMsg() {
     var inp = $("msgInput"), t = clean(inp.value, 1000); if (!t || !activeChat) return; var c = activeChat; inp.value = "";
-    if (c.ai) {
-      addBubble({ mine: true, text: t, at: Date.now() });
-      var col = collection(db, "users", UID, "saathi");
-      addDoc(col, { role: "user", text: t, createdAt: serverTimestamp() }).catch(function () {});
-      var typing = el('<div class="typing"><i></i><i></i><i></i></div>'); $("convoBody").appendChild(typing); $("convoBody").scrollTop = 1e9;
-      setTimeout(function () {
-        typing.remove(); var r = FALLBACK[Math.floor(Math.random() * FALLBACK.length)];
-        if (activeChat === c) addBubble({ mine: false, text: r, at: Date.now() });
-        addDoc(col, { role: "assistant", text: r, createdAt: serverTimestamp() }).catch(function () {});
-      }, 900 + Math.random() * 600);
-      return;
-    }
+    if (c.ai) { saathiTalk(c, t); return; }
     var b = writeBatch(db), mref = doc(collection(db, "matches", c.mid, "messages"));
     b.set(mref, { from: UID, text: t, createdAt: serverTimestamp() });
     var upd = { lastText: t, lastAt: serverTimestamp(), lastFrom: UID }; upd["typing_" + UID] = null; typingOn = false; lastTypingSent = 0;
@@ -429,6 +473,148 @@ import {
       addDoc(collection(db, "reports"), { from: UID, to: u.id, reason: "Chat se report", createdAt: serverTimestamp() }).then(function () { toast("Report bhej di. Shukriya."); box.remove(); }).catch(function (e) { toast(errMsg(e)); });
     });
   });
+
+  // ---- Gaana Studio ----
+  var player = new Player(), curSong = null, curMeta = null, LIBKEY = "pulse_songs_v1";
+  Object.keys(GENRES).forEach(function (k) { $("stGenre").appendChild(new Option(GENRES[k].name, k)); });
+  var SONG_SYS = "Tum ek geetkaar ho. Sirf ORIGINAL bol likho: kisi maujooda gaane ke bol ya kisi artist ki nakal nahi. Hinglish (Roman Hindi) me likho. Sirf JSON do: {\"title\":string,\"minor\":boolean,\"bpm\":number(70-130),\"lines\":[{\"section\":\"Verse 1\"|\"Chorus\"|\"Verse 2\"|\"Bridge\",\"text\":string}]}. Theek 8 se 12 lines, har line 4-9 shabd, Chorus ki 2 line do baar aa sakti hain. Gaali, hinsa, nafrat, vayask baatein aur asli logon ke naam nahi.";
+  function fallbackSong(idea, genre, mood) {
+    var w = idea.split(/\s+/).filter(function (x) { return x.length > 3; }), k = (w[0] || "zindagi").replace(/[^\p{L}\p{N}]/gu, "") || "zindagi", k2 = w[1] || "khushi";
+    var L = [["Verse 1", "Aaj phir " + k + " ki yaad aayi"], ["Verse 1", "Dil ne chupke se awaaz lagayi"], ["Verse 1", "Raaton ke saath chalti hai " + k2], ["Verse 1", "Subah ne naye rang bikhraye"],
+      ["Chorus", "Chal chal re dil, chal chal re"], ["Chorus", "Har pal naya safar hai"], ["Chorus", "Chal chal re dil, chal chal re"], ["Chorus", "Tu hai to sab sundar hai"],
+      ["Verse 2", "Raaste mushkil sahi, par haunsla hai"], ["Verse 2", "Ek muskaan se roshan jahan hai"], ["Chorus", "Chal chal re dil, chal chal re"], ["Chorus", "Har pal naya safar hai"]];
+    return { title: k.charAt(0).toUpperCase() + k.slice(1) + " ki dhun", minor: mood === "udaas" || mood === "shaanti", bpm: 0, lines: L.map(function (x) { return { section: x[0], text: x[1] }; }) };
+  }
+  function normSong(j) {
+    var lines = (j && Array.isArray(j.lines) ? j.lines : []).map(function (x) { return { section: clean(x && x.section, 20), text: clean(x && x.text, 90) }; }).filter(function (x) { return x.text; }).slice(0, 12);
+    if (lines.length < 4) return null;
+    return { title: clean(j.title, 60) || "Meri dhun", minor: !!j.minor, bpm: +j.bpm || 0, lines: lines };
+  }
+  function showSong(meta) {
+    player.stop(); $("stPlay").textContent = "▶ Chalao"; $("stBar").style.width = "0";
+    curMeta = meta; curSong = buildSong({ genre: meta.genre, bpm: meta.bpm, minor: meta.minor, title: meta.title, lines: meta.lines });
+    $("stTitle").textContent = meta.title; $("stMeta").textContent = GENRES[meta.genre].name + " · " + curSong.bpm + " BPM · " + Math.round(curSong.duration) + " sec · AI bol + browser me bani dhun";
+    var box = $("stLyrics"); box.innerHTML = ""; var last = "";
+    meta.lines.forEach(function (l, i) { if (l.section !== last) { box.appendChild(el('<div class="sec">' + esc(l.section) + '</div>')); last = l.section; } box.appendChild(el('<div class="ln" data-i="' + i + '">' + esc(l.text) + '</div>')); });
+    $("stResult").hidden = false;
+  }
+  function loadLib() { try { return JSON.parse(localStorage.getItem(LIBKEY) || "[]"); } catch (e) { return []; } }
+  function saveLib(meta) { try { var l = loadLib().filter(function (x) { return x.title !== meta.title; }); l.unshift(meta); localStorage.setItem(LIBKEY, JSON.stringify(l.slice(0, 20))); } catch (e) {} renderLib(); }
+  function renderLib() {
+    var box = $("stLib"); box.innerHTML = ""; var l = loadLib();
+    if (!l.length) { box.appendChild(el('<div class="empty">Abhi koi dhun nahi. Upar idea likho aur pehla gaana banao 🎶</div>')); return; }
+    l.forEach(function (m) { var r = el('<div class="st-song"><span>🎵</span><b>' + esc(m.title) + '</b><span>' + esc(GENRES[m.genre] ? GENRES[m.genre].name : "") + '</span></div>'); r.addEventListener("click", function () { showSong(m); $("stResult").scrollIntoView({ behavior: "smooth" }); }); box.appendChild(r); });
+  }
+  $("stMake").addEventListener("click", function () {
+    var idea = clean($("stPrompt").value, 300), genre = $("stGenre").value, mood = $("stMood").value, btn = this;
+    if (!idea) { toast("Pehle gaane ka idea likho"); return; }
+    btn.disabled = true; $("stNote").textContent = "AI bol likh raha hai...";
+    aiJson(SONG_SYS, "Idea: " + idea + "\nGenre: " + GENRES[genre].name + (mood ? "\nMood: " + mood : "")).then(normSong).then(function (sp) { if (!sp) throw new Error("bad"); $("stNote").textContent = "AI ne bol likhe ✦"; return sp; })
+      .catch(function () { $("stNote").textContent = "AI abhi band hai, isliye simple template se bana. (Firebase me AI Logic ON karoge to asli AI bol aayenge.)"; return fallbackSong(idea, genre, mood); })
+      .then(function (sp) { var meta = { title: sp.title, genre: genre, bpm: sp.bpm, minor: sp.minor, lines: sp.lines }; showSong(meta); saveLib(meta); })
+      .catch(function (e) { toast(errMsg(e)); }).then(function () { btn.disabled = false; });
+  });
+  function speak(t) { try { if ($("stVoice").checked && window.speechSynthesis) { speechSynthesis.cancel(); var u = new SpeechSynthesisUtterance(t); u.lang = "hi-IN"; u.rate = 0.9; u.pitch = 1.05; speechSynthesis.speak(u); } } catch (e) {} }
+  $("stPlay").addEventListener("click", function () {
+    if (!curSong) return;
+    if (player.playing) { player.stop(); try { speechSynthesis.cancel(); } catch (e) {} this.textContent = "▶ Chalao"; return; }
+    var btn = this; btn.textContent = "⏹ Roko";
+    player.play(curSong, {
+      onLine: function (i) { document.querySelectorAll("#stLyrics .ln").forEach(function (n) { n.classList.toggle("on", +n.getAttribute("data-i") === i); }); if (i >= 0) speak(curMeta.lines[i].text); },
+      onTick: function (s, t) { $("stBar").style.width = Math.min(100, s / t * 100) + "%"; },
+      onEnd: function () { btn.textContent = "▶ Chalao"; $("stBar").style.width = "0"; }
+    }).catch(function (e) { btn.textContent = "▶ Chalao"; toast(errMsg(e)); });
+  });
+  $("stWav").addEventListener("click", function () {
+    if (!curSong) return; var btn = this; btn.disabled = true; btn.textContent = "Ban raha hai...";
+    renderWav(curSong).then(function (r) { var a = document.createElement("a"); a.href = URL.createObjectURL(r.blob); a.download = (curMeta.title || "pulse-gaana").replace(/[^\w\-]+/g, "_") + ".wav"; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000); toast("WAV download ho gaya ⬇"); })
+      .catch(function (e) { toast(errMsg(e)); }).then(function () { btn.disabled = false; btn.textContent = "⬇ WAV"; });
+  });
+  $("stPost").addEventListener("click", function () {
+    if (!curMeta) return; var btn = this; btn.disabled = true;
+    var txt = clean("🎵 " + curMeta.title + " (" + GENRES[curMeta.genre].name + ", Pulse Gaana Studio AI)\n" + curMeta.lines.slice(0, 4).map(function (l) { return l.text; }).join(" / "), 500);
+    addDoc(collection(db, "posts"), { uid: UID, name: ME.name, text: txt, likedBy: [], createdAt: serverTimestamp() }).then(function () { toast("Feed pe post ho gaya 🎉"); }).catch(function (e) { toast(errMsg(e)); }).then(function () { btn.disabled = false; });
+  });
+
+  // ---- Voice call + walkie-talkie (WebRTC; signaling Firestore messages se) ----
+  var CALL = null, callTick = null;
+  function callShow(show) { $("callUI").hidden = !show; }
+  function callSetup(name, sub, opts) {
+    $("callName").textContent = name; $("callSub").textContent = sub; $("callAv").textContent = (name || "?").charAt(0).toUpperCase();
+    $("callAccept").hidden = !opts.incoming; $("callMute").hidden = !!opts.incoming || opts.walkie; $("ptt").hidden = !opts.walkie || !!opts.incoming; $("callMute").classList.remove("on"); $("callMute").textContent = "Mute"; callShow(true);
+  }
+  function callMsg(mid, text, call, touchMatch) {
+    var b = writeBatch(db), mref = doc(collection(db, "matches", mid, "messages"));
+    b.set(mref, { from: UID, text: text, call: call, createdAt: serverTimestamp() });
+    if (touchMatch) b.update(doc(db, "matches", mid), { lastText: text, lastAt: serverTimestamp(), lastFrom: UID });
+    return b.commit();
+  }
+  function onRemote(stream) { var a = $("callAudio"); a.srcObject = stream; a.play().catch(function () {}); }
+  function onState(st) {
+    if (!CALL) return;
+    if (st === "connected" && !CALL.connected) { CALL.connected = true; clearTimeout(CALL.timeout); CALL.t0 = Date.now(); if (CALL.mode === "walkie" && !CALL.muteInit) { CALL.muteInit = true; setMic(false); $("ptt").hidden = false; $("callAccept").hidden = true; }
+      callTick = setInterval(function () { if (!CALL) return; var s = Math.floor((Date.now() - CALL.t0) / 1000); $("callSub").textContent = (CALL.mode === "walkie" ? "Walkie-talkie · " : "Call · ") + Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); }, 500); }
+    if ((st === "failed" || st === "closed") && !CALL.ending) endCall(true, "Connection nahi ban paya (network). Dobara try karo.");
+  }
+  function setMic(on) { if (CALL && CALL.stream) CALL.stream.getAudioTracks().forEach(function (t) { t.enabled = on; }); }
+  function watchCall() {
+    var cur = CALL; if (!cur) return;
+    cur.unsub = onSnapshot(query(collection(db, "matches", cur.mid, "messages"), orderBy("createdAt", "desc"), limit(8)), function (s) {
+      s.forEach(function (d) {
+        var m = d.data(); if (!m.call || m.call.id !== cur.id || m.from === UID || CALL !== cur) return;
+        if (m.call.k === "answer" && cur.role === "out" && !cur.answered && cur.pc) { cur.answered = true; Call.applyAnswer(cur.pc, m.call.sdp).catch(function () { endCall(true, "Call jud nahi paayi"); }); }
+        if (m.call.k === "end") endCall(false, cur.connected ? "Call khatam" : "Call nahi uthi");
+      });
+    });
+  }
+  function startCall(mode) {
+    if (!activeChat || activeChat.ai || CALL) return;
+    if (!Call.supported()) { toast("Is browser me call nahi chalti. Chrome/Android app use karo."); return; }
+    var c = activeChat, id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    Call.getMic().then(function (stream) {
+      CALL = { mid: c.mid, id: id, role: "out", mode: mode, stream: stream, name: c.name, peer: c.id };
+      callSetup(c.name, "Ring ho rahi hai...", { walkie: mode === "walkie" });
+      return Call.makeOffer(stream, onRemote, onState).then(function (o) {
+        if (!CALL || CALL.id !== id) { o.pc.close(); return; }
+        CALL.pc = o.pc; watchCall();
+        CALL.timeout = setTimeout(function () { if (CALL && CALL.id === id && !CALL.connected) endCall(true, "Jawab nahi mila"); }, 45000);
+        return callMsg(c.mid, mode === "walkie" ? "📻 Walkie-talkie" : "📞 Voice call", { k: "offer", id: id, mode: mode, sdp: o.sdp }, true);
+      });
+    }).catch(function (e) { endCall(false); toast(e && e.name === "NotAllowedError" ? "Mic ki permission chahiye. Browser settings me allow karo." : errMsg(e)); });
+  }
+  function endCall(notify, msg) {
+    var c = CALL; if (!c) return; c.ending = true; CALL = null; clearInterval(callTick); clearTimeout(c.timeout);
+    if (c.unsub) try { c.unsub(); } catch (e) {}
+    if (c.stream) c.stream.getTracks().forEach(function (t) { t.stop(); }); if (c.pc) try { c.pc.close(); } catch (e) {}
+    $("callAudio").srcObject = null; callShow(false);
+    if (notify && c.mid) callMsg(c.mid, "📞 Call khatam", { k: "end", id: c.id }, true).catch(function () {});
+    if (msg) toast(msg);
+  }
+  function maybeIncoming(mid, m, other) {
+    if (CALL || !/^(📞 Voice|📻)/.test(m.lastText || "") || Date.now() - ms(m.lastAt) > 40000) return;
+    getDocs(query(collection(db, "matches", mid, "messages"), orderBy("createdAt", "desc"), limit(6))).then(function (s) {
+      if (CALL) return; var offer = null, ended = {};
+      s.forEach(function (d) { var x = d.data(); if (!x.call) return; if (x.call.k === "end") ended[x.call.id] = 1; else if (x.call.k === "offer" && x.from !== UID && !offer) offer = x.call; });
+      if (!offer || ended[offer.id]) return;
+      userName(other).then(function (n) {
+        if (CALL) return; CALL = { mid: mid, id: offer.id, role: "in", mode: offer.mode, offer: offer.sdp, name: n, peer: other };
+        callSetup(n, offer.mode === "walkie" ? "📻 Walkie-talkie aa raha hai" : "📞 Aapko call aa rahi hai", { incoming: true }); try { navigator.vibrate && navigator.vibrate([300, 150, 300]); } catch (e) {}
+        watchCall(); CALL.timeout = setTimeout(function () { if (CALL && CALL.id === offer.id && !CALL.connected) endCall(false, "Missed call"); }, 40000);
+      });
+    }).catch(function () {});
+  }
+  $("callAccept").addEventListener("click", function () {
+    var c = CALL; if (!c || c.role !== "in") return; this.hidden = true; $("callSub").textContent = "Jud rahe hain...";
+    Call.getMic().then(function (stream) { c.stream = stream; return Call.makeAnswer(stream, c.offer, onRemote, onState); })
+      .then(function (a) { c.pc = a.pc; $("callMute").hidden = c.mode === "walkie"; $("ptt").hidden = c.mode !== "walkie"; return callMsg(c.mid, "📞 Jawab", { k: "answer", id: c.id, sdp: a.sdp }, false); })
+      .catch(function (e) { endCall(true); toast(e && e.name === "NotAllowedError" ? "Mic ki permission chahiye" : errMsg(e)); });
+  });
+  $("callEnd").addEventListener("click", function () { endCall(true); });
+  $("callMute").addEventListener("click", function () { if (!CALL) return; var on = this.classList.toggle("on"); setMic(!on); this.textContent = on ? "Unmute" : "Mute"; });
+  (function () { var p = $("ptt"); function dn(e) { e.preventDefault(); setMic(true); p.classList.add("live"); p.textContent = "🎙 Bol rahe ho..."; } function up() { setMic(false); p.classList.remove("live"); p.textContent = "🎙 Dabake bolo"; }
+    p.addEventListener("pointerdown", dn); p.addEventListener("pointerup", up); p.addEventListener("pointerleave", up); p.addEventListener("pointercancel", up); })();
+  $("callBtn").addEventListener("click", function () { startCall("call"); });
+  $("wtBtn").addEventListener("click", function () { startCall("walkie"); });
 
   // ---- boot ----
   setMode("login");
