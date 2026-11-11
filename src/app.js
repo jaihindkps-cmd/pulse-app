@@ -383,7 +383,7 @@ import * as Call from "./call.js";
 
   function addBubble(m) {
     var sys = $("convoBody").querySelector(".sys"); if (sys) sys.remove();
-    var b = el('<div class="bubble ' + (m.mine ? "me" : "them") + '">' + esc(m.text) + '<span class="t">' + hm(m.at) + '</span></div>');
+    var b = el('<div class="bubble ' + (m.mine ? "me" : "them") + '">' + esc(m.text) + (m.warn ? '<span class="warn">⚠️ Savdhan: paisa, OTP ya bank details kabhi mat bhejo. Shak ho to Report karo.</span>' : '') + '<span class="t">' + hm(m.at) + '</span></div>');
     $("convoBody").appendChild(b); $("convoBody").scrollTop = $("convoBody").scrollHeight; return b;
   }
   function closeMsgListener() { if (msgUnsub) { msgUnsub(); msgUnsub = null; } }
@@ -392,7 +392,7 @@ import * as Call from "./call.js";
     if (!c.ai && (!c.name || c.name === "...")) userName(c.id).then(function (n) { c.name = n; if (activeChat === c) { $("convoName").textContent = n; $("convoAv").textContent = ini(n); } });
     var av = $("convoAv"); av.textContent = c.ai ? "✦" : ini(c.name); av.style.background = g(c.id);
     $("convoName").innerHTML = esc(c.name) + (c.ai ? '<span class="ai-pill">AI</span>' : ""); $("convoStatus").textContent = c.ai ? "Hamesha online" : "";
-    $("moreBtn").hidden = !!c.ai; $("callBtn").hidden = $("wtBtn").hidden = !!c.ai;
+    $("moreBtn").hidden = !!c.ai; $("medBar").hidden = true; $("callBtn").hidden = $("wtBtn").hidden = !!c.ai;
     var body = $("convoBody"); body.innerHTML = "";
     if (c.ai) {
       body.appendChild(el('<div class="ai-note">✦ Saathi ek AI companion hai, asli insaan nahi. Ye baat karne aur sunne ke liye hai, doctor ya counsellor ka vikalp nahi. Zyada pareshan ho to kisi apne se ya helpline se zaroor baat karo.</div>'));
@@ -406,7 +406,19 @@ import * as Call from "./call.js";
       msgUnsub = onSnapshot(query(collection(db, "matches", c.mid, "messages"), orderBy("createdAt", "asc"), limit(200)), function (s) {
         body.innerHTML = "";
         if (s.empty) body.appendChild(el('<div class="sys">Match ho gaya! Pehla message aap bhejo 👋</div>'));
-        s.forEach(function (d) { var m = snapData(d); if (m.call && m.call.k === "answer") return; addBubble({ mine: m.from === UID, text: m.text, at: ms(m.createdAt) }); });
+        var med = { state: "off" }, hist = [];
+        s.forEach(function (d) {
+          var m = snapData(d); if (m.call && m.call.k === "answer") return;
+          if (m.med) {
+            var k = m.med.k, sys = body.querySelector(".sys"); if (sys) sys.remove();
+            if (k === "ask") med = { state: "pending", asker: m.from }; else if (k === "yes" && med.state === "pending" && m.from !== med.asker) med = { state: "on" }; else if (k === "off" || k === "no") med = { state: "off" };
+            body.appendChild(el(k === "say" ? '<div class="med-note"><b>🤝 AI Mediator</b>' + esc(String(m.text).replace(/^🤝 AI Mediator:\s*/, "")) + '</div>' : '<div class="med-note"><b>🤝 Mediator</b>' + esc(m.text) + '</div>'));
+            return;
+          }
+          hist.push({ from: m.from, text: m.text });
+          addBubble({ mine: m.from === UID, text: m.text, at: ms(m.createdAt), warn: m.from !== UID && SCAM_MONEY.test(m.text) });
+        });
+        c.med = med; c.hist = hist; renderMed(); body.scrollTop = body.scrollHeight;
         liveStatus();
       }, function (e) { toast(errMsg(e)); });
     }
@@ -449,6 +461,7 @@ import * as Call from "./call.js";
   function sendMsg() {
     var inp = $("msgInput"), t = clean(inp.value, 1000); if (!t || !activeChat) return; var c = activeChat; inp.value = "";
     if (c.ai) { saathiTalk(c, t); return; }
+    if (SCAM_MONEY.test(t) || PII.test(t)) { if (!window.confirm("⚠️ Safety: paisa, OTP, bank details, phone number ya link bhejna risky ho sakta hai. Pehle bharosa banao. Phir bhi bhejna hai?")) { inp.value = t; return; } }
     var b = writeBatch(db), mref = doc(collection(db, "matches", c.mid, "messages"));
     b.set(mref, { from: UID, text: t, createdAt: serverTimestamp() });
     var upd = { lastText: t, lastAt: serverTimestamp(), lastFrom: UID }; upd["typing_" + UID] = null; typingOn = false; lastTypingSent = 0;
@@ -464,11 +477,12 @@ import * as Call from "./call.js";
     if (!activeChat || activeChat.ai) return;
     var body = $("convoBody"); if (body.querySelector(".safety")) return;
     var u = activeChat;
-    var box = el('<div class="ai-note safety">' + esc(u.name) + ' ke saath: <button class="btn-outline" id="doBlock" style="margin:8px 4px 0;padding:8px 14px">Block karo</button><button class="btn-outline" id="doReport" style="margin:8px 4px 0;padding:8px 14px">Report karo</button></div>');
+    var box = el('<div class="ai-note safety">' + esc(u.name) + ' ke saath: <button class="btn-outline" id="doBlock" style="margin:8px 4px 0;padding:8px 14px">Block karo</button><button class="btn-outline" id="doReport" style="margin:8px 4px 0;padding:8px 14px">Report karo</button><button class="btn-outline" id="doMeet" style="margin:8px 4px 0;padding:8px 14px">📍 Safe meet</button><div style="font-size:12px;margin-top:8px;color:var(--muted)">Pehli mulaqat: din me, public jagah, kisi apne ko batakar. Emergency: 112.</div></div>');
     body.appendChild(box); body.scrollTop = 1e9;
     $("doBlock").addEventListener("click", function () {
       setDoc(doc(db, "blocks", UID + "_" + u.id), { blocker: UID, blocked: u.id, createdAt: serverTimestamp() }).then(function () { blocked.add(u.id); toast("Block kar diya"); $("convo").classList.remove("open"); closeMsgListener(); activeChat = null; renderChats(); }).catch(function (e) { toast(errMsg(e)); });
     });
+    $("doMeet").addEventListener("click", function () { safeMeet(u); });
     $("doReport").addEventListener("click", function () {
       addDoc(collection(db, "reports"), { from: UID, to: u.id, reason: "Chat se report", createdAt: serverTimestamp() }).then(function () { toast("Report bhej di. Shukriya."); box.remove(); }).catch(function (e) { toast(errMsg(e)); });
     });
@@ -615,6 +629,47 @@ import * as Call from "./call.js";
     p.addEventListener("pointerdown", dn); p.addEventListener("pointerup", up); p.addEventListener("pointerleave", up); p.addEventListener("pointercancel", up); })();
   $("callBtn").addEventListener("click", function () { startCall("call"); });
   $("wtBtn").addEventListener("click", function () { startCall("walkie"); });
+
+  // ---- AI Mediator (dono ki marzi se) + safety ----
+  var SCAM_MONEY = /(\botp\b|\bupi\b|paytm|gpay|phonepe|bank\s*(account|details)|account\s*number|card\s*number|\bcvv\b|paise\s*(bhej|do|chahiye)|money\s*(send|transfer)|gift\s*card|crypto|bitcoin|\bloan\b|invest(ment)?\b|udhar)/i;
+  var PII = /(\b\d{10}\b|https?:\/\/|www\.)/i;
+  var MED_SYS = "Tum 'Mediator' ho: ek nishpaksh AI jo do logon ki baatcheet me madad karta hai. Dono ne tumhe ye chat padhne ki ijazat di hai. Kisi ka paksh mat lo. Hinglish me, 900 akshar se kam, is tarah likho: 1) Dono ki baat, ek-ek line me (naam se). 2) Jahan dono sehmat hain. 3) Ek chhota agla kadam. 4) Ek vinamr line jo pehla vyakti doosre se keh sake. Agar chat me dhamki, gaali, zabardasti, blackmail ya paisa maangna dikhe to sulah ki jagah saaf kaho ki jisko asurakshit lage wo Block/Report kare aur zaroorat par 112 ya 1091 (mahila helpline) par call kare. Doctor/vakeel jaisi salaah mat do. Koi naya personal data mat maango.";
+  function medMsg(mid, text, med, touch) {
+    var b = writeBatch(db), mref = doc(collection(db, "matches", mid, "messages"));
+    b.set(mref, { from: UID, text: String(text).slice(0, 950), med: med, createdAt: serverTimestamp() });
+    if (touch) b.update(doc(db, "matches", mid), { lastText: String(text).slice(0, 80), lastAt: serverTimestamp(), lastFrom: UID });
+    return b.commit().catch(function (e) { toast(errMsg(e)); });
+  }
+  function renderMed() {
+    var c = activeChat, bar = $("medBar"); if (!c || c.ai || !c.med) { bar.hidden = true; return; }
+    var st = c.med, h = "";
+    if (st.state === "off") h = '<span class="tx">🤝 AI Mediator: jab dono haan kahein tabhi ye chat padhta hai.</span><button id="medAsk">Mediator bulao</button>';
+    else if (st.state === "pending" && st.asker === UID) h = '<span class="tx">Doosre ki haan ka intezaar...</span><button class="o" id="medOff">Radd karo</button>';
+    else if (st.state === "pending") h = '<span class="tx">' + esc(c.name) + ' AI Mediator chahte hain. Haan = dono ki chat ke aakhri 12 msg AI padhega.</span><button id="medYes">Haan</button><button class="o" id="medNo">Naa</button>';
+    else h = '<span class="tx">✅ Mediator ON (dono ki marzi). Kabhi bhi band kar sakte ho.</span><button id="medHelp">Madad maango</button><button class="o" id="medOff">Band karo</button>';
+    bar.innerHTML = h; bar.hidden = false;
+    var q = function (id, f) { var n = $(id); if (n) n.addEventListener("click", f); };
+    q("medAsk", function () { medMsg(c.mid, "Mediator ki request bheji gayi. Doosre ki haan chahiye.", { k: "ask" }, true); });
+    q("medYes", function () { medMsg(c.mid, "Dono ne haan kaha. AI Mediator ON.", { k: "yes" }, true); });
+    q("medNo", function () { medMsg(c.mid, "Mediator ki request radd.", { k: "no" }, false); });
+    q("medOff", function () { medMsg(c.mid, "Mediator band kar diya gaya.", { k: "off" }, false); });
+    q("medHelp", function () { mediate(c); });
+  }
+  var medBusy = false;
+  function mediate(c) {
+    if (medBusy || !c.hist || !c.hist.length) { toast(c.hist && c.hist.length ? "Ruko..." : "Pehle thodi baat to karo"); return; }
+    medBusy = true; var btn = $("medHelp"); if (btn) { btn.disabled = true; btn.textContent = "Soch raha hai..."; }
+    var names = {}; names[UID] = ME.name; names[c.id] = c.name;
+    var tr = c.hist.slice(-12).map(function (m) { return (names[m.from] || "?") + ": " + m.text; }).join("\n");
+    var fallback = "AI abhi band hai, to ek simple tareeka:\n1) Ek-ek karke apni baat 'main ... mehsoos karta/karti hoon' se shuru karo.\n2) Doosre ko bina beech me toke poora suno.\n3) Jahan sehmat ho wo likho, phir ek chhota hal chuno.\n4) Dhamki ya zabardasti lage to Block/Report karo.";
+    aiChat(MED_SYS, [{ role: "user", text: "Chat (" + names[UID] + " aur " + names[c.id] + "):\n" + tr }]).catch(function () { return fallback; })
+      .then(function (t) { return medMsg(c.mid, "🤝 AI Mediator: " + t, { k: "say" }, true); }).then(function () { medBusy = false; });
+  }
+  function safeMeet(u) {
+    var where = window.prompt("Kahan aur kab milna hai? (jaise: Phoenix Mall, Lucknow, kal 5 baje)"); if (!where) return;
+    var text = "Safety check: main " + u.name + " (Pulse match) se milne ja raha/rahi hoon. Jagah/samay: " + where.slice(0, 120) + ". Kripya 1 ghante baad mujhe call karke check karna.";
+    if (navigator.share) navigator.share({ text: text }).catch(function () {}); else if (navigator.clipboard) navigator.clipboard.writeText(text).then(function () { toast("Copy ho gaya. Apne bharose ke insaan ko bhejo 📋"); }); else toast(text);
+  }
 
   // ---- boot ----
   setMode("login");

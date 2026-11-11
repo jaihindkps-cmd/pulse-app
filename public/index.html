@@ -404,6 +404,13 @@
   .callbox h3 { margin: 0 0 6px; font-size: 24px; } .call-sub { opacity: .75; margin-bottom: 26px; min-height: 20px; }
   .call-actions { display: flex; gap: 14px; justify-content: center; } .cbtn { border: none; border-radius: 999px; padding: 14px 24px; font-weight: 800; font-size: 15px; color: #fff; cursor: pointer; font-family: var(--font-body); } .cbtn.ok { background: #18c27a; } .cbtn.no { background: #ff4d5e; } .cbtn.mute { background: rgba(255,255,255,.18); } .cbtn.mute.on { background: #fff; color: #111; }
   .ptt { display: block; width: 100%; margin: 0 0 20px; padding: 26px 10px; border-radius: 22px; border: 2px solid rgba(255,255,255,.35); background: rgba(255,255,255,.1); color: #fff; font-size: 18px; font-weight: 800; touch-action: none; user-select: none; font-family: var(--font-body); } .ptt[hidden] { display: none; } .ptt.live { background: #18c27a; border-color: #18c27a; }
+
+  /* ---- Mediator + safety ---- */
+  .med-bar { padding: 8px 12px; font-size: 12.5px; background: color-mix(in srgb, var(--accent) 9%, var(--surface)); border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .med-bar[hidden] { display: none; } .med-bar .tx { flex: 1; min-width: 140px; color: var(--muted); } .med-bar button { border: none; border-radius: 999px; padding: 7px 13px; font-weight: 700; font-size: 12.5px; cursor: pointer; font-family: var(--font-body); background: var(--grad); color: #fff; } .med-bar button.o { background: var(--surface-2); color: var(--fg); }
+  .med-note { margin: 10px auto; max-width: 92%; padding: 11px 13px; border-radius: 14px; font-size: 13.5px; line-height: 1.5; background: color-mix(in srgb, var(--accent) 12%, var(--surface)); border: 1px solid var(--line); white-space: pre-wrap; }
+  .med-note b { display: block; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); margin-bottom: 3px; }
+  .bubble .warn { display: block; margin-top: 6px; font-size: 11.5px; font-weight: 700; color: #d9480f; }
 </style></head><body>
 <div class="app">
   <header class="topbar">
@@ -496,6 +503,7 @@
       <button class="icon-btn" id="wtBtn" aria-label="Walkie-talkie" title="Walkie-talkie">📻</button>
       <button class="icon-btn" id="moreBtn" aria-label="Block ya report" title="Block / Report"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button>
     </div>
+    <div class="med-bar" id="medBar" hidden></div>
     <div class="convo-body" id="convoBody"></div>
     <div class="convo-input">
       <input id="msgInput" maxlength="1000" placeholder="Message likho..." autocomplete="off">

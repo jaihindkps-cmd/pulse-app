@@ -10,7 +10,7 @@ export function aiError() { return lastError; }
 export function aiWorking() { return good; }
 
 function model(name, system, json) {
-  var cfg = { model: name, generationConfig: { temperature: json ? 1 : 0.85, maxOutputTokens: json ? 2200 : 320 } };
+  var cfg = { model: name, generationConfig: { temperature: json ? 1 : 0.85, maxOutputTokens: json ? 2200 : 700 } };
   if (system) cfg.systemInstruction = system;
   if (json) cfg.generationConfig.responseMimeType = "application/json";
   return getGenerativeModel(ai, cfg);
