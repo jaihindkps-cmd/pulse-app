@@ -884,7 +884,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   var dhamPick = null;
   $("bhCreate").addEventListener("click", function () { makeRoom(BHAJANS[+$("bhPick").value], null); });
   function makeRoom(b, dham) {
-    b = b, items = b.l || $("bhOwn").value.split("\n").map(function (x) { return clean(x, 120); }).filter(Boolean).slice(0, 60), name = dham ? dham.n + " Aarti" : clean($("bhName").value, 40) || (b.l ? b.t : "Our Bhajan");
+    var items = b.l || $("bhOwn").value.split("\n").map(function (x) { return clean(x, 120); }).filter(Boolean).slice(0, 60), name = dham ? dham.n + " Aarti" : clean($("bhName").value, 40) || (b.l ? b.t : "Our Bhajan");
     if (!items.length) { toast("Write at least one line"); return; } if (!rate("room", 3, 60000)) return;
     var id = code6(), btn = $("bhCreate"); btn.disabled = true;
     setDoc(doc(db, "rooms", id), { name: name, title: b.l ? b.t : name, host: UID, hostName: ME.name, items: items, line: 0, dham: dham ? dham.id : "", members: [UID], flowers: 0, createdAt: serverTimestamp(), updatedAt: serverTimestamp() })
