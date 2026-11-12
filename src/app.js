@@ -924,7 +924,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     var tb = document.querySelector('.tab[data-tab="discover"]'); tb.lastChild.nodeValue = lab;
     document.querySelector('.tab[data-tab="nearby"]').style.display = (MODE === "friends" || MODE === "dating") ? "" : "none";
     $("mFilterBox").hidden = MODE !== "marriage"; titles.discover = lab; titles.jobs = lab;
-    fillProfileForm();
+    fillProfileForm(); paintStrength();
   }
   function seekOk(a, b) { var sk = a.seeking || "Everyone"; if (sk === "Everyone") return true; return (sk === "Women" && b.gender === "Woman") || (sk === "Men" && b.gender === "Man"); }
   var MF = {}; try { MF = JSON.parse(localStorage.getItem("pulse_mf") || "{}"); } catch (e) {}
@@ -1107,6 +1107,18 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   [$("convoName"), $("convoAv")].forEach(function (n) { n.addEventListener("click", function () { if (activeChat && !activeChat.ai) openProfile(activeChat.id); }); });
   document.addEventListener("click", function (e) { var t = e.target.closest && e.target.closest("[data-uid]"); if (t && UID) openProfile(t.getAttribute("data-uid")); });
 
+
+  // ================= Profile strength + invite =================
+  function profStrength() {
+    var m = MODE, keys = ["name", "age", "city", "about", "photo"].concat(m === "marriage" ? ["religion", "marital", "edu", "height", "diet"] : m === "jobseeker" ? ["field", "skills", "exp", "role", "prefCity"] : m === "recruiter" ? ["company", "desig", "cabout"] : ["work"]);
+    var n = keys.filter(function (k) { return ME[k] != null && ME[k] !== ""; }).length; return Math.round(n * 100 / keys.length);
+  }
+  function paintStrength() {
+    var host = $("pName") && $("pName").parentNode; if (!host) return; var b = $("pStrength");
+    if (!b) { b = el('<div id="pStrength" class="pf-priv" style="margin:10px 0"></div>'); host.appendChild(b); }
+    var v = profStrength(); b.innerHTML = '<b>Profile strength: ' + v + '%</b><div style="height:6px;border-radius:6px;background:rgba(255,255,255,.12);margin:6px 0"><div style="height:6px;border-radius:6px;width:' + v + '%;background:linear-gradient(90deg,#ff5fa2,#ffb86c)"></div></div>' + (v < 100 ? '<span>Complete your profile in the Edit section to get more matches' + (isJobMode() ? " and responses" : "") + ".</span>" : "<span>Great — your profile is complete ✅</span>") + '<div style="margin-top:8px"><button class="btn-outline" id="inviteBtn" style="padding:6px 14px">📣 Invite friends</button></div>';
+    $("inviteBtn").addEventListener("click", function () { var data = { title: "Pulse", text: "Join me on Pulse — friends, dating, marriage and jobs in one app (beta).", url: location.origin + location.pathname }; if (navigator.share) navigator.share(data).catch(function () {}); else if (navigator.clipboard) navigator.clipboard.writeText(data.url).then(function () { toast("Link copied"); }); else toast(data.url); });
+  }
   // ---- boot ----
   initI18n(); setMode("login");
   fetch("firebase-config.json", { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (cfg) {

@@ -9,6 +9,7 @@ service cloud.firestore {
     function me() { return request.auth.uid; }
     // Creator (admin): sirf ye verified email. Isse badalna ho to yahi line badlo.
     function isAdmin() { return request.auth != null && request.auth.token.email_verified == true && request.auth.token.email == 'jaihindkps@gmail.com'; }
+    function myMode() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('mode', 'friends'); }
     function notBanned() { return !exists(/databases/$(database)/documents/bans/$(request.auth.uid)); }
     function inPair(id) { return me() in id.split('_'); }
     function otherOf(id) { return id.split('_')[0] == me() ? id.split('_')[1] : id.split('_')[0]; }
@@ -33,7 +34,13 @@ service cloud.firestore {
         && request.resource.data.get('city', '').size() <= 40
         && request.resource.data.get('work', '').size() <= 60
         && request.resource.data.get('about', '').size() <= 300
-        && request.resource.data.get('photo', '').size() <= 45000;
+        && request.resource.data.get('photo', '').size() <= 45000
+        && request.resource.data.get('mode', 'friends') in ['friends', 'dating', 'marriage', 'jobseeker', 'recruiter']
+        && request.resource.data.get('skills', '').size() <= 200 && request.resource.data.get('resume', '').size() <= 200
+        && request.resource.data.get('company', '').size() <= 100 && request.resource.data.get('cabout', '').size() <= 300
+        && request.resource.data.get('csite', '').size() <= 200 && request.resource.data.get('role', '').size() <= 100
+        && request.resource.data.get('desig', '').size() <= 100 && request.resource.data.get('community', '').size() <= 100
+        && request.resource.data.get('religion', '').size() <= 60 && request.resource.data.get('prefCity', '').size() <= 100;
       allow delete: if loggedIn() && uid == me();
 
       // Saathi AI ki baatein: sirf apni.
@@ -154,10 +161,12 @@ service cloud.firestore {
     // Jobs: recruiter apni job likhta/badalta/hatata hai. Sab verified log padh sakte hain.
     match /jobs/{jid} {
       allow read: if signedIn();
-      allow create: if signedIn() && notBanned() && request.resource.data.rid == me()
+      allow create: if signedIn() && notBanned() && request.resource.data.rid == me() && myMode() == 'recruiter'
+        && request.resource.data.get('status', 'open') in ['open', 'closed'] && request.resource.data.get('skills', '').size() <= 120
         && request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 80
         && request.resource.data.get('desc', '').size() <= 1500 && request.resource.data.get('salary', '').size() <= 40 && request.resource.data.get('company', '').size() <= 60;
       allow update: if signedIn() && resource.data.rid == me() && request.resource.data.rid == me()
+        && request.resource.data.get('status', 'open') in ['open', 'closed']
         && request.resource.data.title is string && request.resource.data.title.size() <= 80;
       allow delete: if signedIn() && resource.data.rid == me();
     }
@@ -170,8 +179,9 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/jobs/$(request.resource.data.jid))
         && get(/databases/$(database)/documents/jobs/$(request.resource.data.jid)).data.rid == request.resource.data.rid
         && aid == request.resource.data.jid + '_' + request.resource.data.seeker
-        && ((request.resource.data.seeker == me() && request.resource.data.status == 'applied')
-            || (request.resource.data.rid == me() && request.resource.data.status == 'invited'));
+        && get(/databases/$(database)/documents/jobs/$(request.resource.data.jid)).data.get('status', 'open') != 'closed'
+        && ((request.resource.data.seeker == me() && request.resource.data.status == 'applied' && myMode() == 'jobseeker')
+            || (request.resource.data.rid == me() && request.resource.data.status == 'invited' && myMode() == 'recruiter'));
       allow update: if signedIn()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
         && ((resource.data.rid == me() && request.resource.data.status in ['shortlisted', 'rejected', 'hired', 'invited'])
