@@ -312,7 +312,9 @@
   .seg button.on { background: var(--surface); color: var(--fg); box-shadow: var(--shadow); }
   .form { display: flex; flex-direction: column; gap: 12px; }
   .form label { display: flex; flex-direction: column; gap: 5px; font-size: 12px; font-weight: 700; color: var(--muted); }
-  .form input, .form select, .form textarea { font-family: var(--font-body); font-size: 15px; color: var(--fg); background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; outline: none; width: 100%; }
+  .form input, .form select, .form textarea { font-family: var(--font-body); font-size: 15px; color: var(--fg); background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; outline: none; width: 100%; transition: border-color .15s, box-shadow .15s, background .15s; }
+  .form input:focus, .form select:focus, .form textarea:focus { border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 3px rgba(124,77,255,.16); }
+  .form input:hover, .form select:hover, .form textarea:hover { border-color: #cfc9e0; }
   .form input:focus, .form select:focus, .form textarea:focus, .composer textarea:focus-visible, .convo-input input:focus { border-color: var(--accent); }
   #signupOnly { display: flex; flex-direction: column; gap: 12px; }
   #signupOnly[hidden] { display: none; }
@@ -448,17 +450,27 @@
   .forgot { display: block; text-align: center; font-size: 12.5px; color: var(--accent); margin-top: 10px; } .sub-h { font-weight: 800; font-size: 13px; margin: 8px 0 -2px; color: var(--accent); }
   .jobs-seg { margin-bottom: 12px; } .jcard { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 14px; margin-bottom: 10px; box-shadow: var(--shadow); } .jcard h4 { margin: 0 0 2px; font-size: 16px; } .jcard .jm { font-size: 12.5px; color: var(--muted); margin-bottom: 8px; } .jcard .jd { font-size: 13.5px; line-height: 1.5; margin-bottom: 10px; } .jcard .jrow { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; } .jcard button { padding: 8px 14px; font-size: 13px; }
   .chip { display: inline-block; font-size: 11.5px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--surface-2); color: var(--muted); margin: 0 4px 4px 0; } .chip.ok { background: #d3f9d8; color: #1b6b2a; } .chip.warn { background: #fff3bf; color: #8a6100; } .chip.no { background: #ffe3e3; color: #b02a2a; } .chip.acc { background: color-mix(in srgb, var(--accent) 14%, var(--surface)); color: var(--accent); }
-  .jfilters { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; } .jfilters select, .jfilters input, .jform select, .jform input, .jform textarea { font-family: var(--font-body); font-size: 14px; color: var(--fg); background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 11px 12px; outline: none; width: 100%; box-sizing: border-box; } .jform { display: flex; flex-direction: column; gap: 10px; }
+  .jfilters { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; } .jfilters select, .jfilters input, .jform select, .jform input, .jform textarea { font-family: var(--font-body); font-size: 14px; color: var(--fg); background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 11px 12px; outline: none; width: 100%; box-sizing: border-box; transition: border-color .15s, box-shadow .15s, background .15s; } .jfilters select:focus, .jfilters input:focus, .jform select:focus, .jform input:focus, .jform textarea:focus { border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 3px rgba(124,77,255,.16); } .jform { display: flex; flex-direction: column; gap: 10px; }
   .scam-note { font-size: 12px; background: #fff3bf; color: #6b4e00; border-radius: 12px; padding: 9px 12px; margin-bottom: 12px; line-height: 1.5; }
   .thread { position: absolute; inset: 0; z-index: 80; background: var(--bg); display: flex; flex-direction: column; } .thread[hidden] { display: none; } .th-log { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 6px; } .th-log .bubble { max-width: 80%; }
   .swipe-card .facts { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 4px; } .swipe-card .facts span { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: rgba(255,255,255,.22); backdrop-filter: blur(4px); }
 .av-lg{width:84px;height:84px;border-radius:50%;margin:0 auto 8px;display:grid;place-items:center;font-size:32px;font-weight:700;color:#fff}.pf-top{text-align:center}.pf-priv{margin:10px 0;padding:8px 10px;border-radius:10px;background:rgba(80,200,140,.12);font-size:12px}
 .auth{align-items:flex-start!important;padding-top:0!important}.auth-card{margin:60px auto 28px!important}#langBtn2{position:fixed!important;top:max(12px,env(safe-area-inset-top,0px));right:14px;z-index:210!important}
 .pw-wrap{position:relative;display:block}.pw-wrap input{width:100%;padding-right:48px!important}.pw-eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:38px;height:38px;border:0;background:transparent;font-size:18px;cursor:pointer;opacity:.7}
-/* performance: no continuous animation or large blur on phones */
+/* performance: the earlier fix killed ALL blur/glass to stop a real hang. The actual cause was
+   continuous animated blur sources (moving gradient blobs behind ::before/::after) plus
+   unbounded queries, not a one-time static backdrop-filter. Keep animation/filter off those
+   moving layers, but restore cheap *static* glass on header/tab-bar/auth-card for a premium
+   look without the GPU cost that caused the freeze. */
 .app::before,.auth::after{filter:none!important;animation:none!important}
-.post,.swipe-card .avatar-big,.auth-card{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
-.tabbar,header.top,.top{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;background:var(--surface)!important}
+.swipe-card .avatar-big{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+.post{box-shadow:0 4px 18px rgba(42,26,74,.07);transition:box-shadow .15s}
+.post:hover{box-shadow:0 10px 28px rgba(42,26,74,.12)}
+.auth-card{backdrop-filter:saturate(160%) blur(14px)!important;-webkit-backdrop-filter:saturate(160%) blur(14px)!important;background:rgba(255,255,255,.82)!important;border:1px solid rgba(255,255,255,.6)}
+.tabbar,header.top,.top{backdrop-filter:saturate(180%) blur(16px)!important;-webkit-backdrop-filter:saturate(180%) blur(16px)!important;background:rgba(255,255,255,.72)!important}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .auth-card{background:rgba(22,19,31,.78)!important;border-color:rgba(255,255,255,.08)}:root:not([data-theme="light"]) .tabbar,:root:not([data-theme="light"]) header.top,:root:not([data-theme="light"]) .top{background:rgba(22,19,31,.68)!important}}
+:root[data-theme="dark"] .auth-card{background:rgba(22,19,31,.78)!important;border-color:rgba(255,255,255,.08)}
+:root[data-theme="dark"] .tabbar,:root[data-theme="dark"] header.top,:root[data-theme="dark"] .top{background:rgba(22,19,31,.68)!important}
 .screen{will-change:auto;overscroll-behavior:contain}
 .bio-card{border:1px solid var(--line);border-radius:14px;margin:10px 0;overflow:hidden}.bio-h{background:linear-gradient(90deg,var(--accent),var(--accent-2));color:#fff;font-weight:700;padding:8px 12px;font-size:14px}.bio-row{display:flex;justify-content:space-between;gap:10px;padding:7px 12px;border-top:1px solid var(--line);font-size:13.5px}.bio-k{color:var(--faint);font-weight:600}.bio-v{text-align:right;font-weight:600}
 </style></head><body>
