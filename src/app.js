@@ -209,7 +209,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   $("postBtn").addEventListener("click", function () {
     var t = clean(postText.value, 500); if (!t || !rate("post", 4, 60000)) return; this.disabled = true;
     autoFlag(t, "post"); addDoc(collection(db, "posts"), { uid: UID, name: ME.name, text: t, likedBy: [], createdAt: serverTimestamp() })
-      .then(function () { postText.value = ""; postText.style.height = "auto"; $("charCount").textContent = "0/500"; toast("Post ho gaya 🎉"); })
+      .then(function () { postText.value = ""; postText.style.height = "auto"; $("charCount").textContent = "0/500"; toast("Post ho gaya 🎉"); bump("cPosts"); })
       .catch(function (e) { toast(errMsg(e)); $("postBtn").disabled = false; });
   });
   function listenFeed() {
@@ -260,13 +260,14 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     var u = topUser, c = topCard; c.style.transition = "transform .35s"; c.style.transform = "translateX(" + (kind === "like" ? 600 : -600) + "px) rotate(" + (kind === "like" ? 30 : -30) + "deg)";
     queue.shift();
     setDoc(doc(db, "swipes", UID + "_" + u.id), { from: UID, to: u.id, kind: kind, createdAt: serverTimestamp() }).then(function () {
+      bump("cSwipes");
       if (kind !== "like") return;
       return getDoc(doc(db, "swipes", u.id + "_" + UID)).then(function (s) {
         if (!s.exists() || s.data().kind !== "like") return;
         var mref = doc(db, "matches", pairId(UID, u.id)), ids = [UID, u.id].sort();
         return getDoc(mref).then(function (m) {
           if (m.exists()) { showMatch(u); return; } // doosre ne pehle hi match bana diya
-          return setDoc(mref, { users: ids, createdAt: serverTimestamp(), lastText: "", lastAt: serverTimestamp(), lastFrom: "" }).then(function () { showMatch(u); });
+          return setDoc(mref, { users: ids, createdAt: serverTimestamp(), lastText: "", lastAt: serverTimestamp(), lastFrom: "" }).then(function () { showMatch(u); bump("cMatches"); });
         });
       });
     }).catch(function (e) { toast(errMsg(e)); });
@@ -511,7 +512,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     var col = collection(db, "users", UID, "saathi");
     addBubble({ mine: true, text: t, at: Date.now() });
     addDoc(col, { role: "user", text: t, createdAt: serverTimestamp() }).catch(function () {});
-    saathiHist.push({ role: "user", text: t });
+    saathiHist.push({ role: "user", text: t }); bump("cAi");
     function finish(txt) { saathiHist.push({ role: "model", text: txt }); saathiHist = saathiHist.slice(-14); addDoc(col, { role: "assistant", text: txt, createdAt: serverTimestamp() }).catch(function () {}); saathiBusy = false; }
     if (CRISIS.test(t)) { setTimeout(function () { if (activeChat === c) addBubble({ mine: false, text: CRISIS_REPLY, at: Date.now() }); finish(CRISIS_REPLY); }, 500); return; }
     if (saathiBusy) return; saathiBusy = true;
@@ -537,7 +538,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     b.set(mref, { from: UID, text: t, createdAt: serverTimestamp() });
     var upd = { lastText: t, lastAt: serverTimestamp(), lastFrom: UID }; upd["typing_" + UID] = null; typingOn = false; lastTypingSent = 0;
     b.update(doc(db, "matches", c.mid), upd);
-    b.commit().catch(function (e) { toast(e && e.code === "permission-denied" ? "Ye user available nahi hai" : errMsg(e)); });
+    b.commit().then(function () { bump("cMsgs"); }).catch(function (e) { toast(e && e.code === "permission-denied" ? "Ye user available nahi hai" : errMsg(e)); });
   }
   $("sendBtn").addEventListener("click", sendMsg);
   $("msgInput").addEventListener("keydown", function (e) { if (e.key === "Enter") sendMsg(); });
@@ -604,6 +605,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     if (!curSong) return;
     if (player.playing) { player.stop(); try { speechSynthesis.cancel(); } catch (e) {} this.textContent = "▶ Chalao"; return; }
     var btn = this; btn.textContent = "⏹ Roko";
+    bump("cSongs");
     player.play(curSong, {
       onLine: function (i) { document.querySelectorAll("#stLyrics .ln").forEach(function (n) { n.classList.toggle("on", +n.getAttribute("data-i") === i); }); if (i >= 0) speak(curMeta.lines[i].text); },
       onTick: function (s, t) { $("stBar").style.width = Math.min(100, s / t * 100) + "%"; },
@@ -618,7 +620,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   $("stPost").addEventListener("click", function () {
     if (!curMeta) return; var btn = this; btn.disabled = true;
     var txt = clean("🎵 " + curMeta.title + " (" + GENRES[curMeta.genre].name + ", Pulse Gaana Studio AI)\n" + curMeta.lines.slice(0, 4).map(function (l) { return l.text; }).join(" / "), 500);
-    addDoc(collection(db, "posts"), { uid: UID, name: ME.name, text: txt, likedBy: [], createdAt: serverTimestamp() }).then(function () { toast("Feed pe post ho gaya 🎉"); }).catch(function (e) { toast(errMsg(e)); }).then(function () { btn.disabled = false; });
+    addDoc(collection(db, "posts"), { uid: UID, name: ME.name, text: txt, likedBy: [], createdAt: serverTimestamp() }).then(function () { toast("Feed pe post ho gaya 🎉"); bump("cPosts"); }).catch(function (e) { toast(errMsg(e)); }).then(function () { btn.disabled = false; });
   });
 
   // ---- Voice call + walkie-talkie (WebRTC; signaling Firestore messages se) ----
@@ -663,7 +665,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
         if (!CALL || CALL.id !== id) { o.pc.close(); return; }
         CALL.pc = o.pc; watchCall();
         CALL.timeout = setTimeout(function () { if (CALL && CALL.id === id && !CALL.connected) endCall(true, "Jawab nahi mila"); }, 45000);
-        return callMsg(c.mid, mode === "walkie" ? "📻 Walkie-talkie" : "📞 Voice call", { k: "offer", id: id, mode: mode, sdp: o.sdp }, true);
+        return callMsg(c.mid, mode === "walkie" ? "📻 Walkie-talkie" : "📞 Voice call", { k: "offer", id: id, mode: mode, sdp: o.sdp }, true).then(function (r) { bump("cCalls"); return r; });
       });
     }).catch(function (e) { endCall(false); toast(e && e.name === "NotAllowedError" ? "Mic ki permission chahiye. Browser settings me allow karo." : errMsg(e)); });
   }
@@ -741,6 +743,21 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     var text = "Safety check: main " + u.name + " (Pulse match) se milne ja raha/rahi hoon. Jagah/samay: " + where.slice(0, 120) + ". Kripya 1 ghante baad mujhe call karke check karna.";
     if (navigator.share) navigator.share({ text: text }).catch(function () {}); else if (navigator.clipboard) navigator.clipboard.writeText(text).then(function () { toast("Copy ho gaya. Apne bharose ke insaan ko bhejo 📋"); }); else toast(text);
   }
+
+  // ---- activity counters (admin monitoring only -- counts, never message content) ----
+  // Flat top-level fields (not dotted paths) so counts update the same way in every
+  // Firestore client. See ACTIVITY_FIELDS below for what each one means.
+  function bump(field, n) {
+    if (!UID) return;
+    var upd = {}; upd[field] = increment(n || 1);
+    updateDoc(doc(db, "users", UID), upd).catch(function () {});
+  }
+  var ACTIVITY_FIELDS = [
+    { k: "cPosts", lbl: "Posts" }, { k: "cMsgs", lbl: "Msgs" }, { k: "cSwipes", lbl: "Swipes" },
+    { k: "cMatches", lbl: "Matches" }, { k: "cApps", lbl: "Applications" }, { k: "cJobs", lbl: "Jobs posted" },
+    { k: "cCalls", lbl: "Calls" }, { k: "cSongs", lbl: "Songs played" }, { k: "cRooms", lbl: "Aarti rooms" },
+    { k: "cAi", lbl: "AI chats" }
+  ];
 
   // ---- throttle (spam rokne ke liye) ----
   var rateLog = {};
@@ -864,7 +881,9 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
       var joined = u.createdAt ? ago(ms(u.createdAt)) : "—";
       var active = last ? (online ? "online now 🟢" : ago(last) + " se offline") : "kabhi active nahi hua";
       var isPrem = !!premiumSet[u.id], isBanned = !!bannedSet[u.id];
-      var row = el('<div class="cr-row" data-notr style="flex-wrap:wrap;gap:4px 10px;align-items:center"><b>' + esc(u.name || "(no name)") + '</b>' + chip(u.mode || "friends") + (u.hidden ? chip("paused") : "") + (u.verified ? ' <span title="Identity verified">✔️</span>' : "") + (isPrem ? chip("⭐ Premium") : "") + (isBanned ? chip("🚫 Banned") : "") + '<span style="color:var(--faint);font-size:12px">joined ' + esc(joined) + ' · ' + esc(active) + '</span><div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap"><button class="btn-outline cm-prem" style="padding:2px 10px">' + (isPrem ? "Premium hatao" : "Premium do") + '</button><button class="btn-outline cm-ban" style="padding:2px 10px">' + (isBanned ? "Unban" : "Ban") + '</button></div></div>');
+      var acts = ACTIVITY_FIELDS.filter(function (f) { return +u[f.k] > 0; }).map(function (f) { return u[f.k] + " " + f.lbl; });
+      var actLine = acts.length ? acts.join(" · ") : "No activity yet";
+      var row = el('<div class="cr-row" data-notr style="flex-wrap:wrap;gap:4px 10px;align-items:center"><b>' + esc(u.name || "(no name)") + '</b>' + chip(u.mode || "friends") + (u.hidden ? chip("paused") : "") + (u.verified ? ' <span title="Identity verified">✔️</span>' : "") + (isPrem ? chip("⭐ Premium") : "") + (isBanned ? chip("🚫 Banned") : "") + '<span style="color:var(--faint);font-size:12px">joined ' + esc(joined) + ' · ' + esc(active) + '</span><div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap"><button class="btn-outline cm-prem" style="padding:2px 10px">' + (isPrem ? "Premium hatao" : "Premium do") + '</button><button class="btn-outline cm-ban" style="padding:2px 10px">' + (isBanned ? "Unban" : "Ban") + '</button></div><div style="width:100%;color:var(--faint);font-size:12px">' + esc(actLine) + '</div></div>');
       row.querySelector(".cm-prem").addEventListener("click", function () {
         var ref = doc(db, "premium", u.id);
         (isPrem ? deleteDoc(ref) : setDoc(ref, { at: serverTimestamp(), by: UID })).then(function () { if (isPrem) delete premiumSet[u.id]; else premiumSet[u.id] = true; toast(isPrem ? "Premium removed" : "Premium granted"); paintMembers(); }).catch(function (e) { toast(errMsg(e)); });
@@ -943,7 +962,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     if (!items.length) { toast("Write at least one line"); return; } if (!rate("room", 3, 60000)) return;
     var id = code6(), btn = $("bhCreate"); btn.disabled = true;
     setDoc(doc(db, "rooms", id), { name: name, title: b.l ? b.t : name, host: UID, hostName: ME.name, items: items, line: 0, dham: dham ? dham.id : "", members: [UID], flowers: 0, createdAt: serverTimestamp(), updatedAt: serverTimestamp() })
-      .then(function () { enterRoom(id); }).catch(function (e) { toast(e && e.code === "permission-denied" ? "Rooms need the latest rules (ask the creator to publish them)" : errMsg(e)); }).then(function () { btn.disabled = false; });
+      .then(function () { enterRoom(id); bump("cRooms"); }).catch(function (e) { toast(e && e.code === "permission-denied" ? "Rooms need the latest rules (ask the creator to publish them)" : errMsg(e)); }).then(function () { btn.disabled = false; });
   }
   function joinRoom(code) {
     code = clean(code, 8).toUpperCase(); if (!code) return;
@@ -951,7 +970,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
       if (!s.exists()) { toast("Room not found"); return; }
       var m = s.data().members || []; if (m.indexOf(UID) >= 0) return enterRoom(code);
       if (m.length >= 12) { toast("Room is full"); return; }
-      return updateDoc(doc(db, "rooms", code), { members: arrayUnion(UID), updatedAt: serverTimestamp() }).then(function () { addDoc(collection(db, "rooms", code, "msgs"), { from: UID, name: ME.name, text: "🙏 joined", createdAt: serverTimestamp() }).catch(function () {}); enterRoom(code); });
+      return updateDoc(doc(db, "rooms", code), { members: arrayUnion(UID), updatedAt: serverTimestamp() }).then(function () { addDoc(collection(db, "rooms", code, "msgs"), { from: UID, name: ME.name, text: "🙏 joined", createdAt: serverTimestamp() }).catch(function () {}); enterRoom(code); bump("cRooms"); });
     }).catch(function (e) { toast(e && e.code === "permission-denied" ? "Cannot join this room" : errMsg(e)); });
   }
   $("bhJoin").addEventListener("click", function () { joinRoom($("bhCode").value); });
@@ -1125,7 +1144,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     if (!rate("apply", 8, 60000)) return; 
     btn.disabled = true;
     setDoc(doc(db, "applications", j.id + "_" + UID), { jid: j.id, rid: j.rid, seeker: UID, sname: ME.name, jtitle: j.title, company: j.company || j.rname || "", status: "applied", createdAt: serverTimestamp(), updatedAt: serverTimestamp() })
-      .then(function () { return sendCv(j.id + "_" + UID); }).then(function () { toast(ME.cvName ? "Applied ✅ Your CV was sent" : "Applied ✅ Tip: upload a CV in the Me tab"); }).catch(function (e) { btn.disabled = false; toast(e && e.code === "permission-denied" ? "Already applied or not allowed" : errMsg(e)); });
+      .then(function () { return sendCv(j.id + "_" + UID); }).then(function () { toast(ME.cvName ? "Applied ✅ Your CV was sent" : "Applied ✅ Tip: upload a CV in the Me tab"); bump("cApps"); }).catch(function (e) { btn.disabled = false; toast(e && e.code === "permission-denied" ? "Already applied or not allowed" : errMsg(e)); });
   }
   function appCard(a, who) {
     var c = el('<div class="jcard" data-notr><h4>' + esc(who === "r" ? a.sname : a.jtitle) + '</h4><div class="jm">' + esc(who === "r" ? "Applied for " + a.jtitle : a.company) + '</div><div>' + stChip(a.status) + '</div><div class="jrow" style="margin-top:8px"></div></div>'), row = c.querySelector(".jrow");
@@ -1189,7 +1208,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     $("pjGo").addEventListener("click", function () {
       var t = clean($("pjTitle").value, 80); if (!t) { toast("Add a job title"); return; } if (!rate("pjob", 3, 60000)) return; var b = this; b.disabled = true;
       addDoc(collection(db, "jobs"), { rid: UID, rname: ME.name, company: clean($("pjCompany").value, 60), title: t, field: $("pjField").value, city: clean($("pjCity").value, 40), type: $("pjType").value, exp: +$("pjExp").value || 0, salary: clean($("pjSalary").value, 40), skills: clean($("pjSkills").value, 120), desc: clean($("pjDesc").value, 1500), status: "open", createdAt: serverTimestamp() })
-        .then(function () { toast("Job published ✅"); jobsTab = "myjobs"; renderJobs(); }).catch(function (e) { b.disabled = false; toast(errMsg(e)); });
+        .then(function () { toast("Job published ✅"); jobsTab = "myjobs"; renderJobs(); bump("cJobs"); }).catch(function (e) { b.disabled = false; toast(errMsg(e)); });
     });
   }
   // application thread
@@ -1200,7 +1219,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   }
   function closeThread() { if (TH && TH.unsub) TH.unsub(); TH = null; $("thread").hidden = true; }
   $("thClose").addEventListener("click", closeThread);
-  function sendThread() { var i = $("thMsg"), t = clean(i.value, 500); if (!t || !TH || !rate("thmsg", 8, 10000)) return; i.value = ""; addDoc(collection(db, "applications", TH.id, "msgs"), { from: UID, text: t, createdAt: serverTimestamp() }).catch(function (e) { toast(e && e.code === "permission-denied" ? "Messaging is closed for this application" : errMsg(e)); }); }
+  function sendThread() { var i = $("thMsg"), t = clean(i.value, 500); if (!t || !TH || !rate("thmsg", 8, 10000)) return; i.value = ""; addDoc(collection(db, "applications", TH.id, "msgs"), { from: UID, text: t, createdAt: serverTimestamp() }).then(function () { bump("cMsgs"); }).catch(function (e) { toast(e && e.code === "permission-denied" ? "Messaging is closed for this application" : errMsg(e)); }); }
   $("thSend").addEventListener("click", sendThread); $("thMsg").addEventListener("keydown", function (e) { if (e.key === "Enter") sendThread(); });
 
   // ================= Safety extras =================
