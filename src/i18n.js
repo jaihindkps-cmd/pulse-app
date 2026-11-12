@@ -69,7 +69,21 @@ var EN2HI = [
   ["Bhajan Room", "Bhajan Room"], ["Create room", "Room banao"], ["Join with code", "Code se judo"], ["Room code", "Room code"], ["Invite to room", "Room me bulao"], ["Offer flower", "Phool arpit karo"], ["Next line", "Agli line"], ["Previous line", "Pichhli line"],
   ["Start drone and rhythm", "Dhun aur taal chalao"], ["Stop sound", "Awaaz band karo"], ["Leave room", "Room chhodo"], ["Close room", "Room band karo"], ["people singing", "log bhajan kar rahe hain"], ["Choose a bhajan", "Bhajan chuno"], ["Your own bhajan (one line per row)", "Apna bhajan (har line alag)"],
   ["Room name", "Room ka naam"], ["Only the host moves the lines. Everyone sees the same line live.", "Sirf host line badalta hai. Sabko wahi line live dikhti hai."], ["Photo", "Photo"], ["Send photo", "Photo bhejo"], ["Emoji", "Emoji"], ["Creator Panel", "Creator Panel"],
-  ["Language", "Bhasha"], ["Today's Darshan", "Aaj ke Darshan"], ["Start Aarti room here", "Yahan Aarti room shuru karo"], ["Dham Darshan", "Dham Darshan"], ["Privacy Policy & Terms", "Privacy Policy aur Terms"], ["Delete my account", "Mera account delete karo"], ["Enable notifications", "Notification chalu karo"], ["Profile photo", "Profile photo"], ["Meet safely", "Safe meet"], ["Today", "Aaj"]
+  ["Language", "Bhasha"], ["Today's Darshan", "Aaj ke Darshan"], ["Start Aarti room here", "Yahan Aarti room shuru karo"], ["Dham Darshan", "Dham Darshan"], ["Privacy Policy & Terms", "Privacy Policy aur Terms"], ["Delete my account", "Mera account delete karo"], ["Enable notifications", "Notification chalu karo"], ["Profile photo", "Profile photo"], ["Meet safely", "Safe meet"], ["Today", "Aaj"],
+  // --- Identity verification
+  ["Identity verification", "Pehchaan verification"], ["Verify", "Verify karo"], ["Re-verify", "Dobara verify karo"], ["Resubmit", "Dobara bhejo"],
+  ["Verified — your badge is shown to other members. The photo itself is never shown to anyone.", "Verified — aapka badge doosre members ko dikhta hai. Photo kisi ko bhi kabhi nahi dikhayi jaati."],
+  ["Submitted — waiting for our safety team to review. This can take a little time.", "Bhej diya — hamari safety team review karegi. Thoda samay lag sakta hai."],
+  ["Take a quick selfie so our safety team can confirm you are a real person. Shown to members only as a verified badge — the photo itself is never shown to other members.", "Ek jaldi selfie lo taaki hamari safety team confirm kar sake ki aap asli insaan ho. Doosron ko sirf verified badge dikhta hai — photo kabhi nahi dikhayi jaati."],
+  ["Submit this selfie for identity verification? Only our safety team reviews it to confirm you are a real person — it is never shown to other members or used for anything else. Continue?", "Is selfie ko identity verification ke liye bhejein? Sirf hamari safety team isse dekhegi — ye kabhi doosre members ko nahi dikhayi jaati aur kisi aur kaam me use nahi hoti. Aage badhein?"],
+  ["Identity verified", "Pehchaan verified"], ["Identity verification requests", "Pehchaan verification ki requests"], ["No pending requests.", "Abhi koi request baaki nahi."], ["Approve", "Manzoor karo"], ["Deny", "Mana karo"], ["Revoke", "Wapas lo"],
+  // --- Matrimony biodata
+  ["Matrimony Biodata", "Shaadi Biodata"], ["Age", "Umar"], ["Height", "Lambai"], ["Religion", "Dharm"], ["Mother tongue", "Matribhasha"], ["Community", "Samaaj"], ["Marital status", "Vaivahik sthiti"], ["Education", "Padhai"], ["Diet", "Khana (shakahari/mansahari)"], ["Occupation", "Kaam"], ["Looking for", "Kya chahiye"],
+  // --- Saved jobs
+  ["Saved", "Saved"], ["★ Saved", "★ Saved ho gaya"], ["☆ Save", "☆ Save karo"], ["No saved jobs yet. Tap ☆ Save on any job to keep it here.", "Abhi koi job save nahi ki. Kisi bhi job par ☆ Save dabao, wo yahan aa jaayegi."],
+  // --- CV / contact / premium
+  ["Resume / CV (PDF or Word, max 600 KB)", "Resume / CV (PDF ya Word, max 600 KB)"], ["No CV uploaded.", "Abhi koi CV upload nahi hui."], ["Remove CV", "CV hatao"],
+  ["Contact details", "Contact ki jaankari"], ["Account settings", "Account settings"], ["Grant Premium", "Premium do"], ["Remove Premium", "Premium hatao"]
 ];
 
 var lang = "en";
