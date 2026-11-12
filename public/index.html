@@ -561,12 +561,15 @@
         <div id="secSeeker" hidden><div class="sub-h">Job profile</div>
           <label>Field<select id="eField"></select></label><label>Desired role<input id="eRole" maxlength="60"></label><label>Skills (comma separated)<input id="eSkills" maxlength="150"></label>
           <label>Experience (years)<input id="eExp" type="number" min="0" max="50" inputmode="numeric"></label><label>Job type<select id="eJobType"><option>Full-time</option><option>Part-time</option><option>Contract</option><option>Internship</option><option>Remote</option></select></label>
-          <label>Preferred city<input id="ePrefCity" maxlength="40"></label><label>Notice period<input id="eNotice" maxlength="30" placeholder="e.g. Immediate, 30 days"></label><label>Resume link (optional)<input id="eResume" maxlength="200" placeholder="https://..."></label></div>
+          <label>Preferred city<input id="ePrefCity" maxlength="40"></label><label>Notice period<input id="eNotice" maxlength="30" placeholder="e.g. Immediate, 30 days"></label><label>Resume / CV (PDF or Word, max 600 KB)<input id="cvFile" type="file" accept=".pdf,.doc,.docx,application/pdf"></label><div class="st-note" id="cvStatus">No CV uploaded.</div><div class="jrow"><button type="button" class="btn-outline" id="cvRemove" hidden>Remove CV</button></div><input id="eResume" type="hidden"></div>
         <div id="secRecruiter" hidden><div class="sub-h">Company</div>
           <label>Company name<input id="eCompany" maxlength="60"></label><label>Your designation<input id="eDesig" maxlength="60"></label><label>About the company<textarea id="eCAbout" maxlength="300" rows="3"></textarea></label><label>Website (optional)<input id="eCSite" maxlength="120"></label></div>
-        <button class="btn-grad" id="saveProfile">Save karo</button>
+        <button class="btn-grad" id="saveProfile">Save changes</button>
       </div>
-      <div class="section-title">Privacy</div>
+      <div class="section-title">Contact details</div>
+      <div class="st-note">Your phone number is stored separately and is released only to a member you approve. It is never shown on your profile or in search.</div>
+      <div class="edit-form" style="padding:0 18px 8px"><label>Phone number (optional)<input id="ePhone" type="tel" inputmode="tel" maxlength="16" placeholder="+91XXXXXXXXXX"></label><button class="btn-outline" id="phoneSave" type="button" style="margin:6px 0">Save number</button><div class="sub-h">Contact requests</div><div id="reqBox" class="st-note">None.</div></div>
+      <div class="section-title">Account settings</div>
       <div class="setting-row">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
         <div class="lbl">Location sharing<div class="desc">ON hone par hi aap Nearby me dikhoge</div></div>

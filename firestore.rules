@@ -38,7 +38,7 @@ service cloud.firestore {
         && request.resource.data.get('mode', 'friends') in ['friends', 'dating', 'marriage', 'jobseeker', 'recruiter']
         && request.resource.data.get('skills', '').size() <= 200 && request.resource.data.get('resume', '').size() <= 200
         && request.resource.data.get('company', '').size() <= 100 && request.resource.data.get('cabout', '').size() <= 300
-        && request.resource.data.get('csite', '').size() <= 200 && request.resource.data.get('role', '').size() <= 100
+        && request.resource.data.get('csite', '').size() <= 200 && request.resource.data.get('cvName', '').size() <= 100 && request.resource.data.get('role', '').size() <= 100
         && request.resource.data.get('desig', '').size() <= 100 && request.resource.data.get('community', '').size() <= 100
         && request.resource.data.get('religion', '').size() <= 60 && request.resource.data.get('prefCity', '').size() <= 100;
       allow delete: if loggedIn() && uid == me();
@@ -186,6 +186,11 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
         && ((resource.data.rid == me() && request.resource.data.status in ['shortlisted', 'rejected', 'hired', 'invited'])
             || (resource.data.seeker == me() && ((resource.data.status == 'invited' && request.resource.data.status in ['applied', 'declined']) || request.resource.data.status == 'withdrawn')));
+      match /cv/{f} {
+        allow read: if signedIn() && (get(/databases/$(database)/documents/applications/$(aid)).data.seeker == me() || get(/databases/$(database)/documents/applications/$(aid)).data.rid == me());
+        allow write: if signedIn() && notBanned() && get(/databases/$(database)/documents/applications/$(aid)).data.seeker == me()
+          && request.resource.data.get('data', '').size() <= 820000;
+      }
       match /msgs/{m} {
         allow read: if signedIn() && (get(/databases/$(database)/documents/applications/$(aid)).data.seeker == me() || get(/databases/$(database)/documents/applications/$(aid)).data.rid == me());
         allow create: if signedIn() && notBanned() && request.resource.data.from == me()
@@ -193,6 +198,35 @@ service cloud.firestore {
           && get(/databases/$(database)/documents/applications/$(aid)).data.status != 'rejected'
           && request.resource.data.text is string && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 500;
       }
+    }
+
+    // CV: sirf apna. Apply karte waqt copy applications/{aid}/cv me jati hai (sirf wo do log).
+    match /resumes/{uid} {
+      allow read, write: if signedIn() && uid == me() && notBanned()
+        && (request.method == 'delete' || (request.resource.data.get('data', '').size() <= 820000 && request.resource.data.get('name', '').size() <= 100));
+    }
+    // Phone number: sirf maalik; dusra tabhi padh sakta hai jab maalik ne approve kiya.
+    match /contacts/{uid} {
+      allow read: if signedIn() && (uid == me() || get(/databases/$(database)/documents/contactReqs/$(uid + '_' + me())).data.get('status', '') == 'approved');
+      allow write: if signedIn() && uid == me() && notBanned()
+        && (request.method == 'delete' || (request.resource.data.phone is string && request.resource.data.phone.size() >= 10 && request.resource.data.phone.size() <= 16));
+    }
+    match /contactReqs/{rid} {
+      allow get: if signedIn() && me() in rid.split('_');
+      allow list: if signedIn() && (resource.data.owner == me() || resource.data.requester == me());
+      allow create: if signedIn() && notBanned() && request.resource.data.requester == me()
+        && rid == request.resource.data.owner + '_' + me() && request.resource.data.owner != me()
+        && request.resource.data.status == 'pending'
+        && exists(/databases/$(database)/documents/premium/$(me()));
+      allow update: if signedIn() && resource.data.owner == me()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+        && request.resource.data.status in ['approved', 'denied'];
+      allow delete: if signedIn() && me() in rid.split('_');
+    }
+    // Premium: sirf creator (admin) dete/hatate hain. User sirf apna dekh sakta hai.
+    match /premium/{uid} {
+      allow read: if signedIn() && (uid == me() || isAdmin());
+      allow write: if isAdmin();
     }
   }
 }

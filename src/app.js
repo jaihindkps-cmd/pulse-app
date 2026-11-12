@@ -100,7 +100,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     $("pName").textContent = ME.name; $("pHandle").textContent = ME.city || "";
     $("eName").value = ME.name || ""; $("eCity").value = ME.city || ""; $("eWork").value = ME.work || ""; $("eAbout").value = ME.about || "";
     getDocs(query(collection(db, "blocks"), where("blocker", "==", UID))).then(function (s) { blocked = new Set(); s.forEach(function (d) { blocked.add(d.data().blocked); }); }).catch(function () {}).then(function () {
-      applyMode(); listenApps(); listenFeed(); listenMatches(); refreshLocToggle(); showTab("feed"); setLive(); paintAv(); creatorPanel(); pendingRoom();
+      applyMode(); listenApps(); listenReqs(); listenFeed(); listenMatches(); refreshLocToggle(); showTab("feed"); setLive(); paintAv(); creatorPanel(); pendingRoom();
     });
   }
   function init(cfg) {
@@ -758,8 +758,8 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   $("notifBtn").addEventListener("click", function () { if (!window.Notification) { toast("Notifications are not supported here"); return; } Notification.requestPermission().then(function (p) { toast(p === "granted" ? "Notifications on 🔔" : "Notifications blocked"); }); });
 
   // ---- policy, language, delete ----
-  var POLICY_EN = '<h3>Privacy Policy &amp; Terms</h3><p>Pulse is for people 18+ only.</p><h4>What we store</h4><p>Your profile (name, age, city, work, about, optional small photo), your posts, matches, chat messages and photos you send, and approximate location only if you turn Nearby ON (rounded to about 1 km; deleted when you turn it off).</p><h4>Who can see it</h4><p>Profiles are visible to verified members. Chats are visible only to the two people in them. Saathi AI and AI Mediator send the text you give them to Google Gemini to reply; the Mediator reads a chat only after both people agree. The creator panel shows only reports and totals, never private chats.</p><h4>Your control</h4><p>You can block or report anyone, turn off location any time, and delete your account from the Me tab (this removes your profile, posts and Saathi history; messages you sent in shared chats may remain for the other person).</p><h4>Rules</h4><p>No harassment, threats, scams, nudity, hate or impersonation. Never send money, OTP or bank details to anyone you met here. Accounts that break these rules can be banned. Meet in public places and tell someone you trust.</p>';
-  var POLICY_HI = '<h3>Privacy Policy aur Terms</h3><p>Pulse sirf 18+ ke liye hai.</p><h4>Kya save hota hai</h4><p>Aapki profile (naam, umar, sheher, kaam, about, chhoti photo), posts, match, chat aur bheji hui photos, aur location sirf tab jab aap Nearby ON karo (lagbhag 1 km tak mota-mota, band karte hi hat jaati hai).</p><h4>Kaun dekh sakta hai</h4><p>Profile verified members dekh sakte hain. Chat sirf un do logon ko dikhti hai. Saathi AI aur AI Mediator jawab ke liye text Google Gemini ko bhejte hain; Mediator chat tabhi padhta hai jab dono haan kahein. Creator panel me sirf reports aur ginti dikhti hai, private chat kabhi nahi.</p><h4>Aapka control</h4><p>Kisi ko bhi block ya report karo, location kabhi band karo, aur Me tab se account delete karo (profile, posts, Saathi history hat jaati hai; shared chat me bheje gaye message doosre ke paas rah sakte hain).</p><h4>Niyam</h4><p>Pareshan karna, dhamki, thagi, nagnata, nafrat ya jhoothi pehchaan mana hai. Yahan mile kisi ko paisa, OTP ya bank details mat bhejo. Niyam todne par account ban ho sakta hai. Public jagah par milo aur kisi apne ko batao.</p>';
+  var POLICY_EN = '<h3>Terms of Use &amp; Privacy Policy</h3><p><i>Version 2026-11 (Beta). Please read carefully before using Pulse.</i></p><h4>1. Eligibility and acceptance</h4><p>Pulse is available only to persons aged 18 or above who are legally competent to enter into a contract. By creating an account or using the service you accept these Terms and this Policy. If you do not agree, do not use the service.</p><h4>2. Beta service</h4><p>Pulse is a beta (testing) service. Features may change, be interrupted or be withdrawn without notice, and data may be reset. The service is provided on an &quot;as is&quot; and &quot;as available&quot; basis without warranties of any kind, to the fullest extent permitted by law.</p><h4>3. Information we process</h4><p>Account data (email address, display name, age, city, occupation, profile text, optional photo and role-specific details such as job or matrimonial attributes); content you create (posts, messages, images, CVs you choose to upload); records of consent; and, only if you enable Nearby, approximate location rounded to about 1 km. Your email address and phone number are not displayed to other members. A phone number, if you add one, is released only to a member you approve, subject to the Premium conditions in clause 6.</p><h4>4. Purposes and sharing</h4><p>We process data to operate the service, match and connect members, prevent abuse and comply with law. Profiles are visible to verified members according to the mode you choose. A CV is shared only with the recruiter of a job you apply to. AI features (Saathi, AI Mediator, Gaana Studio) transmit the text you submit to Google Gemini to generate replies; the Mediator reads a conversation only after both participants agree. Infrastructure is provided by Google Firebase. We do not sell personal data.</p><h4>5. Conduct and enforcement</h4><p>You must not harass, threaten, defraud, impersonate, post unlawful, obscene, hateful or infringing content, solicit money, OTPs or banking details, or misuse another member data. We may remove content, restrict features or suspend accounts, including automatically flagged accounts after review. Members may block and report any account.</p><h4>6. Contact details and Premium</h4><p>Requesting another member contact number requires Premium status and the explicit approval of that member, who may revoke access at any time. Premium is activated manually by the Pulse team once payment is confirmed. Any attempt to obtain contact details by other means is prohibited.</p><h4>7. Recruitment and matrimonial notices</h4><p>Pulse does not verify employers, candidates, or matrimonial claims and is not a party to any employment, engagement or marriage arrangement. Never pay a fee to obtain a job or interview. Verify identity, credentials and family details independently and meet only in public places.</p><h4>8. Your rights</h4><p>You may edit your profile, pause visibility, turn off location, withdraw applications, revoke contact approvals and delete your account from the Me tab, which removes your profile, posts, CV and AI history. Messages sent in shared conversations may remain visible to the other participant. Requests and complaints may be made through the in-app Report function.</p><h4>9. Limitation of liability and governing law</h4><p>To the extent permitted by law, Pulse and its owner are not liable for member conduct, meetings between members, or indirect or consequential loss. These Terms are governed by the laws of India and subject to the courts of competent jurisdiction in India.</p>';
+  var POLICY_HI = '<p><b>नोट:</b> यह कानूनी दस्तावेज़ अंग्रेज़ी में है और वही मान्य है। (This legal text in English is the binding version.)</p>' + POLICY_EN;
   document.addEventListener("click", function (e) { var a = e.target.closest && e.target.closest(".plink"); if (a) { e.preventDefault(); $("policyText").innerHTML = getLang() === "en" ? POLICY_EN : POLICY_HI; $("policyUI").hidden = false; } });
   $("policyClose").addEventListener("click", function () { $("policyUI").hidden = true; });
   [$("langBtn"), $("langBtn2")].forEach(function (b) { b.textContent = getLang() === "en" ? "हि" : "EN"; b.addEventListener("click", function () { setLang(getLang() === "en" ? "hi" : "en"); }); });
@@ -786,6 +786,9 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
         row.querySelector(".cd").addEventListener("click", function () { deleteDoc(doc(db, "reports", d.id)).then(function () { row.remove(); }).catch(function (e) { toast(errMsg(e)); }); }); l.appendChild(row); });
     }).catch(function (e) { toast(errMsg(e)); });
     $("crBan").addEventListener("click", function () { var id = clean($("crUid").value, 60); if (id) setDoc(doc(db, "bans", id), { at: serverTimestamp(), by: UID }).then(function () { toast("Banned"); }).catch(function (e) { toast(errMsg(e)); }); });
+    box.appendChild(el('<div class="st-row" style="margin-top:8px"><button class="btn-grad" id="crPrem" style="padding:6px 12px">Grant Premium</button><button class="btn-outline" id="crUnprem" style="padding:6px 12px;margin-left:6px">Remove Premium</button></div>'));
+    $("crPrem").addEventListener("click", function () { var id = clean($("crUid").value, 60); if (id) setDoc(doc(db, "premium", id), { at: serverTimestamp(), by: UID }).then(function () { toast("Premium granted"); }).catch(function (e) { toast(errMsg(e)); }); });
+    $("crUnprem").addEventListener("click", function () { var id = clean($("crUid").value, 60); if (id) deleteDoc(doc(db, "premium", id)).then(function () { toast("Premium removed"); }).catch(function (e) { toast(errMsg(e)); }); });
     $("crUnban").addEventListener("click", function () { var id = clean($("crUid").value, 60); if (id) deleteDoc(doc(db, "bans", id)).then(function () { toast("Unbanned"); }).catch(function (e) { toast(errMsg(e)); }); });
   }
 
@@ -914,7 +917,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   var NUMF = { height: 1, ageMin: 1, ageMax: 1, exp: 1 };
   function fillProfileForm() {
     $("eMode").value = MODE; Object.keys(PROF_FIELDS).forEach(function (id) { var v = ME[PROF_FIELDS[id]]; if (v != null && v !== "") $(id).value = v; });
-    $("hideToggle").classList.toggle("on", !!ME.hidden); sectionsFor($("eMode").value);
+    $("hideToggle").classList.toggle("on", !!ME.hidden); cvPaint(); phoneLoad(); sectionsFor($("eMode").value);
   }
   function sectionsFor(m) { $("secMate").hidden = !isMateMode(m); $("secMarriage").hidden = m !== "marriage"; $("secSeeker").hidden = m !== "jobseeker"; $("secRecruiter").hidden = m !== "recruiter"; $("eWork").parentNode.firstChild.nodeValue = m === "recruiter" ? "Role at work" : "Occupation"; }
   $("eMode").addEventListener("change", function () { sectionsFor(this.value); });
@@ -991,14 +994,15 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     ["jfField", "jfCity", "jfType", "jfQ"].forEach(function (id) { $(id).addEventListener("input", paint); });
   }
   function applyJob(j, btn) {
-    if (!rate("apply", 8, 60000)) return; if (!ME.field && !ME.skills) toast("Tip: complete your Job profile in Me tab for better chances");
+    if (!rate("apply", 8, 60000)) return; 
     btn.disabled = true;
     setDoc(doc(db, "applications", j.id + "_" + UID), { jid: j.id, rid: j.rid, seeker: UID, sname: ME.name, jtitle: j.title, company: j.company || j.rname || "", status: "applied", createdAt: serverTimestamp(), updatedAt: serverTimestamp() })
-      .then(function () { toast("Applied ✅"); }).catch(function (e) { btn.disabled = false; toast(e && e.code === "permission-denied" ? "Already applied or not allowed" : errMsg(e)); });
+      .then(function () { return sendCv(j.id + "_" + UID); }).then(function () { toast(ME.cvName ? "Applied ✅ Your CV was sent" : "Applied ✅ Tip: upload a CV in the Me tab"); }).catch(function (e) { btn.disabled = false; toast(e && e.code === "permission-denied" ? "Already applied or not allowed" : errMsg(e)); });
   }
   function appCard(a, who) {
     var c = el('<div class="jcard" data-notr><h4>' + esc(who === "r" ? a.sname : a.jtitle) + '</h4><div class="jm">' + esc(who === "r" ? "Applied for " + a.jtitle : a.company) + '</div><div>' + stChip(a.status) + '</div><div class="jrow" style="margin-top:8px"></div></div>'), row = c.querySelector(".jrow");
     function btn(t, cls, f) { var b = document.createElement("button"); b.className = cls; b.textContent = t; b.addEventListener("click", f); row.appendChild(b); }
+    if (who === "r") btn("📄 View CV", "btn-outline", function () { downloadCv(a.id); });
     if (a.status !== "rejected") btn("💬 Message", "btn-outline", function () { openThread(a, who); });
     return { c: c, btn: btn };
   }
@@ -1028,7 +1032,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     }).catch(function (e) { toast(errMsg(e)); });
   }
   function candCard(u) {
-    return el('<div class="jcard" data-notr><h4>' + esc(u.name) + (u.age ? ", " + esc(u.age) : "") + '</h4><div class="jm">' + esc(u.role || u.work || "Job seeker") + " · " + esc(u.city || "") + '</div><div>' + chip(u.field || "Other", "acc") + (u.exp != null && u.exp !== "" ? chip(u.exp + " yrs") : chip("Fresher")) + (u.jobType ? chip(u.jobType) : "") + (u.notice ? chip("Notice: " + u.notice) : "") + '</div><div class="jd">' + esc(u.skills || "") + (u.about ? " — " + esc(String(u.about).slice(0, 160)) : "") + '</div><div class="jrow"></div></div>');
+    return el('<div class="jcard" data-notr><h4>' + esc(u.name) + (u.age ? ", " + esc(u.age) : "") + '</h4><div class="jm">' + esc(u.role || u.work || "Job seeker") + " · " + esc(u.city || "") + '</div><div>' + chip(u.field || "Other", "acc") + (u.exp != null && u.exp !== "" ? chip(u.exp + " yrs") : chip("Fresher")) + (u.jobType ? chip(u.jobType) : "") + (u.cvName ? chip("CV on file", "ok") : "") + (u.notice ? chip("Notice: " + u.notice) : "") + '</div><div class="jd">' + esc(u.skills || "") + (u.about ? " — " + esc(String(u.about).slice(0, 160)) : "") + '</div><div class="jrow"></div></div>');
   }
   function showCandidate(uid) { getDoc(doc(db, "users", uid)).then(function (s) { if (!s.exists()) return; var u = s.data(); $("policyText").innerHTML = '<h3>' + esc(u.name) + '</h3><p>' + esc([u.role || u.work, u.city, u.field].filter(Boolean).join(" · ")) + '</p><p><b>Experience:</b> ' + esc(u.exp != null ? u.exp + " years" : "Fresher") + '<br><b>Skills:</b> ' + esc(u.skills || "-") + '<br><b>Job type:</b> ' + esc(u.jobType || "-") + '<br><b>Preferred city:</b> ' + esc(u.prefCity || "-") + '<br><b>Notice:</b> ' + esc(u.notice || "-") + '</p><p>' + esc(u.about || "") + '</p>' + (/^https?:\/\//i.test(u.resume || "") ? '<p><a href="' + esc(u.resume) + '" target="_blank" rel="noopener noreferrer">Resume link</a></p>' : ""); $("policyUI").hidden = false; }).catch(function (e) { toast(errMsg(e)); }); }
   function viewCands(box) {
@@ -1096,9 +1100,10 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
       var rows = [u.age ? u.age + " yrs" : "", u.city, u.work, MODE_LABEL[m]].filter(Boolean).join(" · ");
       var extra = m === "marriage" ? factsFor(u) : (m === "jobseeker" ? '<div class="facts">' + [u.field, u.role, u.exp != null && u.exp !== "" ? u.exp + " yrs exp" : "", u.skills].filter(Boolean).map(function (x) { return "<span>" + esc(x) + "</span>"; }).join("") + "</div>" : (m === "recruiter" ? '<div class="facts">' + [u.company, u.desig].filter(Boolean).map(function (x) { return "<span>" + esc(x) + "</span>"; }).join("") + "</div>" : ""));
       var mine = uid === UID;
-      $("policyText").innerHTML = '<div class="pf-top"><div class="av-lg" style="background:' + g(uid) + '">' + esc(ini(u.name)) + '</div><h3 data-notr>' + esc(u.name) + '</h3><div class="jm" data-notr>' + esc(rows) + '</div></div>' + extra + '<p data-notr>' + esc(u.about || "") + '</p><div class="pf-priv">🔒 Email, phone and private details are never shown to other members.</div>' + (mine ? "" : '<div class="jrow"><button class="btn-outline" id="pfReport">Report</button><button class="btn-outline" id="pfBlock">Block</button></div>');
+      $("policyText").innerHTML = '<div class="pf-top"><div class="av-lg" style="background:' + g(uid) + '">' + esc(ini(u.name)) + '</div><h3 data-notr>' + esc(u.name) + '</h3><div class="jm" data-notr>' + esc(rows) + '</div></div>' + extra + '<p data-notr>' + esc(u.about || "") + '</p><div class="pf-priv">🔒 Email, phone and private details are never shown to other members.</div>' + (mine ? "" : '<div id="pfContactOut" class="st-note" data-notr></div><div class="jrow"><button class="btn-grad" id="pfContact">Request contact number</button><button class="btn-outline" id="pfReport">Report</button><button class="btn-outline" id="pfBlock">Block</button></div>');
       $("policyUI").hidden = false;
       if (!mine) {
+        $("pfContact").addEventListener("click", function () { requestContact(uid, $("pfContactOut")); });
         $("pfReport").addEventListener("click", function () { var r = window.prompt("Why are you reporting? (short)", "Abuse / fake / spam"); if (r === null) return; addDoc(collection(db, "reports"), { from: UID, to: uid, reason: clean(r, 180) || "Profile report", createdAt: serverTimestamp() }).then(function () { toast("Report sent. Thank you."); $("policyUI").hidden = true; }).catch(function (e) { toast(errMsg(e)); }); });
         $("pfBlock").addEventListener("click", function () { if (!window.confirm("Block this person?")) return; setDoc(doc(db, "blocks", UID + "_" + uid), { blocker: UID, blocked: uid, createdAt: serverTimestamp() }).then(function () { blocked.add(uid); toast("Blocked"); $("policyUI").hidden = true; }).catch(function (e) { toast(errMsg(e)); }); });
       }
@@ -1118,6 +1123,63 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     var anchor = $("pHandle"); if (!anchor) return; var b = $("pStrength");
     if (!b) { b = el('<div id="pStrength" class="pf-priv" style="margin:10px 0"></div>'); anchor.parentNode.insertBefore(b, anchor.nextSibling); }
     var v = profStrength(); b.innerHTML = '<b>Profile strength: ' + v + '%</b><div style="height:6px;border-radius:6px;background:rgba(255,255,255,.12);margin:6px 0"><div style="height:6px;border-radius:6px;width:' + v + '%;background:linear-gradient(90deg,#ff5fa2,#ffb86c)"></div></div>' + (v < 100 ? '<span>Complete your profile in the Edit section to get more matches' + (isJobMode() ? " and responses" : "") + ".</span>" : "<span>Great — your profile is complete ✅</span>") + '';
+  }
+
+  // ================= CV upload, contact permission, premium gate =================
+  var CVMAX = 600 * 1024, CVOK = /\.(pdf|doc|docx)$/i;
+  function fileB64(f) { return new Promise(function (res, rej) { var r = new FileReader(); r.onload = function () { res(String(r.result).split(",")[1] || ""); }; r.onerror = rej; r.readAsDataURL(f); }); }
+  function cvPaint() { $("cvStatus").textContent = ME && ME.cvName ? "Uploaded: " + ME.cvName : "No CV uploaded."; $("cvRemove").hidden = !(ME && ME.cvName); }
+  $("cvFile").addEventListener("change", function () {
+    var f = this.files && this.files[0]; this.value = ""; if (!f) return;
+    if (!CVOK.test(f.name)) { toast("Please choose a PDF or Word file"); return; }
+    if (f.size > CVMAX) { toast("File is too large. Maximum 600 KB"); return; }
+    if (!rate("cv", 5, 60000)) return;
+    fileB64(f).then(function (b64) { return setDoc(doc(db, "resumes", UID), { name: clean(f.name, 100), type: f.type || "application/octet-stream", size: f.size, data: b64, updatedAt: serverTimestamp() }); })
+      .then(function () { return updateDoc(doc(db, "users", UID), { cvName: clean(f.name, 100) }); })
+      .then(function () { ME.cvName = clean(f.name, 100); cvPaint(); toast("CV uploaded ✅"); }).catch(function (e) { toast(errMsg(e)); });
+  });
+  $("cvRemove").addEventListener("click", function () { if (!window.confirm("Remove your CV?")) return; deleteDoc(doc(db, "resumes", UID)).then(function () { return updateDoc(doc(db, "users", UID), { cvName: "" }); }).then(function () { ME.cvName = ""; cvPaint(); toast("CV removed"); }).catch(function (e) { toast(errMsg(e)); }); });
+  function sendCv(aid) { return getDoc(doc(db, "resumes", UID)).then(function (d) { if (d.exists()) return setDoc(doc(db, "applications", aid, "cv", "main"), d.data()); }).catch(function () {}); }
+  function downloadCv(aid) {
+    getDoc(doc(db, "applications", aid, "cv", "main")).then(function (d) {
+      if (!d.exists()) { toast("No CV attached to this application"); return; } var c = d.data(), bin = atob(c.data), arr = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+      var a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([arr], { type: c.type })); a.download = c.name || "cv"; document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+    }).catch(function (e) { toast(errMsg(e)); });
+  }
+  // contact number
+  var PHONE_RE = /^\+?\d{10,15}$/;
+  function phoneLoad() { getDoc(doc(db, "contacts", UID)).then(function (d) { $("ePhone").value = d.exists() ? d.data().phone : ""; }).catch(function () {}); }
+  $("phoneSave").addEventListener("click", function () {
+    var v = $("ePhone").value.replace(/[\s-]/g, ""); if (!v) { deleteDoc(doc(db, "contacts", UID)).then(function () { toast("Number removed"); }).catch(function (e) { toast(errMsg(e)); }); return; }
+    if (!PHONE_RE.test(v)) { toast("Enter a valid phone number"); return; }
+    setDoc(doc(db, "contacts", UID), { phone: v, updatedAt: serverTimestamp() }).then(function () { toast("Number saved. It is shared only with members you approve."); }).catch(function (e) { toast(errMsg(e)); });
+  });
+  var reqUnsub = null, firstReq = true;
+  function listenReqs() {
+    if (reqUnsub) { reqUnsub(); reqUnsub = null; } firstReq = true;
+    reqUnsub = onSnapshot(query(collection(db, "contactReqs"), where("owner", "==", UID)), function (s) {
+      var box = $("reqBox"); box.innerHTML = s.empty ? "None." : "";
+      if (!firstReq) s.docChanges().forEach(function (ch) { if (ch.type === "added" && !ch.doc.metadata.hasPendingWrites) toast("📞 " + (ch.doc.data().name || "A member") + " requested your contact number"); }); firstReq = false;
+      s.forEach(function (d) { var r = d.data(), row = el('<div class="cr-row" data-notr><b>' + esc(r.name || "Member") + '</b> · ' + esc(r.status) + ' <span class="rq"></span></div>'), hold = row.querySelector(".rq");
+        function b(t, st, cls) { var x = document.createElement("button"); x.className = cls; x.style.cssText = "padding:4px 10px;margin-left:6px"; x.textContent = t; x.addEventListener("click", function () { updateDoc(doc(db, "contactReqs", d.id), { status: st, updatedAt: serverTimestamp() }).catch(function (e) { toast(errMsg(e)); }); }); hold.appendChild(x); }
+        if (r.status !== "approved") b("Approve", "approved", "btn-grad"); if (r.status !== "denied") b(r.status === "approved" ? "Revoke" : "Deny", "denied", "btn-outline"); box.appendChild(row); });
+    }, function () {});
+    unsubs.push(function () { if (reqUnsub) { reqUnsub(); reqUnsub = null; } });
+  }
+  function requestContact(uid, out) {
+    var id = uid + "_" + UID;
+    getDoc(doc(db, "contactReqs", id)).then(function (d) {
+      if (d.exists()) {
+        var st = d.data().status;
+        if (st === "approved") return getDoc(doc(db, "contacts", uid)).then(function (c) { out.textContent = c.exists() ? "Contact number: " + c.data().phone : "This member has not added a number."; });
+        out.textContent = st === "pending" ? "Request sent. Waiting for the member to respond." : "The member has declined this request."; return;
+      }
+      return getDoc(doc(db, "premium", UID)).then(function (p) {
+        if (!p.exists()) { out.textContent = "Contact requests are a Premium feature. Premium is activated by the Pulse team after payment is confirmed."; return; }
+        if (!rate("creq", 5, 60000)) return;
+        return setDoc(doc(db, "contactReqs", id), { owner: uid, requester: UID, name: ME.name, status: "pending", createdAt: serverTimestamp(), updatedAt: serverTimestamp() }).then(function () { out.textContent = "Request sent. The member must approve before the number is released."; });
+      });
+    }).catch(function (e) { out.textContent = errMsg(e); });
   }
   // ---- boot ----
   initI18n(); setMode("login");
