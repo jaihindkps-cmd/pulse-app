@@ -457,6 +457,7 @@
 .av-lg{width:84px;height:84px;border-radius:50%;margin:0 auto 8px;display:grid;place-items:center;font-size:32px;font-weight:700;color:#fff}.pf-top{text-align:center}.pf-priv{margin:10px 0;padding:8px 10px;border-radius:10px;background:rgba(80,200,140,.12);font-size:12px}
 .auth{align-items:flex-start!important;padding-top:0!important}.auth-card{margin:60px auto 28px!important}#langBtn2{position:fixed!important;top:max(12px,env(safe-area-inset-top,0px));right:14px;z-index:210!important}
 .pw-wrap{position:relative;display:block}.pw-wrap input{width:100%;padding-right:48px!important}.pw-eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:38px;height:38px;border:0;background:transparent;font-size:18px;cursor:pointer;opacity:.7}
+.auth-or{display:flex;align-items:center;gap:10px;color:var(--faint);font-size:12px;margin:2px 0 10px}.auth-or::before,.auth-or::after{content:"";flex:1;height:1px;background:var(--line)}
 /* performance: the earlier fix killed ALL blur/glass to stop a real hang. The actual cause was
    continuous animated blur sources (moving gradient blobs behind ::before/::after) plus
    unbounded queries, not a one-time static backdrop-filter. Keep animation/filter off those
@@ -664,8 +665,10 @@
         <div class="auth-err" id="vErr" role="alert"></div>
       </div>
       <div class="seg" id="segBox"><button id="segLogin" class="on">Login</button><button id="segSignup">Naya account</button></div>
+      <button type="button" class="btn-outline" id="googleBtn" style="width:100%;padding:11px;margin:4px 0 10px;display:flex;align-items:center;justify-content:center;gap:8px"><svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.4 29.3 35 24 35c-6.1 0-11-4.9-11-11s4.9-11 11-11c2.8 0 5.3 1 7.3 2.7l5.7-5.7C33.6 6.5 29 4.5 24 4.5 12.9 4.5 4 13.4 4 24.5s8.9 20 20 20 20-8.9 20-20c0-1.4-.1-2.7-.4-4z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 16 19 13 24 13c2.8 0 5.3 1 7.3 2.7l5.7-5.7C33.6 6.5 29 4.5 24 4.5c-7.6 0-14.1 4.3-17.4 10.6l-.3-.4z"/><path fill="#4CAF50" d="M24 44.5c5 0 9.5-1.9 12.9-5l-6-5c-1.9 1.3-4.3 2-6.9 2-5.2 0-9.6-3.3-11.2-7.9l-6.5 5C9.8 40.1 16.3 44.5 24 44.5z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.1-4.1 5.5l6 5C40.9 35.5 44 30.4 44 24.5c0-1.4-.1-2.7-.4-4z"/></svg><span id="googleBtnLbl">Continue with Google</span></button>
+      <div class="auth-or"><span>ya</span></div>
       <form id="authForm" class="form" autocomplete="on">
-        <label>Email<input id="aUser" type="email" required maxlength="80" autocapitalize="none" autocomplete="email" inputmode="email" placeholder="aap@example.com"></label>
+        <div id="emailRow"><label>Email<input id="aUser" type="email" required maxlength="80" autocapitalize="none" autocomplete="email" inputmode="email" placeholder="aap@example.com"></label></div>
         <div id="signupOnly">
           <label>Aapka naam<input id="aName" maxlength="40" autocomplete="name"></label>
           <label>Umar (18+)<input id="aAge" type="number" min="18" max="99" inputmode="numeric"></label>
@@ -676,7 +679,7 @@
           <label>Show me<select id="aSeeking"><option>Everyone</option><option>Women</option><option>Men</option></select></label></div>
           <label class="chk"><input type="checkbox" id="aAdult"><span>I am 18+. I accept the <a href="#" class="plink">Privacy Policy &amp; Terms</a> and understand this is a <b>beta (testing) version</b></span></label>
         </div>
-        <label>Password<span class="pw-wrap"><input id="aPass" type="password" required minlength="6" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go" placeholder="kam se kam 6 akshar"><button type="button" class="pw-eye" id="pwEye" aria-label="Show password">👁</button></span></label>
+        <div id="pwRow"><label>Password<span class="pw-wrap"><input id="aPass" type="password" required minlength="6" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go" placeholder="kam se kam 6 akshar"><button type="button" class="pw-eye" id="pwEye" aria-label="Show password">👁</button></span></label></div>
         <div class="auth-err" id="authErr" role="alert"></div>
         <a href="#" id="forgotLink" class="forgot">Forgot password?</a>
         <button class="btn-grad" id="authBtn" type="submit" style="width:100%;padding:13px">Login</button>

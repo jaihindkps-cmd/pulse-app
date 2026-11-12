@@ -1,6 +1,6 @@
 // Pulse (Firebase version): Auth + Firestore + Hosting, sab free (Spark) plan par.
 import { initializeApp } from "firebase/app";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, deleteUser, sendEmailVerification, sendPasswordResetEmail } from "firebase/auth";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut, deleteUser, sendEmailVerification, sendPasswordResetEmail } from "firebase/auth";
 import {
   initializeFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, collection, addDoc, query, where, orderBy, limit,
   getDocs, onSnapshot, serverTimestamp, arrayUnion, arrayRemove, Timestamp, writeBatch, increment, getCountFromServer
@@ -56,6 +56,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
 
   // ---- auth UI ----
   var mode = "login";
+  var googleUser = null; // set only while a just-signed-in Google user still needs to complete their Pulse profile
   function setMode(m) {
     mode = m;
     $("segLogin").classList.toggle("on", m === "login"); $("segSignup").classList.toggle("on", m === "signup");
@@ -63,6 +64,28 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     $("aPass").setAttribute("autocomplete", m === "login" ? "current-password" : "new-password");
     $("aName").required = $("aAge").required = m === "signup"; $("authErr").textContent = "";
   }
+  function resetAuthChrome() {
+    googleUser = null; $("emailRow").style.display = ""; $("pwRow").style.display = ""; $("aUser").required = true;
+    $("segBox").style.display = ""; $("googleBtn").style.display = ""; $("googleBtn").disabled = false; $("googleBtnLbl").textContent = "Continue with Google";
+    document.querySelector(".auth-or").style.display = "";
+  }
+  function showGoogleOnboarding(u) {
+    googleUser = u; $("auth").hidden = false; $("authForm").style.display = ""; $("segBox").style.display = "none"; $("verifyBox").style.display = "none";
+    document.querySelector(".auth-or").style.display = "none"; $("googleBtn").style.display = "none";
+    $("emailRow").style.display = "none"; $("aUser").required = false; $("pwRow").style.display = "none"; $("aPass").required = false;
+    $("signupOnly").hidden = false; $("aName").required = true; $("aAge").required = true;
+    $("aName").value = u.displayName || ""; $("authErr").textContent = "";
+    $("authBtn").textContent = "Profile complete karo";
+  }
+  $("googleBtn").addEventListener("click", function () {
+    if (!auth) { $("authErr").textContent = "App abhi set nahi hui (firebase-config.json khaali hai)."; return; }
+    var btn = this; btn.disabled = true; $("googleBtnLbl").textContent = "Jud rahe hain...";
+    signInWithPopup(auth, new GoogleAuthProvider()).catch(function (e) {
+      btn.disabled = false; $("googleBtnLbl").textContent = "Continue with Google";
+      if (e && (e.code === "auth/popup-closed-by-user" || e.code === "auth/cancelled-popup-request")) return;
+      $("authErr").textContent = errMsg(e);
+    });
+  });
   $("pwEye").addEventListener("click", function () { var f = $("aPass"), show = f.type === "password"; f.type = show ? "text" : "password"; this.textContent = show ? "🙈" : "👁"; this.setAttribute("aria-label", show ? "Hide password" : "Show password"); f.focus(); });
   $("segLogin").addEventListener("click", function () { setMode("login"); });
   $("segSignup").addEventListener("click", function () { setMode("signup"); });
@@ -70,6 +93,17 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   $("authForm").addEventListener("submit", function (e) {
     e.preventDefault(); $("authErr").textContent = "";
     if (!auth) { $("authErr").textContent = "App abhi set nahi hui (firebase-config.json khaali hai)."; return; }
+    if (googleUser) {
+      var gu = googleUser, gAge = parseInt($("aAge").value, 10), gName = clean($("aName").value, 40);
+      if (!gName) { $("authErr").textContent = "Naam likho"; return; }
+      if (!(gAge >= 18 && gAge <= 99)) { $("authErr").textContent = "Ye app sirf 18+ ke liye hai"; return; }
+      if (!$("aAdult").checked) { $("authErr").textContent = "Please confirm you are 18+ and accept the policy"; return; }
+      $("authBtn").disabled = true;
+      var gProf = { name: gName, age: gAge, city: clean($("aCity").value, 40), work: "", about: "", looking: ({ friends: "Dosti", dating: "Dating", marriage: "Shaadi" })[signMode] || "Dosti", mode: signMode, gender: isMateMode(signMode) ? $("aGender").value : "", seeking: isMateMode(signMode) ? $("aSeeking").value : "", hidden: false, consentV: "2026-11", consentAt: serverTimestamp(), createdAt: serverTimestamp() };
+      setDoc(doc(db, "users", gu.uid), gProf).then(function () { googleUser = null; UID = gu.uid; ME = Object.assign({}, gProf, { uid: UID }); return afterAuth(gu); })
+        .catch(function (err) { $("authErr").textContent = errMsg(err); }).then(function () { $("authBtn").disabled = false; });
+      return;
+    }
     var email = $("aUser").value.trim(), pw = $("aPass").value;
     $("authBtn").disabled = true;
     var p;
@@ -126,7 +160,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   }
 
   // ---- email verification (asli insaan ka saboot) ----
-  function showForms() { $("verifyBox").style.display = "none"; $("authForm").style.display = ""; $("segBox").style.display = ""; $("vErr").textContent = ""; }
+  function showForms() { $("verifyBox").style.display = "none"; $("authForm").style.display = ""; $("vErr").textContent = ""; resetAuthChrome(); }
   function showVerify(u) {
     $("auth").hidden = false; $("authForm").style.display = "none"; $("segBox").style.display = "none"; $("verifyBox").style.display = "";
     $("vMsg").textContent = "Verification mail " + u.email + " par bheji hai. Mail me link par click karo (Spam folder bhi dekho), phir niche button dabao.";
@@ -134,7 +168,11 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   function afterAuth(u) {
     if (!u.emailVerified) { showVerify(u); return Promise.resolve(); }
     return getDoc(doc(db, "users", u.uid)).then(function (s) {
-      if (!s.exists()) { signOut(auth); showForms(); $("auth").hidden = false; $("authErr").textContent = "Profile nahi mili. Naya account banao."; return; }
+      if (!s.exists()) {
+        var isGoogle = (u.providerData || []).some(function (p) { return p.providerId === "google.com"; });
+        if (isGoogle) { showGoogleOnboarding(u); return; }
+        signOut(auth); showForms(); $("auth").hidden = false; $("authErr").textContent = "Profile nahi mili. Naya account banao."; return;
+      }
       return getDoc(doc(db, "bans", u.uid)).catch(function () { return { exists: function () { return false; } }; }).then(function (b) { if (b.exists()) { signOut(auth); showForms(); $("auth").hidden = false; $("authErr").textContent = "This account has been suspended for breaking the rules."; return; } showForms(); UID = u.uid; ME = Object.assign({}, s.data(), { uid: UID }); start(); });
     }).catch(function (e) { showForms(); $("auth").hidden = false; $("authErr").textContent = errMsg(e); });
   }
