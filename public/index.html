@@ -443,6 +443,17 @@
   .daily { position: relative; height: 170px; border-radius: 22px; overflow: hidden; margin: 4px 0 14px; background-size: cover; background-position: center; color: #fff; box-shadow: var(--shadow); cursor: pointer; } .daily::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,.05), rgba(0,0,0,.75)); }
   .daily .tx { position: absolute; z-index: 1; left: 14px; right: 14px; bottom: 12px; } .daily .lb { font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; opacity: .85; } .daily h3 { margin: 2px 0 6px; font-size: 22px; text-shadow: 0 2px 10px rgba(0,0,0,.5); } .daily .row { display: flex; gap: 8px; align-items: center; font-size: 12.5px; } .daily button { margin-left: auto; border: none; border-radius: 999px; padding: 8px 14px; font-weight: 800; background: #fff; color: #7a2b00; cursor: pointer; font-family: var(--font-body); }
   .dham-sheet .hd { height: 170px; border-radius: 16px; background-size: cover; background-position: center; margin-bottom: 12px; }
+
+  .mode-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 4px; } .mode-lbl { grid-column: 1 / -1; font-size: 13px; font-weight: 700; color: var(--muted); }
+  .mode-grid button { border: 1.5px solid var(--line); background: var(--surface-2); color: var(--fg); border-radius: 14px; padding: 12px 8px; font-weight: 700; font-size: 13px; cursor: pointer; font-family: var(--font-body); display: flex; flex-direction: column; align-items: center; gap: 4px; } .mode-grid button i { font-style: normal; font-size: 22px; } .mode-grid button.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--surface)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
+  .forgot { display: block; text-align: center; font-size: 12.5px; color: var(--accent); margin-top: 10px; } .sub-h { font-weight: 800; font-size: 13px; margin: 8px 0 -2px; color: var(--accent); }
+  .jobs-seg { margin-bottom: 12px; } .jcard { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 14px; margin-bottom: 10px; box-shadow: var(--shadow); } .jcard h4 { margin: 0 0 2px; font-size: 16px; } .jcard .jm { font-size: 12.5px; color: var(--muted); margin-bottom: 8px; } .jcard .jd { font-size: 13.5px; line-height: 1.5; margin-bottom: 10px; } .jcard .jrow { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; } .jcard button { padding: 8px 14px; font-size: 13px; }
+  .chip { display: inline-block; font-size: 11.5px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--surface-2); color: var(--muted); margin: 0 4px 4px 0; } .chip.ok { background: #d3f9d8; color: #1b6b2a; } .chip.warn { background: #fff3bf; color: #8a6100; } .chip.no { background: #ffe3e3; color: #b02a2a; } .chip.acc { background: color-mix(in srgb, var(--accent) 14%, var(--surface)); color: var(--accent); }
+  .jfilters { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; } .jfilters select, .jfilters input, .jform select, .jform input, .jform textarea { font-family: var(--font-body); font-size: 14px; color: var(--fg); background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 11px 12px; outline: none; width: 100%; box-sizing: border-box; } .jform { display: flex; flex-direction: column; gap: 10px; }
+  .scam-note { font-size: 12px; background: #fff3bf; color: #6b4e00; border-radius: 12px; padding: 9px 12px; margin-bottom: 12px; line-height: 1.5; }
+  .thread { position: absolute; inset: 0; z-index: 80; background: var(--bg); display: flex; flex-direction: column; } .thread[hidden] { display: none; } .th-log { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 6px; } .th-log .bubble { max-width: 80%; }
+  .swipe-card .facts { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 4px; } .swipe-card .facts span { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: rgba(255,255,255,.22); backdrop-filter: blur(4px); }
+.av-lg{width:84px;height:84px;border-radius:50%;margin:0 auto 8px;display:grid;place-items:center;font-size:32px;font-weight:700;color:#fff}.pf-top{text-align:center}.pf-priv{margin:10px 0;padding:8px 10px;border-radius:10px;background:rgba(80,200,140,.12);font-size:12px}
 </style></head><body>
 <div class="app">
   <header class="topbar">
@@ -464,7 +475,13 @@
     <div id="feed"></div>
   </main>
 
+  <main class="screen" id="screen-jobs" hidden><div id="jobsBox"></div></main>
+
   <main class="screen" id="screen-discover" hidden>
+    <div id="mFilterBox" hidden><button class="btn-outline" id="mFilterBtn" style="width:100%;padding:10px;margin-bottom:8px">🔎 Filters (age, religion, status, city)</button><div class="st-card" id="mFilter" hidden>
+      <div class="st-row"><input class="bh-in" id="fAgeMin" type="number" placeholder="Age from" style="margin:0 0 8px"><input class="bh-in" id="fAgeMax" type="number" placeholder="Age to" style="margin:0 0 8px"></div>
+      <input class="bh-in" id="fReligion" placeholder="Religion"><input class="bh-in" id="fCity" placeholder="City"><select class="bh-in" id="fMarital"><option value="">Any marital status</option><option>Never married</option><option>Divorced</option><option>Widowed</option></select>
+      <button class="btn-grad" id="fApply" style="width:100%;padding:11px">Apply filters</button></div></div>
     <div class="deck-wrap" id="deck"></div>
     <div class="swipe-controls">
       <button class="sbtn nope" id="btnNope" aria-label="Pass"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6L6 18M6 6l12 12" stroke-linecap="round"/></svg></button>
@@ -531,7 +548,20 @@
         <label>Sheher<input id="eCity" maxlength="40"></label>
         <label>Kaam<input id="eWork" maxlength="60"></label>
         <label>Mere baare me<textarea id="eAbout" maxlength="300" rows="3"></textarea></label>
-        <label>Kya dhoond rahe ho<select id="eLooking"><option>Dosti</option><option>Dating</option><option>Shaadi</option></select></label>
+        <label>I am here for<select id="eMode"><option value="friends">Friendship</option><option value="dating">Dating</option><option value="marriage">Marriage</option><option value="jobseeker">Find a job</option><option value="recruiter">Hire talent</option></select></label>
+        <div id="secMate"><label>I am<select id="eGender"><option value="">Select</option><option>Woman</option><option>Man</option><option>Other</option></select></label><label>Show me<select id="eSeeking"><option>Everyone</option><option>Women</option><option>Men</option></select></label></div>
+        <div id="secMarriage" hidden><div class="sub-h">Marriage profile</div>
+          <label>Religion<input id="eReligion" maxlength="30"></label><label>Mother tongue<input id="eTongue" maxlength="30"></label><label>Community (optional)<input id="eCommunity" maxlength="40"></label>
+          <label>Marital status<select id="eMarital"><option>Never married</option><option>Divorced</option><option>Widowed</option></select></label><label>Height (cm)<input id="eHeight" type="number" min="120" max="230" inputmode="numeric"></label>
+          <label>Education<input id="eEdu" maxlength="50"></label><label>Diet<select id="eDiet"><option>Vegetarian</option><option>Non-vegetarian</option><option>Eggetarian</option><option>Vegan</option></select></label>
+          <label>Profile managed by<select id="eManaged"><option>Self</option><option>Parent</option><option>Sibling</option><option>Friend</option></select></label>
+          <div class="st-row"><label style="flex:1">Partner age from<input id="eAgeMin" type="number" min="18" max="99"></label><label style="flex:1">to<input id="eAgeMax" type="number" min="18" max="99"></label></div></div>
+        <div id="secSeeker" hidden><div class="sub-h">Job profile</div>
+          <label>Field<select id="eField"></select></label><label>Desired role<input id="eRole" maxlength="60"></label><label>Skills (comma separated)<input id="eSkills" maxlength="150"></label>
+          <label>Experience (years)<input id="eExp" type="number" min="0" max="50" inputmode="numeric"></label><label>Job type<select id="eJobType"><option>Full-time</option><option>Part-time</option><option>Contract</option><option>Internship</option><option>Remote</option></select></label>
+          <label>Preferred city<input id="ePrefCity" maxlength="40"></label><label>Notice period<input id="eNotice" maxlength="30" placeholder="e.g. Immediate, 30 days"></label><label>Resume link (optional)<input id="eResume" maxlength="200" placeholder="https://..."></label></div>
+        <div id="secRecruiter" hidden><div class="sub-h">Company</div>
+          <label>Company name<input id="eCompany" maxlength="60"></label><label>Your designation<input id="eDesig" maxlength="60"></label><label>About the company<textarea id="eCAbout" maxlength="300" rows="3"></textarea></label><label>Website (optional)<input id="eCSite" maxlength="120"></label></div>
         <button class="btn-grad" id="saveProfile">Save karo</button>
       </div>
       <div class="section-title">Privacy</div>
@@ -542,6 +572,8 @@
       </div>
       <div class="setting-row"><div class="lbl">Profile photo<div class="desc">Small photo shown on your swipe card</div></div><button class="btn-outline" id="photoSet" style="padding:8px 14px">Upload</button><input type="file" id="avatarInput" accept="image/*" hidden></div>
       <div class="setting-row"><div class="lbl">Enable notifications<div class="desc">Alerts when the app is in the background</div></div><button class="btn-outline" id="notifBtn" style="padding:8px 14px">Enable</button></div>
+      <div class="setting-row"><div class="lbl">Pause my profile<div class="desc">Hide me from Discover, Nearby and candidate search</div></div><button class="toggle" id="hideToggle" aria-label="Pause profile"></button></div>
+      <div class="setting-row"><div class="lbl">Blocked people<div class="desc">Unblock someone you blocked</div></div><button class="btn-outline" id="blockedBtn" style="padding:8px 14px">Manage</button></div>
       <div id="creatorBox" hidden></div>
       <button class="btn-grad" style="width:100%;margin-top:16px;padding:13px" id="inviteBtn">📨 Doston ko bulao (invite link)</button>
       <button class="btn-outline" style="width:100%;margin-top:12px" id="logoutBtn">Logout</button>
@@ -578,6 +610,7 @@
     <div class="room-ctrl"><button class="rc" id="rcPrev" hidden>⏮</button><button class="rc big" id="rcFlower">🌸</button><button class="rc" id="rcBell">🔔</button><button class="rc" id="rcSound">🎶</button><button class="rc" id="rcAuto" hidden>▶ Auto</button><button class="rc" id="rcNext" hidden>⏭</button></div>
     <div class="room-chat"><div class="rchat-log" id="roomLog"></div><div class="rchat-in"><input id="roomMsg" maxlength="200" placeholder="Say Jai... / write a message"><button class="send-btn" id="roomSend" aria-label="Send">➤</button></div></div>
   </div>
+  <div class="thread" id="thread" hidden><div class="room-top" style="color:var(--fg)"><button class="icon-btn" id="thClose">←</button><div style="flex:1;min-width:0"><div class="rn" id="thTitle">-</div><div class="rs" id="thSub"></div></div></div><div class="th-log" id="thLog"></div><div class="rchat-in" style="padding:10px 12px"><input id="thMsg" maxlength="500" placeholder="Write a message..."><button class="send-btn" id="thSend">➤</button></div></div>
   <div class="imgview" id="imgView" hidden><img id="imgBig" alt=""></div>
   <div class="policy" id="policyUI" hidden><div class="policy-box"><button class="icon-btn" id="policyClose" style="float:right">✕</button><div id="policyText"></div></div></div>
   <div class="callui" id="callUI" hidden><div class="callbox"><div class="call-av" id="callAv">A</div><h3 id="callName">-</h3><div class="call-sub" id="callSub"></div>
@@ -614,11 +647,15 @@
           <label>Aapka naam<input id="aName" maxlength="40" autocomplete="name"></label>
           <label>Umar (18+)<input id="aAge" type="number" min="18" max="99" inputmode="numeric"></label>
           <label>Sheher<input id="aCity" maxlength="40" autocomplete="address-level2"></label>
-          <label class="chk"><input type="checkbox" id="aAdult"><span>I am 18+ and accept the <a href="#" class="plink">Privacy Policy &amp; Terms</a></span></label>
-          <label>Kya dhoond rahe ho<select id="aLooking"><option>Dosti</option><option>Dating</option><option>Shaadi</option></select></label>
+          <div class="mode-grid" id="modeGrid"><div class="mode-lbl">I am here for</div>
+            <button type="button" data-m="friends" class="on"><i>🤝</i>Friendship</button><button type="button" data-m="dating"><i>💜</i>Dating</button><button type="button" data-m="marriage"><i>💍</i>Marriage</button><button type="button" data-m="jobseeker"><i>💼</i>Find a job</button><button type="button" data-m="recruiter"><i>🏢</i>Hire talent</button></div>
+          <div id="aMateBox" hidden><label>I am<select id="aGender"><option value="">Select</option><option>Woman</option><option>Man</option><option>Other</option></select></label>
+          <label>Show me<select id="aSeeking"><option>Everyone</option><option>Women</option><option>Men</option></select></label></div>
+          <label class="chk"><input type="checkbox" id="aAdult"><span>I am 18+. I accept the <a href="#" class="plink">Privacy Policy &amp; Terms</a> and understand this is a <b>beta (testing) version</b></span></label>
         </div>
         <label>Password<input id="aPass" type="password" required minlength="6" autocomplete="current-password" placeholder="kam se kam 6 akshar"></label>
         <div class="auth-err" id="authErr" role="alert"></div>
+        <a href="#" id="forgotLink" class="forgot">Forgot password?</a>
         <button class="btn-grad" id="authBtn" type="submit" style="width:100%;padding:13px">Login</button>
       </form>
     </div>

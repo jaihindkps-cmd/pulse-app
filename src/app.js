@@ -1,6 +1,6 @@
 // Pulse (Firebase version): Auth + Firestore + Hosting, sab free (Spark) plan par.
 import { initializeApp } from "firebase/app";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, deleteUser, sendEmailVerification } from "firebase/auth";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, deleteUser, sendEmailVerification, sendPasswordResetEmail } from "firebase/auth";
 import {
   initializeFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, collection, addDoc, query, where, orderBy, limit,
   getDocs, onSnapshot, serverTimestamp, arrayUnion, arrayRemove, Timestamp, writeBatch, increment, getCountFromServer
@@ -81,7 +81,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
       if (!$("aAdult").checked) { $("authErr").textContent = "Please confirm you are 18+ and accept the policy"; $("authBtn").disabled = false; return; }
       signingUp = true;
       p = createUserWithEmailAndPassword(auth, email, pw).then(function (cred) {
-        var prof = { name: name, age: age, city: clean($("aCity").value, 40), work: "", about: "", looking: $("aLooking").value, createdAt: serverTimestamp() };
+        var prof = { name: name, age: age, city: clean($("aCity").value, 40), work: "", about: "", looking: ({ friends: "Dosti", dating: "Dating", marriage: "Shaadi" })[signMode] || "Dosti", mode: signMode, gender: isMateMode(signMode) ? $("aGender").value : "", seeking: isMateMode(signMode) ? $("aSeeking").value : "", hidden: false, consentV: "2026-11", consentAt: serverTimestamp(), createdAt: serverTimestamp() };
         return setDoc(doc(db, "users", cred.user.uid), prof).then(function () { UID = cred.user.uid; ME = Object.assign({}, prof, { uid: UID }); signingUp = false; lastSent = Date.now(); return sendEmailVerification(cred.user).catch(function () { lastSent = 0; }).then(function () { return afterAuth(cred.user); }); })
           .catch(function (err) { return deleteUser(cred.user).catch(function () {}).then(function () { throw err; }); });
       });
@@ -97,9 +97,9 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     $("auth").hidden = true;
     $("meAv").textContent = $("pAv").textContent = (ME.name || "?").charAt(0).toUpperCase();
     $("pName").textContent = ME.name; $("pHandle").textContent = ME.city || "";
-    $("eName").value = ME.name || ""; $("eCity").value = ME.city || ""; $("eWork").value = ME.work || ""; $("eAbout").value = ME.about || ""; $("eLooking").value = ME.looking || "Dosti";
+    $("eName").value = ME.name || ""; $("eCity").value = ME.city || ""; $("eWork").value = ME.work || ""; $("eAbout").value = ME.about || "";
     getDocs(query(collection(db, "blocks"), where("blocker", "==", UID))).then(function (s) { blocked = new Set(); s.forEach(function (d) { blocked.add(d.data().blocked); }); }).catch(function () {}).then(function () {
-      listenFeed(); listenMatches(); refreshLocToggle(); showTab("feed"); setLive(); paintAv(); creatorPanel(); pendingRoom();
+      applyMode(); listenApps(); listenFeed(); listenMatches(); refreshLocToggle(); showTab("feed"); setLive(); paintAv(); creatorPanel(); pendingRoom();
     });
   }
   function init(cfg) {
@@ -146,13 +146,14 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   $("vOut").addEventListener("click", function () { signOut(auth); });
 
   // ---- tabs ----
-  var titles = { feed: "Pulse", discover: "Discover", nearby: "Nearby", studio: "Gaana Studio", chats: "Messages", profile: "Profile" };
-  var screens = ["feed", "discover", "nearby", "studio", "chats", "profile"];
+  var titles = { feed: "Pulse", jobs: "Jobs", discover: "Discover", nearby: "Nearby", studio: "Gaana Studio", chats: "Messages", profile: "Profile" };
+  var screens = ["feed", "discover", "jobs", "nearby", "studio", "chats", "profile"];
   function showTab(name) {
+    var key = name; if (name === "discover" && isJobMode()) name = "jobs";
     screens.forEach(function (s) { $("screen-" + s).hidden = s !== name; });
-    document.querySelectorAll(".tab").forEach(function (t) { t.classList.toggle("active", t.getAttribute("data-tab") === name); });
+    document.querySelectorAll(".tab").forEach(function (t) { t.classList.toggle("active", t.getAttribute("data-tab") === key); });
     $("screenTitle").textContent = titles[name];
-    if (name === "discover") loadDeck(); if (name === "nearby") loadNearby(); else stopNearby(); if (name === "studio") renderLib(); if (name === "chats") $("chatDot").hidden = true;
+    if (name === "discover") loadDeck(); if (name === "jobs") loadJobs(); if (name === "nearby") loadNearby(); else stopNearby(); if (name === "studio") renderLib(); if (name === "chats") $("chatDot").hidden = true;
   }
   document.querySelectorAll(".tab").forEach(function (t) { t.addEventListener("click", function () { if (UID) showTab(t.getAttribute("data-tab")); }); });
 
@@ -161,7 +162,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   postText.addEventListener("input", function () { this.style.height = "auto"; this.style.height = this.scrollHeight + "px"; $("postBtn").disabled = !this.value.trim(); $("charCount").textContent = this.value.length + "/500"; });
   $("postBtn").addEventListener("click", function () {
     var t = clean(postText.value, 500); if (!t || !rate("post", 4, 60000)) return; this.disabled = true;
-    addDoc(collection(db, "posts"), { uid: UID, name: ME.name, text: t, likedBy: [], createdAt: serverTimestamp() })
+    autoFlag(t, "post"); addDoc(collection(db, "posts"), { uid: UID, name: ME.name, text: t, likedBy: [], createdAt: serverTimestamp() })
       .then(function () { postText.value = ""; postText.style.height = "auto"; $("charCount").textContent = "0/500"; toast("Post ho gaya 🎉"); })
       .catch(function (e) { toast(errMsg(e)); $("postBtn").disabled = false; });
   });
@@ -171,7 +172,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
       snap.forEach(function (d) {
         var p = snapData(d); if (blocked.has(p.uid)) return; n++;
         var liked = (p.likedBy || []).indexOf(UID) >= 0;
-        var node = el('<article class="post"><div class="post-head"><div class="av-sm" style="background:' + g(p.uid) + '">' + ini(p.name) + '</div><div class="who"><div class="name">' + esc(p.name) + '</div><div class="meta">' + ago(ms(p.createdAt)) + '</div></div></div><p class="post-text">' + esc(p.text) + '</p><div class="post-actions"><button class="act like ' + (liked ? "liked" : "") + '"><svg viewBox="0 0 24 24" fill="' + (liked ? "currentColor" : "none") + '" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-4.3-9.3-8.5C.9 9.4 2.4 6 5.6 6c1.9 0 3.2 1.1 4.4 2.5C11.2 7.1 12.5 6 14.4 6c3.2 0 4.7 3.4 2.9 6.5C19 16.7 12 21 12 21Z"/></svg><span class="cnt">' + (p.likedBy || []).length + '</span></button></div></article>');
+        var node = el('<article class="post"><div class="post-head" data-uid="' + esc(p.uid) + '" style="cursor:pointer"><div class="av-sm" style="background:' + g(p.uid) + '">' + ini(p.name) + '</div><div class="who"><div class="name">' + esc(p.name) + '</div><div class="meta">' + ago(ms(p.createdAt)) + '</div></div></div><p class="post-text">' + esc(p.text) + '</p><div class="post-actions"><button class="act like ' + (liked ? "liked" : "") + '"><svg viewBox="0 0 24 24" fill="' + (liked ? "currentColor" : "none") + '" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-4.3-9.3-8.5C.9 9.4 2.4 6 5.6 6c1.9 0 3.2 1.1 4.4 2.5C11.2 7.1 12.5 6 14.4 6c3.2 0 4.7 3.4 2.9 6.5C19 16.7 12 21 12 21Z"/></svg><span class="cnt">' + (p.likedBy || []).length + '</span></button></div></article>');
         node.querySelector(".like").addEventListener("click", function () {
           updateDoc(d.ref, { likedBy: liked ? arrayRemove(UID) : arrayUnion(UID) }).catch(function (e) { toast(errMsg(e)); });
         });
@@ -185,9 +186,9 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   var queue = [], dragging = false, sx = 0, cx = 0, topCard = null, topUser = null, busy = false;
   function shuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
   function loadDeck() {
-    Promise.all([getDocs(query(collection(db, "users"), limit(100))), getDocs(query(collection(db, "swipes"), where("from", "==", UID)))]).then(function (r) {
+    Promise.all([getDocs(query(collection(db, "users"), limit(300))), getDocs(query(collection(db, "swipes"), where("from", "==", UID)))]).then(function (r) {
       var done = new Set(); r[1].forEach(function (d) { done.add(d.data().to); });
-      var list = []; r[0].forEach(function (d) { if (d.id !== UID && !done.has(d.id) && !blocked.has(d.id)) list.push(Object.assign({ id: d.id }, d.data())); });
+      var list = []; r[0].forEach(function (d) { var u = Object.assign({ id: d.id }, d.data()); if (d.id !== UID && !done.has(d.id) && !blocked.has(d.id) && deckOk(u)) list.push(u); });
       queue = shuffle(list).slice(0, 20); renderDeck();
     }).catch(function (e) { toast(errMsg(e)); });
   }
@@ -196,7 +197,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     if (!queue.length) { deck.innerHTML = '<div class="deck-empty"><div><div style="font-size:42px;margin-bottom:8px">💫</div><div style="font-weight:700;font-size:16px;color:var(--fg);margin-bottom:4px">Abhi itne hi log</div><div style="font-size:13px">Jaise-jaise naye log judenge, yahan dikhenge. Doston ko Pulse bhejo!</div></div></div>'; return; }
     queue.slice(0, 3).reverse().forEach(function (u, i, arr) {
       var top = i === arr.length - 1, depth = arr.length - 1 - i;
-      var c = el('<div class="swipe-card" style="background:' + g(u.id) + ';transform:translateY(' + depth * 14 + 'px) scale(' + (1 - depth * 0.05) + ')"><div class="scrim"></div><div class="avatar-big"' + (u.photo && JPEG.test(u.photo) ? ' style="background:center/cover url(' + u.photo + ')"' : "") + '>' + (u.photo && JPEG.test(u.photo) ? "" : ini(u.name)) + '</div><span class="stamp like">Like</span><span class="stamp nope">Nope</span><div class="info"><h3>' + esc(u.name) + (u.age ? ", " + u.age : "") + '</h3><div class="sub">' + esc([u.work, u.city].filter(Boolean).join(" · ") || "Pulse member") + '</div>' + (u.about ? '<p class="about">' + esc(u.about) + '</p>' : '') + '<div class="tags"><span>' + esc(u.looking || "Dosti") + '</span></div></div></div>');
+      var c = el('<div class="swipe-card" style="background:' + g(u.id) + ';transform:translateY(' + depth * 14 + 'px) scale(' + (1 - depth * 0.05) + ')"><div class="scrim"></div><div class="avatar-big"' + (u.photo && JPEG.test(u.photo) ? ' style="background:center/cover url(' + u.photo + ')"' : "") + '>' + (u.photo && JPEG.test(u.photo) ? "" : ini(u.name)) + '</div><span class="stamp like">Like</span><span class="stamp nope">Nope</span><div class="info"><h3>' + esc(u.name) + (u.age ? ", " + u.age : "") + '</h3><div class="sub">' + esc([u.work, u.city].filter(Boolean).join(" · ") || "Pulse member") + '</div>' + (u.about ? '<p class="about">' + esc(u.about) + '</p>' : '') + '<div class="tags"><span>' + esc(MODE_LABEL[modeOf(u)]) + '</span></div>' + factsFor(u) + '</div></div>');
       deck.appendChild(c);
       if (top) { topCard = c; topUser = u; drag(c); }
     });
@@ -283,7 +284,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
           list.appendChild(el('<div class="section-title">Abhi aas-paas · ' + rows.length + ' log (live)</div>'));
           rows.slice(0, 50).forEach(function (r) {
             var dist = r.km < 1 ? "1 km se kam" : "~" + Math.round(r.km) + " km";
-            var row = el('<div class="nearby-row"><div class="av-sm" style="width:50px;height:50px;font-size:18px;background:' + g(r.id) + '">' + ini(r.p.name) + '</div><div class="body"><div class="nm">' + esc(r.p.name) + (r.p.age ? ", " + esc(r.p.age) : "") + '</div><div class="meta">📍 ' + dist + ' · ' + esc(r.p.work || r.p.city || "Pulse member") + '</div></div><button class="wave">💬 Chat</button></div>');
+            var row = el('<div class="nearby-row" data-uid="' + esc(r.id) + '"><div class="av-sm" style="width:50px;height:50px;font-size:18px;background:' + g(r.id) + '">' + ini(r.p.name) + '</div><div class="body"><div class="nm">' + esc(r.p.name) + (r.p.age ? ", " + esc(r.p.age) : "") + '</div><div class="meta">📍 ' + dist + ' · ' + esc(r.p.work || r.p.city || "Pulse member") + '</div></div><button class="wave">💬 Chat</button></div>');
             row.querySelector(".wave").addEventListener("click", function () {
               var mt = matchDocs.filter(function (x) { return x.id === r.id; })[0];
               if (mt) { showTab("chats"); openChat({ id: r.id, mid: mt.mid, name: r.p.name }); } else toast("Pehle Discover me match karo, phir chat khulega 💜");
@@ -299,8 +300,11 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
 
   // ---- profile edit ----
   $("saveProfile").addEventListener("click", function () {
-    var upd = { name: clean($("eName").value, 40) || ME.name, city: clean($("eCity").value, 40), work: clean($("eWork").value, 60), about: clean($("eAbout").value, 300), looking: $("eLooking").value };
-    updateDoc(doc(db, "users", UID), upd).then(function () { Object.assign(ME, upd); $("pName").textContent = ME.name; $("pHandle").textContent = ME.city || ""; toast("Profile save ho gayi ✅"); }).catch(function (e) { toast(errMsg(e)); });
+    var m = $("eMode").value, upd = { name: clean($("eName").value, 40) || ME.name, city: clean($("eCity").value, 40), work: clean($("eWork").value, 60), about: clean($("eAbout").value, 300), mode: m, looking: ({ friends: "Dosti", dating: "Dating", marriage: "Shaadi" })[m] || "Dosti" };
+    Object.keys(PROF_FIELDS).forEach(function (id) { var k = PROF_FIELDS[id], v = $(id).value; upd[k] = NUMF[k] ? (v === "" ? null : +v) : clean(v, k === "cabout" ? 300 : 200); });
+    if (!isMateMode(m)) { upd.gender = ME.gender || ""; upd.seeking = ME.seeking || ""; }
+    if (upd.ageMin && upd.ageMax && upd.ageMin > upd.ageMax) { toast("Partner age range is wrong"); return; }
+    updateDoc(doc(db, "users", UID), upd).then(function () { Object.assign(ME, upd); applyMode(); listenApps(); $("pName").textContent = ME.name; $("pHandle").textContent = ME.city || ""; toast("Profile save ho gayi ✅"); }).catch(function (e) { toast(errMsg(e)); });
   });
 
   // ---- chats ----
@@ -468,6 +472,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     var inp = $("msgInput"), t = clean(inp.value, 1000); if (!t || !activeChat) return; var c = activeChat; inp.value = "";
     if (!rate("msg", 10, 10000)) { inp.value = t; return; }
     if (c.ai) { saathiTalk(c, t); return; }
+    autoFlag(t, "chat");
     if (SCAM_MONEY.test(t) || PII.test(t)) { if (!window.confirm("⚠️ Safety: paisa, OTP, bank details, phone number ya link bhejna risky ho sakta hai. Pehle bharosa banao. Phir bhi bhejna hai?")) { inp.value = t; return; } }
     var b = writeBatch(db), mref = doc(collection(db, "matches", c.mid, "messages"));
     b.set(mref, { from: UID, text: t, createdAt: serverTimestamp() });
@@ -775,7 +780,9 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     Promise.all([getCountFromServer(collection(db, "users")), getCountFromServer(collection(db, "posts"))]).then(function (r) { $("crStats").innerHTML = '<div class="cr-row">Members: <b>' + r[0].data().count + '</b> · Posts: <b>' + r[1].data().count + '</b></div>'; }).catch(function () {});
     getDocs(query(collection(db, "reports"), orderBy("createdAt", "desc"), limit(30))).then(function (s) {
       var l = $("crList"); l.innerHTML = s.empty ? '<div class="cr-row">No reports 🎉</div>' : "";
-      s.forEach(function (d) { var r = d.data(); var row = el('<div class="cr-row" data-notr>Reported <b>' + esc(r.to) + '</b>: ' + esc(r.reason || "") + ' <button class="btn-outline" style="padding:4px 10px">Fill ID</button></div>'); row.querySelector("button").addEventListener("click", function () { $("crUid").value = r.to; }); l.appendChild(row); });
+      s.forEach(function (d) { var r = d.data(); var row = el('<div class="cr-row" data-notr>Reported <b>' + esc(r.to) + '</b>: ' + esc(r.reason || "") + ' <button class="btn-outline" style="padding:4px 10px">Fill ID</button> <button class="btn-grad cb" style="padding:4px 10px">Ban</button> <button class="btn-outline cd" style="padding:4px 10px">Dismiss</button></div>'); row.querySelector("button").addEventListener("click", function () { $("crUid").value = r.to; });
+        row.querySelector(".cb").addEventListener("click", function () { if (window.confirm("Ban this member? You are approving this action.")) setDoc(doc(db, "bans", r.to), { at: serverTimestamp(), by: UID, why: String(r.reason || "").slice(0, 100) }).then(function () { deleteDoc(doc(db, "reports", d.id)); row.remove(); toast("Banned"); }).catch(function (e) { toast(errMsg(e)); }); });
+        row.querySelector(".cd").addEventListener("click", function () { deleteDoc(doc(db, "reports", d.id)).then(function () { row.remove(); }).catch(function (e) { toast(errMsg(e)); }); }); l.appendChild(row); });
     }).catch(function (e) { toast(errMsg(e)); });
     $("crBan").addEventListener("click", function () { var id = clean($("crUid").value, 60); if (id) setDoc(doc(db, "bans", id), { at: serverTimestamp(), by: UID }).then(function () { toast("Banned"); }).catch(function (e) { toast(errMsg(e)); }); });
     $("crUnban").addEventListener("click", function () { var id = clean($("crUid").value, 60); if (id) deleteDoc(doc(db, "bans", id)).then(function () { toast("Unbanned"); }).catch(function (e) { toast(errMsg(e)); }); });
@@ -892,6 +899,213 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     if (navigator.share) navigator.share({ title: "Pulse Bhajan Room", text: text, url: url }).catch(function () {}); else if (navigator.clipboard) navigator.clipboard.writeText(text + " " + url).then(function () { toast("Room link copied 📋"); }); else toast(text);
   });
   function pendingRoom() { try { var q = new URLSearchParams(location.search).get("room"); if (q) { sessionStorage.setItem("pulse_room", q); history.replaceState(null, "", location.pathname); } var c = sessionStorage.getItem("pulse_room"); if (c && UID) { sessionStorage.removeItem("pulse_room"); showTab("studio"); $("segBhajan").click(); joinRoom(c); } } catch (e) {} }
+
+  // ================= Modes: friends / dating / marriage / jobseeker / recruiter =================
+  var MODE = "friends", FIELDS = ["IT / Software", "Civil / Construction", "Mechanical", "Electrical", "Sales & Marketing", "Finance / Accounts", "HR", "Teaching", "Healthcare", "Design / Creative", "Operations / Logistics", "Customer Support", "Government / PSU", "Other"];
+  var MODE_LABEL = { friends: "Friendship", dating: "Dating", marriage: "Marriage", jobseeker: "Job seeker", recruiter: "Recruiter" };
+  function modeOf(u) { return (u && u.mode) || ({ Dosti: "friends", Dating: "dating", Shaadi: "marriage" })[u && u.looking] || "friends"; }
+  function isJobMode(m) { m = m || MODE; return m === "jobseeker" || m === "recruiter"; }
+  function isMateMode(m) { m = m || MODE; return m === "dating" || m === "marriage"; }
+  FIELDS.forEach(function (f) { $("eField").appendChild(new Option(f, f)); });
+  var signMode = "friends";
+  document.querySelectorAll("#modeGrid button").forEach(function (b) { b.addEventListener("click", function () { signMode = b.getAttribute("data-m"); document.querySelectorAll("#modeGrid button").forEach(function (x) { x.classList.toggle("on", x === b); }); $("aMateBox").hidden = !isMateMode(signMode); }); });
+  var PROF_FIELDS = { eReligion: "religion", eTongue: "tongue", eCommunity: "community", eMarital: "marital", eHeight: "height", eEdu: "edu", eDiet: "diet", eManaged: "managed", eAgeMin: "ageMin", eAgeMax: "ageMax", eField: "field", eRole: "role", eSkills: "skills", eExp: "exp", eJobType: "jobType", ePrefCity: "prefCity", eNotice: "notice", eResume: "resume", eCompany: "company", eDesig: "desig", eCAbout: "cabout", eCSite: "csite", eGender: "gender", eSeeking: "seeking" };
+  var NUMF = { height: 1, ageMin: 1, ageMax: 1, exp: 1 };
+  function fillProfileForm() {
+    $("eMode").value = MODE; Object.keys(PROF_FIELDS).forEach(function (id) { var v = ME[PROF_FIELDS[id]]; if (v != null && v !== "") $(id).value = v; });
+    $("hideToggle").classList.toggle("on", !!ME.hidden); sectionsFor($("eMode").value);
+  }
+  function sectionsFor(m) { $("secMate").hidden = !isMateMode(m); $("secMarriage").hidden = m !== "marriage"; $("secSeeker").hidden = m !== "jobseeker"; $("secRecruiter").hidden = m !== "recruiter"; $("eWork").parentNode.firstChild.nodeValue = m === "recruiter" ? "Role at work" : "Occupation"; }
+  $("eMode").addEventListener("change", function () { sectionsFor(this.value); });
+  $("hideToggle").addEventListener("click", function () { var on = !this.classList.contains("on"); this.classList.toggle("on", on); updateDoc(doc(db, "users", UID), { hidden: on }).then(function () { ME.hidden = on; toast(on ? "Profile paused" : "Profile visible"); }).catch(function (e) { toast(errMsg(e)); }); });
+  function applyMode() {
+    MODE = modeOf(ME);
+    var lab = { friends: "Discover", dating: "Discover", marriage: "Matches", jobseeker: "Jobs", recruiter: "Hiring" }[MODE];
+    var tb = document.querySelector('.tab[data-tab="discover"]'); tb.lastChild.nodeValue = lab;
+    document.querySelector('.tab[data-tab="nearby"]').style.display = (MODE === "friends" || MODE === "dating") ? "" : "none";
+    $("mFilterBox").hidden = MODE !== "marriage"; titles.discover = lab; titles.jobs = lab;
+    fillProfileForm();
+  }
+  function seekOk(a, b) { var sk = a.seeking || "Everyone"; if (sk === "Everyone") return true; return (sk === "Women" && b.gender === "Woman") || (sk === "Men" && b.gender === "Man"); }
+  var MF = {}; try { MF = JSON.parse(localStorage.getItem("pulse_mf") || "{}"); } catch (e) {}
+  $("mFilterBtn").addEventListener("click", function () { $("mFilter").hidden = !$("mFilter").hidden; });
+  ["fAgeMin", "fAgeMax", "fReligion", "fCity", "fMarital"].forEach(function (id) { if (MF[id]) $(id).value = MF[id]; });
+  $("fApply").addEventListener("click", function () { ["fAgeMin", "fAgeMax", "fReligion", "fCity", "fMarital"].forEach(function (id) { MF[id] = $(id).value; }); try { localStorage.setItem("pulse_mf", JSON.stringify(MF)); } catch (e) {} $("mFilter").hidden = true; loadDeck(); });
+  function deckOk(u) {
+    if (u.hidden || modeOf(u) !== MODE) return false;
+    if (isMateMode()) { if (!seekOk(ME, u) || !seekOk(u, ME)) return false; }
+    if (MODE === "marriage") {
+      var a = +u.age || 0, lo = +MF.fAgeMin || +ME.ageMin || 0, hi = +MF.fAgeMax || +ME.ageMax || 99;
+      if (a && (a < lo || a > hi)) return false;
+      if (MF.fReligion && String(u.religion || "").toLowerCase().indexOf(MF.fReligion.toLowerCase()) < 0) return false;
+      if (MF.fCity && String(u.city || "").toLowerCase().indexOf(MF.fCity.toLowerCase()) < 0) return false;
+      if (MF.fMarital && u.marital !== MF.fMarital) return false;
+    }
+    return true;
+  }
+  function factsFor(u) {
+    if (modeOf(u) !== "marriage") return "";
+    return '<div class="facts">' + [u.religion, u.tongue, u.marital, u.height ? u.height + " cm" : "", u.edu, u.diet].filter(Boolean).map(function (x) { return "<span>" + esc(x) + "</span>"; }).join("") + "</div>";
+  }
+
+  // ================= Jobs =================
+  var APPS = [], appsUnsub = null, jobsTab = null, firstApps = true;
+  function listenApps() {
+    if (appsUnsub) { appsUnsub(); appsUnsub = null; } if (!isJobMode()) return; firstApps = true;
+    var key = MODE === "recruiter" ? "rid" : "seeker";
+    appsUnsub = onSnapshot(query(collection(db, "applications"), where(key, "==", UID)), function (s) {
+      if (!firstApps) s.docChanges().forEach(function (ch) { var a = ch.doc.data(); if (ch.doc.metadata && ch.doc.metadata.hasPendingWrites) return;
+        if (MODE === "recruiter" && ch.type === "added" && a.status === "applied") { toast("📥 New applicant: " + a.sname + " for " + a.jtitle); pushLocal("New applicant", a.sname + " · " + a.jtitle); }
+        if (MODE === "jobseeker" && ch.type === "modified") { toast("📣 " + a.jtitle + ": " + a.status); pushLocal("Application update", a.jtitle + ": " + a.status); }
+        if (MODE === "jobseeker" && ch.type === "added" && a.status === "invited") toast("📨 Invited to apply: " + a.jtitle); });
+      firstApps = false; APPS = s.docs.map(function (d) { return Object.assign({ id: d.id }, snapData(d)); });
+      $("chatDot").hidden = true; if (!$("screen-jobs").hidden) renderJobs();
+    }, function (e) { toast(errMsg(e)); });
+    unsubs.push(function () { if (appsUnsub) { appsUnsub(); appsUnsub = null; } });
+  }
+  function loadJobs() { if (!jobsTab) jobsTab = MODE === "recruiter" ? "cands" : "jobs"; renderJobs(); }
+  function chip(t, c) { return '<span class="chip ' + (c || "") + '">' + esc(t) + "</span>"; }
+  function stChip(st) { return chip(st, { applied: "acc", invited: "warn", shortlisted: "ok", hired: "ok", rejected: "no", declined: "no", withdrawn: "" }[st] || ""); }
+  function renderJobs() {
+    var box = $("jobsBox"), tabs = MODE === "recruiter" ? [["cands", "Candidates"], ["myjobs", "My jobs"], ["post", "Post job"]] : [["jobs", "Jobs"], ["applied", "Applied"], ["invites", "Invites"]];
+    box.innerHTML = '<div class="seg jobs-seg">' + tabs.map(function (t) { return '<button data-t="' + t[0] + '"' + (jobsTab === t[0] ? ' class="on"' : "") + ">" + t[1] + (t[0] === "invites" && APPS.filter(function (a) { return a.status === "invited"; }).length ? " •" : "") + "</button>"; }).join("") + '</div><div id="jbody"></div>';
+    box.querySelectorAll(".jobs-seg button").forEach(function (b) { b.addEventListener("click", function () { jobsTab = b.getAttribute("data-t"); renderJobs(); }); });
+    var f = { jobs: viewJobs, applied: viewApplied, invites: viewInvites, cands: viewCands, myjobs: viewMyJobs, post: viewPost }[jobsTab]; f($("jbody"));
+  }
+  var SCAM = '<div class="scam-note">🛡️ Never pay money to get a job or interview. Real employers do not charge fees. Report any job that asks for payment.</div>';
+  function viewJobs(box) {
+    box.innerHTML = SCAM + '<div class="jfilters"><select id="jfField"><option value="">All fields</option>' + FIELDS.map(function (x) { return '<option' + (x === (ME.field || "") ? " selected" : "") + ">" + esc(x) + "</option>"; }).join("") + '</select><input id="jfCity" placeholder="City" value="' + esc(ME.prefCity || "") + '"><select id="jfType"><option value="">Any type</option><option>Full-time</option><option>Part-time</option><option>Contract</option><option>Internship</option><option>Remote</option></select><input id="jfQ" placeholder="Search title / skill"></div><div id="jlist"><div class="empty">Loading...</div></div>';
+    var jobsCache = null;
+    function paint() {
+      var fF = $("jfField").value, fC = $("jfCity").value.toLowerCase(), fT = $("jfType").value, q = $("jfQ").value.toLowerCase(), l = $("jlist"); l.innerHTML = "";
+      var rows = (jobsCache || []).filter(function (j) { return j.status !== "closed" && !blocked.has(j.rid) && (!fF || j.field === fF) && (!fC || String(j.city || "").toLowerCase().indexOf(fC) >= 0 || /remote/i.test(j.type)) && (!fT || j.type === fT) && (!q || (j.title + " " + j.company + " " + (j.skills || "")).toLowerCase().indexOf(q) >= 0); });
+      if (!rows.length) { l.innerHTML = '<div class="empty">No jobs match yet. Change the filters or check back soon.</div>'; return; }
+      rows.forEach(function (j) {
+        var app = APPS.filter(function (a) { return a.jid === j.id; })[0];
+        var c = el('<div class="jcard" data-notr><h4>' + esc(j.title) + '</h4><div class="jm">' + esc(j.company || j.rname) + " · " + esc(j.city || "") + " · " + esc(j.type || "") + '</div><div>' + chip(j.field || "Other", "acc") + (j.exp ? chip(j.exp + "+ yrs") : chip("Fresher ok")) + (j.salary ? chip(j.salary) : "") + '</div><div class="jd">' + esc(String(j.desc || "").slice(0, 220)) + '</div><div class="jrow">' + (app ? stChip(app.status) : '<button class="btn-grad">Apply</button>') + '</div></div>');
+        var b = c.querySelector(".btn-grad"); if (b) b.addEventListener("click", function () { applyJob(j, b); }); l.appendChild(c);
+      });
+    }
+    getDocs(query(collection(db, "jobs"), orderBy("createdAt", "desc"), limit(100))).then(function (s) { jobsCache = s.docs.map(function (d) { return Object.assign({ id: d.id }, snapData(d)); }); paint(); }).catch(function (e) { toast(errMsg(e)); });
+    ["jfField", "jfCity", "jfType", "jfQ"].forEach(function (id) { $(id).addEventListener("input", paint); });
+  }
+  function applyJob(j, btn) {
+    if (!rate("apply", 8, 60000)) return; if (!ME.field && !ME.skills) toast("Tip: complete your Job profile in Me tab for better chances");
+    btn.disabled = true;
+    setDoc(doc(db, "applications", j.id + "_" + UID), { jid: j.id, rid: j.rid, seeker: UID, sname: ME.name, jtitle: j.title, company: j.company || j.rname || "", status: "applied", createdAt: serverTimestamp(), updatedAt: serverTimestamp() })
+      .then(function () { toast("Applied ✅"); }).catch(function (e) { btn.disabled = false; toast(e && e.code === "permission-denied" ? "Already applied or not allowed" : errMsg(e)); });
+  }
+  function appCard(a, who) {
+    var c = el('<div class="jcard" data-notr><h4>' + esc(who === "r" ? a.sname : a.jtitle) + '</h4><div class="jm">' + esc(who === "r" ? "Applied for " + a.jtitle : a.company) + '</div><div>' + stChip(a.status) + '</div><div class="jrow" style="margin-top:8px"></div></div>'), row = c.querySelector(".jrow");
+    function btn(t, cls, f) { var b = document.createElement("button"); b.className = cls; b.textContent = t; b.addEventListener("click", f); row.appendChild(b); }
+    if (a.status !== "rejected") btn("💬 Message", "btn-outline", function () { openThread(a, who); });
+    return { c: c, btn: btn };
+  }
+  function setStatus(a, st) { return updateDoc(doc(db, "applications", a.id), { status: st, updatedAt: serverTimestamp() }).catch(function (e) { toast(errMsg(e)); }); }
+  function viewApplied(box) {
+    var rows = APPS.filter(function (a) { return a.status !== "invited" && a.status !== "declined"; }); box.innerHTML = rows.length ? "" : '<div class="empty">You have not applied to any job yet.</div>';
+    rows.forEach(function (a) { var x = appCard(a, "s"); if (["applied", "shortlisted"].indexOf(a.status) >= 0) x.btn("Withdraw", "btn-outline", function () { setStatus(a, "withdrawn"); }); box.appendChild(x.c); });
+  }
+  function viewInvites(box) {
+    var rows = APPS.filter(function (a) { return a.status === "invited"; }); box.innerHTML = rows.length ? "" : '<div class="empty">No invitations right now.</div>';
+    rows.forEach(function (a) { var x = appCard(a, "s"); x.btn("Accept & apply", "btn-grad", function () { setStatus(a, "applied"); }); x.btn("Decline", "btn-outline", function () { setStatus(a, "declined"); }); box.appendChild(x.c); });
+  }
+  var MYJOBS = [];
+  function viewMyJobs(box) {
+    box.innerHTML = '<div class="empty">Loading...</div>';
+    getDocs(query(collection(db, "jobs"), where("rid", "==", UID))).then(function (s) {
+      MYJOBS = s.docs.map(function (d) { return Object.assign({ id: d.id }, snapData(d)); }).sort(function (a, b) { return ms(b.createdAt) - ms(a.createdAt); });
+      box.innerHTML = MYJOBS.length ? "" : '<div class="empty">No jobs yet. Use "Post job".</div>';
+      MYJOBS.forEach(function (j) {
+        var mine = APPS.filter(function (a) { return a.jid === j.id; }), c = el('<div class="jcard" data-notr><h4>' + esc(j.title) + '</h4><div class="jm">' + esc(j.city || "") + " · " + esc(j.type || "") + '</div><div>' + chip(j.status === "closed" ? "Closed" : "Open", j.status === "closed" ? "no" : "ok") + chip(mine.length + " applicants", "acc") + '</div><div class="jrow" style="margin-top:8px"><button class="btn-outline" data-a="view">Applicants</button><button class="btn-outline" data-a="tog">' + (j.status === "closed" ? "Reopen" : "Close") + '</button><button class="btn-outline" data-a="del">Delete</button></div><div class="apps"></div></div>');
+        c.querySelector('[data-a="tog"]').addEventListener("click", function () { updateDoc(doc(db, "jobs", j.id), { status: j.status === "closed" ? "open" : "closed", rid: UID, title: j.title }).then(function () { viewMyJobs(box); }).catch(function (e) { toast(errMsg(e)); }); });
+        c.querySelector('[data-a="del"]').addEventListener("click", function () { if (window.confirm("Delete this job?")) deleteDoc(doc(db, "jobs", j.id)).then(function () { viewMyJobs(box); }).catch(function (e) { toast(errMsg(e)); }); });
+        c.querySelector('[data-a="view"]').addEventListener("click", function () { var hold = c.querySelector(".apps"); hold.innerHTML = ""; if (!mine.length) hold.innerHTML = '<div class="empty" style="padding:10px">No applicants yet.</div>';
+          mine.forEach(function (a) { var x = appCard(a, "r"); x.btn("Profile", "btn-outline", function () { showCandidate(a.seeker); }); if (["applied", "invited"].indexOf(a.status) >= 0 || a.status === "shortlisted") { x.btn("Shortlist", "btn-grad", function () { setStatus(a, "shortlisted"); }); x.btn("Reject", "btn-outline", function () { setStatus(a, "rejected"); }); } if (a.status === "shortlisted") x.btn("Hired ✓", "btn-outline", function () { setStatus(a, "hired"); }); hold.appendChild(x.c); }); });
+        box.appendChild(c);
+      });
+    }).catch(function (e) { toast(errMsg(e)); });
+  }
+  function candCard(u) {
+    return el('<div class="jcard" data-notr><h4>' + esc(u.name) + (u.age ? ", " + esc(u.age) : "") + '</h4><div class="jm">' + esc(u.role || u.work || "Job seeker") + " · " + esc(u.city || "") + '</div><div>' + chip(u.field || "Other", "acc") + (u.exp != null && u.exp !== "" ? chip(u.exp + " yrs") : chip("Fresher")) + (u.jobType ? chip(u.jobType) : "") + (u.notice ? chip("Notice: " + u.notice) : "") + '</div><div class="jd">' + esc(u.skills || "") + (u.about ? " — " + esc(String(u.about).slice(0, 160)) : "") + '</div><div class="jrow"></div></div>');
+  }
+  function showCandidate(uid) { getDoc(doc(db, "users", uid)).then(function (s) { if (!s.exists()) return; var u = s.data(); $("policyText").innerHTML = '<h3>' + esc(u.name) + '</h3><p>' + esc([u.role || u.work, u.city, u.field].filter(Boolean).join(" · ")) + '</p><p><b>Experience:</b> ' + esc(u.exp != null ? u.exp + " years" : "Fresher") + '<br><b>Skills:</b> ' + esc(u.skills || "-") + '<br><b>Job type:</b> ' + esc(u.jobType || "-") + '<br><b>Preferred city:</b> ' + esc(u.prefCity || "-") + '<br><b>Notice:</b> ' + esc(u.notice || "-") + '</p><p>' + esc(u.about || "") + '</p>' + (/^https?:\/\//i.test(u.resume || "") ? '<p><a href="' + esc(u.resume) + '" target="_blank" rel="noopener noreferrer">Resume link</a></p>' : ""); $("policyUI").hidden = false; }).catch(function (e) { toast(errMsg(e)); }); }
+  function viewCands(box) {
+    box.innerHTML = '<div class="jfilters"><select id="cfField"><option value="">All fields</option>' + FIELDS.map(function (x) { return "<option>" + esc(x) + "</option>"; }).join("") + '</select><input id="cfCity" placeholder="City"><input id="cfExp" type="number" placeholder="Min. years"><input id="cfQ" placeholder="Skill / role"></div><div id="clist"><div class="empty">Loading...</div></div>';
+    var cache = null;
+    function paint() {
+      var f = $("cfField").value, c = $("cfCity").value.toLowerCase(), e = +$("cfExp").value || 0, q = $("cfQ").value.toLowerCase(), l = $("clist"); l.innerHTML = "";
+      var rows = (cache || []).filter(function (u) { return !u.hidden && !blocked.has(u.id) && (!f || u.field === f) && (!c || (String(u.city || "") + " " + (u.prefCity || "")).toLowerCase().indexOf(c) >= 0) && (+u.exp || 0) >= e && (!q || ((u.skills || "") + " " + (u.role || "") + " " + (u.work || "")).toLowerCase().indexOf(q) >= 0); });
+      if (!rows.length) { l.innerHTML = '<div class="empty">No candidates match yet. Share Pulse with job seekers!</div>'; return; }
+      rows.forEach(function (u) { var cd = candCard(u), row = cd.querySelector(".jrow"), b = document.createElement("button"); b.className = "btn-grad"; b.textContent = "Invite to apply"; b.addEventListener("click", function () { inviteTo(u, b); }); row.appendChild(b); l.appendChild(cd); });
+    }
+    getDocs(query(collection(db, "users"), where("mode", "==", "jobseeker"), limit(150))).then(function (s) { cache = s.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); }).filter(function (u) { return u.id !== UID; }); paint(); }).catch(function (e) { toast(errMsg(e)); });
+    ["cfField", "cfCity", "cfExp", "cfQ"].forEach(function (id) { $(id).addEventListener("input", paint); });
+  }
+  function inviteTo(u, btn) {
+    getDocs(query(collection(db, "jobs"), where("rid", "==", UID))).then(function (s) {
+      var open = s.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); }).filter(function (j) { return j.status !== "closed"; });
+      if (!open.length) { toast("Post a job first, then invite candidates"); return; }
+      var j = open[0]; if (open.length > 1) { var n = window.prompt("Invite to which job? Type number:\n" + open.map(function (x, i) { return (i + 1) + ". " + x.title; }).join("\n"), "1"); j = open[(+n || 1) - 1]; if (!j) return; }
+      if (!rate("invite", 10, 60000)) return;
+      return setDoc(doc(db, "applications", j.id + "_" + u.id), { jid: j.id, rid: UID, seeker: u.id, sname: u.name, jtitle: j.title, company: j.company || ME.company || ME.name, status: "invited", createdAt: serverTimestamp(), updatedAt: serverTimestamp() }).then(function () { btn.disabled = true; btn.textContent = "Invited ✓"; });
+    }).catch(function (e) { toast(e && e.code === "permission-denied" ? "Already in your list" : errMsg(e)); });
+  }
+  function viewPost(box) {
+    box.innerHTML = SCAM + '<div class="jform"><input id="pjTitle" maxlength="80" placeholder="Job title *"><input id="pjCompany" maxlength="60" placeholder="Company" value="' + esc(ME.company || "") + '"><select id="pjField">' + FIELDS.map(function (x) { return "<option>" + esc(x) + "</option>"; }).join("") + '</select><input id="pjCity" maxlength="40" placeholder="City / Remote"><select id="pjType"><option>Full-time</option><option>Part-time</option><option>Contract</option><option>Internship</option><option>Remote</option></select><input id="pjExp" type="number" min="0" max="40" placeholder="Min. experience (years)"><input id="pjSalary" maxlength="40" placeholder="Salary range (optional)"><input id="pjSkills" maxlength="120" placeholder="Skills (comma separated)"><textarea id="pjDesc" rows="5" maxlength="1500" placeholder="Job description"></textarea><button class="btn-grad" id="pjGo" style="padding:13px">Publish job</button></div>';
+    $("pjGo").addEventListener("click", function () {
+      var t = clean($("pjTitle").value, 80); if (!t) { toast("Add a job title"); return; } if (!rate("pjob", 3, 60000)) return; var b = this; b.disabled = true;
+      addDoc(collection(db, "jobs"), { rid: UID, rname: ME.name, company: clean($("pjCompany").value, 60), title: t, field: $("pjField").value, city: clean($("pjCity").value, 40), type: $("pjType").value, exp: +$("pjExp").value || 0, salary: clean($("pjSalary").value, 40), skills: clean($("pjSkills").value, 120), desc: clean($("pjDesc").value, 1500), status: "open", createdAt: serverTimestamp() })
+        .then(function () { toast("Job published ✅"); jobsTab = "myjobs"; renderJobs(); }).catch(function (e) { b.disabled = false; toast(errMsg(e)); });
+    });
+  }
+  // application thread
+  var TH = null;
+  function openThread(a, who) {
+    closeThread(); TH = { id: a.id, unsub: null }; $("thTitle").textContent = who === "r" ? a.sname : a.jtitle; $("thSub").textContent = who === "r" ? "Applied for " + a.jtitle : a.company; $("thread").hidden = false; $("thLog").innerHTML = "";
+    TH.unsub = onSnapshot(query(collection(db, "applications", a.id, "msgs"), orderBy("createdAt", "asc"), limit(100)), function (s) { var l = $("thLog"); l.innerHTML = ""; s.forEach(function (d) { var m = snapData(d); l.appendChild(el('<div class="bubble ' + (m.from === UID ? "me" : "them") + '">' + esc(m.text) + '<span class="t">' + hm(ms(m.createdAt)) + '</span></div>')); }); l.scrollTop = l.scrollHeight; }, function (e) { toast(errMsg(e)); });
+  }
+  function closeThread() { if (TH && TH.unsub) TH.unsub(); TH = null; $("thread").hidden = true; }
+  $("thClose").addEventListener("click", closeThread);
+  function sendThread() { var i = $("thMsg"), t = clean(i.value, 500); if (!t || !TH || !rate("thmsg", 8, 10000)) return; i.value = ""; addDoc(collection(db, "applications", TH.id, "msgs"), { from: UID, text: t, createdAt: serverTimestamp() }).catch(function (e) { toast(e && e.code === "permission-denied" ? "Messaging is closed for this application" : errMsg(e)); }); }
+  $("thSend").addEventListener("click", sendThread); $("thMsg").addEventListener("keydown", function (e) { if (e.key === "Enter") sendThread(); });
+
+  // ================= Safety extras =================
+  $("forgotLink").addEventListener("click", function (e) { e.preventDefault(); var em = $("aUser").value.trim(); if (!em) { $("authErr").textContent = "Type your email first, then tap Forgot password."; return; } sendPasswordResetEmail(auth, em).then(function () { $("authErr").textContent = "If this email is registered, a reset link was sent."; }).catch(function (er) { $("authErr").textContent = errMsg(er); }); });
+  $("blockedBtn").addEventListener("click", function () {
+    var ids = Array.from(blocked); if (!ids.length) { toast("You have not blocked anyone"); return; }
+    Promise.all(ids.map(function (id) { return userName(id).then(function (n) { return [id, n]; }); })).then(function (rows) {
+      $("policyText").innerHTML = '<h3>Blocked people</h3>' + rows.map(function (r) { return '<div class="cr-row" data-notr>' + esc(r[1]) + ' <button class="btn-outline unb" data-id="' + esc(r[0]) + '" style="padding:4px 12px">Unblock</button></div>'; }).join(""); $("policyUI").hidden = false;
+      $("policyText").querySelectorAll(".unb").forEach(function (b) { b.addEventListener("click", function () { var id = b.getAttribute("data-id"); deleteDoc(doc(db, "blocks", UID + "_" + id)).then(function () { blocked.delete(id); b.parentNode.remove(); toast("Unblocked"); }).catch(function (e) { toast(errMsg(e)); }); }); });
+    });
+  });
+
+
+  // ================= Public profile + auto abuse flag =================
+  var ABUSE = /(\bmc\b|\bbc\b|madarchod|behenchod|bhosd|randi|harami|kutta|kutiya|chutiya|\bfuck|bitch|bastard|slut|whore|\bkill you\b|maar dunga|rape|jaan se maar|suicide kar)/i;
+  function autoFlag(text, where) {
+    if (!ABUSE.test(text) || !rate("autoflag", 3, 600000)) return false;
+    addDoc(collection(db, "reports"), { from: UID, to: UID, reason: ("AUTO: abusive words in " + where).slice(0, 190), auto: true, createdAt: serverTimestamp() }).catch(function () {});
+    toast("Please keep Pulse respectful. Abusive messages can lead to a ban."); return true;
+  }
+  function openProfile(uid, nm) {
+    if (!uid || uid === UID && false) return;
+    getDoc(doc(db, "users", uid)).then(function (s) {
+      if (!s.exists()) { toast("Profile not found"); return; } var u = s.data(), m = modeOf(u);
+      var rows = [u.age ? u.age + " yrs" : "", u.city, u.work, MODE_LABEL[m]].filter(Boolean).join(" · ");
+      var extra = m === "marriage" ? factsFor(u) : (m === "jobseeker" ? '<div class="facts">' + [u.field, u.role, u.exp != null && u.exp !== "" ? u.exp + " yrs exp" : "", u.skills].filter(Boolean).map(function (x) { return "<span>" + esc(x) + "</span>"; }).join("") + "</div>" : (m === "recruiter" ? '<div class="facts">' + [u.company, u.desig].filter(Boolean).map(function (x) { return "<span>" + esc(x) + "</span>"; }).join("") + "</div>" : ""));
+      var mine = uid === UID;
+      $("policyText").innerHTML = '<div class="pf-top"><div class="av-lg" style="background:' + g(uid) + '">' + esc(ini(u.name)) + '</div><h3 data-notr>' + esc(u.name) + '</h3><div class="jm" data-notr>' + esc(rows) + '</div></div>' + extra + '<p data-notr>' + esc(u.about || "") + '</p><div class="pf-priv">🔒 Email, phone and private details are never shown to other members.</div>' + (mine ? "" : '<div class="jrow"><button class="btn-outline" id="pfReport">Report</button><button class="btn-outline" id="pfBlock">Block</button></div>');
+      $("policyUI").hidden = false;
+      if (!mine) {
+        $("pfReport").addEventListener("click", function () { var r = window.prompt("Why are you reporting? (short)", "Abuse / fake / spam"); if (r === null) return; addDoc(collection(db, "reports"), { from: UID, to: uid, reason: clean(r, 180) || "Profile report", createdAt: serverTimestamp() }).then(function () { toast("Report sent. Thank you."); $("policyUI").hidden = true; }).catch(function (e) { toast(errMsg(e)); }); });
+        $("pfBlock").addEventListener("click", function () { if (!window.confirm("Block this person?")) return; setDoc(doc(db, "blocks", UID + "_" + uid), { by: UID, who: uid, createdAt: serverTimestamp() }).then(function () { blocked.add(uid); toast("Blocked"); $("policyUI").hidden = true; }).catch(function (e) { toast(errMsg(e)); }); });
+      }
+    }).catch(function (e) { toast(errMsg(e)); });
+  }
+  $("convoName").style.cursor = $("convoAv").style.cursor = "pointer";
+  [$("convoName"), $("convoAv")].forEach(function (n) { n.addEventListener("click", function () { if (activeChat && !activeChat.ai) openProfile(activeChat.id); }); });
+  document.addEventListener("click", function (e) { var t = e.target.closest && e.target.closest("[data-uid]"); if (t && UID) openProfile(t.getAttribute("data-uid")); });
 
   // ---- boot ----
   initI18n(); setMode("login");
