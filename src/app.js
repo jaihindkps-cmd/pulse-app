@@ -128,7 +128,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     if (!u.emailVerified) { showVerify(u); return Promise.resolve(); }
     return getDoc(doc(db, "users", u.uid)).then(function (s) {
       if (!s.exists()) { signOut(auth); showForms(); $("auth").hidden = false; $("authErr").textContent = "Profile nahi mili. Naya account banao."; return; }
-      return getDoc(doc(db, "bans", u.uid)).then(function (b) { if (b.exists()) { signOut(auth); showForms(); $("auth").hidden = false; $("authErr").textContent = "This account has been suspended for breaking the rules."; return; } showForms(); UID = u.uid; ME = Object.assign({}, s.data(), { uid: UID }); start(); });
+      return getDoc(doc(db, "bans", u.uid)).catch(function () { return { exists: function () { return false; } }; }).then(function (b) { if (b.exists()) { signOut(auth); showForms(); $("auth").hidden = false; $("authErr").textContent = "This account has been suspended for breaking the rules."; return; } showForms(); UID = u.uid; ME = Object.assign({}, s.data(), { uid: UID }); start(); });
     }).catch(function (e) { showForms(); $("auth").hidden = false; $("authErr").textContent = errMsg(e); });
   }
   var lastSent = 0;
