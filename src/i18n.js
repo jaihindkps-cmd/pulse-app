@@ -88,10 +88,10 @@ export function tr(s) {
   var t = s.trim(); if (!t) return s;
   for (var i = 0; i < list.length; i++) if (list[i][0] === t) return s.replace(t, list[i][1]);
   var out = s;
-  for (var j = 0; j < list.length; j++) { var k = list[j][0]; if (k.length >= 6 && out.indexOf(k) >= 0) out = out.split(k).join(list[j][1]); }
+  for (var j = 0; j < list.length; j++) { var k = list[j][0]; if (k.length >= 10 && list[j][1].indexOf(k) < 0 && out.indexOf(k) >= 0) out = out.split(k).join(list[j][1]); }
   return out;
 }
-var SKIP = "[data-notr],.post-text,.ln,.sec,#stTitle,.about,textarea,input,script,style,.nm";
+var SKIP = "[data-notr],.bubble,.post-text,.ln,.sec,#stTitle,.about,textarea,input,script,style,.nm";
 function skip(n) { var e = n.nodeType === 1 ? n : n.parentElement; return !e || !!(e.closest && e.closest(SKIP)); }
 function doText(n) { if (skip(n)) return; var v = n.nodeValue, r = tr(v); if (r !== v) n.nodeValue = r; }
 var ATTRS = ["placeholder", "title", "aria-label"];

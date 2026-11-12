@@ -154,7 +154,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     screens.forEach(function (s) { $("screen-" + s).hidden = s !== name; });
     document.querySelectorAll(".tab").forEach(function (t) { t.classList.toggle("active", t.getAttribute("data-tab") === key); });
     $("screenTitle").textContent = titles[name];
-    if (name === "discover") loadDeck(); if (name === "jobs") loadJobs(); if (name === "nearby") loadNearby(); else stopNearby(); if (name === "studio") renderLib(); if (name === "chats") $("chatDot").hidden = true;
+    try { if (name === "discover") loadDeck(); if (name === "jobs") loadJobs(); } catch (e) { toast("Could not load this screen. Please try again."); } if (name === "nearby") loadNearby(); else stopNearby(); if (name === "studio") renderLib(); if (name === "chats") $("chatDot").hidden = true;
   }
   document.querySelectorAll(".tab").forEach(function (t) { t.addEventListener("click", function () { if (UID) showTab(t.getAttribute("data-tab")); }); });
 
@@ -187,7 +187,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   var queue = [], dragging = false, sx = 0, cx = 0, topCard = null, topUser = null, busy = false;
   function shuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
   function loadDeck() {
-    Promise.all([getDocs(query(collection(db, "users"), limit(300))), getDocs(query(collection(db, "swipes"), where("from", "==", UID)))]).then(function (r) {
+    Promise.all([getDocs(query(collection(db, "users"), where("mode", "==", MODE), limit(60))), getDocs(query(collection(db, "swipes"), where("from", "==", UID)))]).then(function (r) {
       var done = new Set(); r[1].forEach(function (d) { done.add(d.data().to); });
       var list = []; r[0].forEach(function (d) { var u = Object.assign({ id: d.id }, d.data()); if (d.id !== UID && !done.has(d.id) && !blocked.has(d.id) && deckOk(u)) list.push(u); });
       queue = shuffle(list).slice(0, 20); renderDeck();
@@ -990,7 +990,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
         var b = c.querySelector(".btn-grad"); if (b) b.addEventListener("click", function () { applyJob(j, b); }); l.appendChild(c);
       });
     }
-    getDocs(query(collection(db, "jobs"), orderBy("createdAt", "desc"), limit(100))).then(function (s) { jobsCache = s.docs.map(function (d) { return Object.assign({ id: d.id }, snapData(d)); }); paint(); }).catch(function (e) { toast(errMsg(e)); });
+    getDocs(query(collection(db, "jobs"), orderBy("createdAt", "desc"), limit(50))).then(function (s) { jobsCache = s.docs.map(function (d) { return Object.assign({ id: d.id }, snapData(d)); }); paint(); }).catch(function (e) { toast(errMsg(e)); });
     ["jfField", "jfCity", "jfType", "jfQ"].forEach(function (id) { $(id).addEventListener("input", paint); });
   }
   function applyJob(j, btn) {
@@ -1044,7 +1044,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
       if (!rows.length) { l.innerHTML = '<div class="empty">No candidates match yet. Share Pulse with job seekers!</div>'; return; }
       rows.forEach(function (u) { var cd = candCard(u), row = cd.querySelector(".jrow"), b = document.createElement("button"); b.className = "btn-grad"; b.textContent = "Invite to apply"; b.addEventListener("click", function () { inviteTo(u, b); }); row.appendChild(b); l.appendChild(cd); });
     }
-    getDocs(query(collection(db, "users"), where("mode", "==", "jobseeker"), limit(150))).then(function (s) { cache = s.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); }).filter(function (u) { return u.id !== UID; }); paint(); }).catch(function (e) { toast(errMsg(e)); });
+    getDocs(query(collection(db, "users"), where("mode", "==", "jobseeker"), limit(60))).then(function (s) { cache = s.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); }).filter(function (u) { return u.id !== UID; }); paint(); }).catch(function (e) { toast(errMsg(e)); });
     ["cfField", "cfCity", "cfExp", "cfQ"].forEach(function (id) { $(id).addEventListener("input", paint); });
   }
   function inviteTo(u, btn) {
@@ -1181,6 +1181,8 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
       });
     }).catch(function (e) { out.textContent = errMsg(e); });
   }
+  window.addEventListener("error", function (e) { if (e && e.message && !/ResizeObserver|Script error/.test(e.message)) toast("Something went wrong: " + String(e.message).slice(0, 80)); });
+  window.addEventListener("unhandledrejection", function (e) { var r = e && e.reason; if (r && r.code === "permission-denied") return; toast("Something went wrong: " + String((r && r.message) || r || "").slice(0, 80)); });
   // ---- boot ----
   initI18n(); setMode("login");
   fetch("firebase-config.json", { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (cfg) {

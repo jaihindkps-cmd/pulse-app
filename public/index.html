@@ -456,6 +456,11 @@
 .av-lg{width:84px;height:84px;border-radius:50%;margin:0 auto 8px;display:grid;place-items:center;font-size:32px;font-weight:700;color:#fff}.pf-top{text-align:center}.pf-priv{margin:10px 0;padding:8px 10px;border-radius:10px;background:rgba(80,200,140,.12);font-size:12px}
 .auth{align-items:flex-start!important;padding-top:0!important}.auth-card{margin:60px auto 28px!important}#langBtn2{position:fixed!important;top:max(12px,env(safe-area-inset-top,0px));right:14px;z-index:210!important}
 .pw-wrap{position:relative;display:block}.pw-wrap input{width:100%;padding-right:48px!important}.pw-eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:38px;height:38px;border:0;background:transparent;font-size:18px;cursor:pointer;opacity:.7}
+/* performance: no continuous animation or large blur on phones */
+.app::before,.auth::after{filter:none!important;animation:none!important}
+.post,.swipe-card .avatar-big,.auth-card{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+.tabbar,header.top,.top{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;background:var(--surface)!important}
+.screen{will-change:auto;overscroll-behavior:contain}
 </style></head><body>
 <div class="app">
   <header class="topbar">
