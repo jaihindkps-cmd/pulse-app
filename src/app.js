@@ -43,11 +43,11 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     var map = {
       "auth/email-already-in-use": "Ye email pehle se registered hai. Login karo.",
       "auth/invalid-email": "Email sahi likho.", "auth/weak-password": "Password kam se kam 6 akshar ka rakho.",
-      "auth/invalid-credential": "Email ya password galat hai.", "auth/wrong-password": "Email ya password galat hai.", "auth/user-not-found": "Email ya password galat hai.",
+      "auth/invalid-credential": "Email or password is wrong. If you just signed up, verify your email first. Forgot it? Use \"Forgot password?\".", "auth/operation-not-allowed": "Email login is not switched on in Firebase yet (Authentication > Sign-in method > Email/Password).", "auth/unauthorized-domain": "This website address is not allowed in Firebase (Authentication > Settings > Authorized domains).", "auth/invalid-api-key": "App key is invalid. Check firebase-config.json.", "auth/api-key-not-valid.-please-pass-a-valid-api-key.": "App key is invalid. Check firebase-config.json.", "auth/user-disabled": "This account has been disabled.", "auth/missing-password": "Type your password.", "auth/missing-email": "Type your email.", "auth/internal-error": "Server problem. Try again in a minute.", "auth/wrong-password": "Email ya password galat hai.", "auth/user-not-found": "Email ya password galat hai.",
       "auth/too-many-requests": "Bahut koshish ho gayi. Thodi der baad try karo.", "auth/network-request-failed": "Internet check karo.",
       "permission-denied": "Ye karne ki ijazat nahi hai.", "unavailable": "Internet check karo."
     };
-    return map[c] || (e && e.message) || "Kuch gadbad ho gayi";
+    return map[c] || ((e && e.message ? e.message : "Something went wrong") + (c ? " [" + c + "]" : ""));
   }
 
   // ---- theme ----
@@ -1099,7 +1099,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
       $("policyUI").hidden = false;
       if (!mine) {
         $("pfReport").addEventListener("click", function () { var r = window.prompt("Why are you reporting? (short)", "Abuse / fake / spam"); if (r === null) return; addDoc(collection(db, "reports"), { from: UID, to: uid, reason: clean(r, 180) || "Profile report", createdAt: serverTimestamp() }).then(function () { toast("Report sent. Thank you."); $("policyUI").hidden = true; }).catch(function (e) { toast(errMsg(e)); }); });
-        $("pfBlock").addEventListener("click", function () { if (!window.confirm("Block this person?")) return; setDoc(doc(db, "blocks", UID + "_" + uid), { by: UID, who: uid, createdAt: serverTimestamp() }).then(function () { blocked.add(uid); toast("Blocked"); $("policyUI").hidden = true; }).catch(function (e) { toast(errMsg(e)); }); });
+        $("pfBlock").addEventListener("click", function () { if (!window.confirm("Block this person?")) return; setDoc(doc(db, "blocks", UID + "_" + uid), { blocker: UID, blocked: uid, createdAt: serverTimestamp() }).then(function () { blocked.add(uid); toast("Blocked"); $("policyUI").hidden = true; }).catch(function (e) { toast(errMsg(e)); }); });
       }
     }).catch(function (e) { toast(errMsg(e)); });
   }
@@ -1114,10 +1114,9 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     var n = keys.filter(function (k) { return ME[k] != null && ME[k] !== ""; }).length; return Math.round(n * 100 / keys.length);
   }
   function paintStrength() {
-    var host = $("pName") && $("pName").parentNode; if (!host) return; var b = $("pStrength");
-    if (!b) { b = el('<div id="pStrength" class="pf-priv" style="margin:10px 0"></div>'); host.appendChild(b); }
-    var v = profStrength(); b.innerHTML = '<b>Profile strength: ' + v + '%</b><div style="height:6px;border-radius:6px;background:rgba(255,255,255,.12);margin:6px 0"><div style="height:6px;border-radius:6px;width:' + v + '%;background:linear-gradient(90deg,#ff5fa2,#ffb86c)"></div></div>' + (v < 100 ? '<span>Complete your profile in the Edit section to get more matches' + (isJobMode() ? " and responses" : "") + ".</span>" : "<span>Great — your profile is complete ✅</span>") + '<div style="margin-top:8px"><button class="btn-outline" id="inviteBtn" style="padding:6px 14px">📣 Invite friends</button></div>';
-    $("inviteBtn").addEventListener("click", function () { var data = { title: "Pulse", text: "Join me on Pulse — friends, dating, marriage and jobs in one app (beta).", url: location.origin + location.pathname }; if (navigator.share) navigator.share(data).catch(function () {}); else if (navigator.clipboard) navigator.clipboard.writeText(data.url).then(function () { toast("Link copied"); }); else toast(data.url); });
+    var anchor = $("pHandle"); if (!anchor) return; var b = $("pStrength");
+    if (!b) { b = el('<div id="pStrength" class="pf-priv" style="margin:10px 0"></div>'); anchor.parentNode.insertBefore(b, anchor.nextSibling); }
+    var v = profStrength(); b.innerHTML = '<b>Profile strength: ' + v + '%</b><div style="height:6px;border-radius:6px;background:rgba(255,255,255,.12);margin:6px 0"><div style="height:6px;border-radius:6px;width:' + v + '%;background:linear-gradient(90deg,#ff5fa2,#ffb86c)"></div></div>' + (v < 100 ? '<span>Complete your profile in the Edit section to get more matches' + (isJobMode() ? " and responses" : "") + ".</span>" : "<span>Great — your profile is complete ✅</span>") + '';
   }
   // ---- boot ----
   initI18n(); setMode("login");

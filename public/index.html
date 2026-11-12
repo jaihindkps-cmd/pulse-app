@@ -366,8 +366,8 @@
   .match-pop.show .match-avs { animation: pop .5s cubic-bezier(.3,1.5,.5,1); }
   .match-pop.show h2 { animation: rise .4s .1s both; }
   /* auth: centered, with a quiet hero */
-  .auth { align-items: center; background: transparent; backdrop-filter: blur(0); }
-  .auth::before { content: ""; position: absolute; inset: 0; background: var(--bg); z-index: -2; }
+  .auth { align-items: center; background: var(--bg); position: fixed; inset: 0; z-index: 200; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+  .auth::before { content: ""; position: fixed; inset: 0; background: var(--bg); z-index: -2; }
   .auth { overflow-x: hidden; }
   .auth::after { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; filter: blur(40px);
     background: radial-gradient(36% 30% at 20% 18%, color-mix(in srgb, var(--accent) 42%, transparent), transparent 70%),
@@ -454,6 +454,7 @@
   .thread { position: absolute; inset: 0; z-index: 80; background: var(--bg); display: flex; flex-direction: column; } .thread[hidden] { display: none; } .th-log { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 6px; } .th-log .bubble { max-width: 80%; }
   .swipe-card .facts { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 4px; } .swipe-card .facts span { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: rgba(255,255,255,.22); backdrop-filter: blur(4px); }
 .av-lg{width:84px;height:84px;border-radius:50%;margin:0 auto 8px;display:grid;place-items:center;font-size:32px;font-weight:700;color:#fff}.pf-top{text-align:center}.pf-priv{margin:10px 0;padding:8px 10px;border-radius:10px;background:rgba(80,200,140,.12);font-size:12px}
+.auth{align-items:flex-start!important;padding-top:0!important}.auth-card{margin:60px auto 28px!important}#langBtn2{position:fixed!important;top:max(12px,env(safe-area-inset-top,0px));right:14px;z-index:210!important}
 </style></head><body>
 <div class="app">
   <header class="topbar">
