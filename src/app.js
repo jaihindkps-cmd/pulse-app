@@ -100,8 +100,15 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     $("pName").textContent = ME.name; $("pHandle").textContent = ME.city || "";
     $("eName").value = ME.name || ""; $("eCity").value = ME.city || ""; $("eWork").value = ME.work || ""; $("eAbout").value = ME.about || "";
     getDocs(query(collection(db, "blocks"), where("blocker", "==", UID))).then(function (s) { blocked = new Set(); s.forEach(function (d) { blocked.add(d.data().blocked); }); }).catch(function () {}).then(function () {
-      applyMode(); listenApps(); listenReqs(); listenFeed(); listenMatches(); refreshLocToggle(); showTab("feed"); setLive(); paintAv(); creatorPanel(); pendingRoom();
+      applyMode(); listenApps(); listenReqs(); listenFeed(); listenMatches(); refreshLocToggle(); showTab("feed"); setLive(); paintAv(); creatorPanel(); pendingRoom(); heartbeat();
     });
+  }
+  // Last-active timestamp (like every other app's "last seen") so the Creator Panel can show who is online, for moderation/abuse monitoring only. Never shown to other members.
+  var hbTimer = null;
+  function heartbeat() {
+    function ping() { if (UID) updateDoc(doc(db, "users", UID), { lastSeen: serverTimestamp() }).catch(function () {}); }
+    ping(); if (hbTimer) clearInterval(hbTimer); hbTimer = setInterval(ping, 120000);
+    document.addEventListener("visibilitychange", function () { if (document.visibilityState === "visible") ping(); });
   }
   function init(cfg) {
     var app = initializeApp(cfg);
@@ -803,7 +810,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     $("crPrem").addEventListener("click", function () { var id = clean($("crUid").value, 60); if (id) setDoc(doc(db, "premium", id), { at: serverTimestamp(), by: UID }).then(function () { toast("Premium granted"); }).catch(function (e) { toast(errMsg(e)); }); });
     $("crUnprem").addEventListener("click", function () { var id = clean($("crUid").value, 60); if (id) deleteDoc(doc(db, "premium", id)).then(function () { toast("Premium removed"); }).catch(function (e) { toast(errMsg(e)); }); });
     $("crUnban").addEventListener("click", function () { var id = clean($("crUid").value, 60); if (id) deleteDoc(doc(db, "bans", id)).then(function () { toast("Unbanned"); }).catch(function (e) { toast(errMsg(e)); }); });
-    box.appendChild(el('<div class="section-title" style="margin-top:14px">Identity verification requests</div><div id="crVerify" class="st-note">Loading…</div>'));
+    box.appendChild(el('<div><div class="section-title" style="margin-top:14px">Identity verification requests</div><div id="crVerify" class="st-note">Loading…</div></div>'));
     getDocs(query(collection(db, "verifications"), orderBy("createdAt", "desc"), limit(20))).then(function (s) {
       var l = $("crVerify"); l.innerHTML = s.empty ? "No pending requests." : "";
       s.forEach(function (d) { var r = d.data(), row = el('<div class="cr-row" data-notr style="align-items:center;gap:10px"><div style="width:46px;height:46px;border-radius:10px;background:center/cover url(' + r.photo + ');flex:none"></div><b>' + esc(r.name || d.id) + '</b><button class="btn-grad" style="padding:4px 10px;margin-left:auto">Approve</button><button class="btn-outline" style="padding:4px 10px">Reject</button></div>');
@@ -811,6 +818,27 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
         row.querySelectorAll("button")[1].addEventListener("click", function () { updateDoc(doc(db, "users", d.id), { verified: false, verifyPending: false }).then(function () { return deleteDoc(doc(db, "verifications", d.id)); }).then(function () { row.remove(); toast("Rejected"); }).catch(function (e) { toast(errMsg(e)); }); });
         l.appendChild(row); });
     }).catch(function (e) { $("crVerify").textContent = errMsg(e); });
+    // Members: who joined, their mode, and last-active time — for abuse/fraud monitoring only. Admin-only (see firestore.rules).
+    box.appendChild(el('<div><div class="section-title" style="margin-top:14px">Members (join date · last active)</div><input class="bh-in" id="crMemQ" placeholder="Search by name" style="margin-bottom:8px"><div id="crMembers" class="st-note">Loading…</div></div>'));
+    var allMembers = [];
+    function paintMembers() {
+      var q = ($("crMemQ").value || "").toLowerCase(), now = Date.now();
+      var rows = allMembers.filter(function (u) { return !q || (u.name || "").toLowerCase().indexOf(q) >= 0; });
+      var l = $("crMembers"); l.innerHTML = rows.length ? "" : '<div class="cr-row">No members match.</div>';
+      rows.forEach(function (u) {
+        var last = ms(u.lastSeen), online = last && (now - last) < 180000;
+        var joined = u.createdAt ? ago(ms(u.createdAt)) : "—";
+        var active = last ? (online ? "online now 🟢" : ago(last) + " se offline") : "kabhi active nahi hua";
+        var row = el('<div class="cr-row" data-notr style="flex-wrap:wrap;gap:4px 10px"><b>' + esc(u.name || "(no name)") + '</b>' + chip(u.mode || "friends") + (u.hidden ? chip("paused") : "") + '<span style="color:var(--faint);font-size:12px">joined ' + esc(joined) + ' · ' + esc(active) + '</span><button class="btn-outline" style="padding:2px 10px;margin-left:auto">Fill ID</button></div>');
+        row.querySelector("button").addEventListener("click", function () { $("crUid").value = u.id; window.scrollTo(0, 0); });
+        l.appendChild(row);
+      });
+    }
+    getDocs(query(collection(db, "users"), orderBy("createdAt", "desc"), limit(100))).then(function (s) {
+      allMembers = s.docs.map(function (d) { return Object.assign({ id: d.id }, snapData(d)); });
+      paintMembers();
+    }).catch(function (e) { $("crMembers").textContent = errMsg(e); });
+    $("crMemQ").addEventListener("input", paintMembers);
   }
 
   // ---- Bhajan Room ----
