@@ -131,12 +131,18 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   function start() {
     $("auth").hidden = true;
     $("meAv").textContent = $("pAv").textContent = (ME.name || "?").charAt(0).toUpperCase();
-    $("pName").textContent = ME.name; $("pHandle").textContent = ME.city || "";
+    $("pName").innerHTML = esc(ME.name) + creatorBadge(ME); $("pHandle").textContent = ME.city || "";
     $("eName").value = ME.name || ""; $("eCity").value = ME.city || ""; $("eWork").value = ME.work || ""; $("eAbout").value = ME.about || "";
     getDocs(query(collection(db, "blocks"), where("blocker", "==", UID))).then(function (s) { blocked = new Set(); s.forEach(function (d) { blocked.add(d.data().blocked); }); }).catch(function () {}).then(function () {
-      applyMode(); listenApps(); listenReqs(); listenFeed(); listenMatches(); refreshLocToggle(); showTab("feed"); setLive(); paintAv(); creatorPanel(); pendingRoom(); heartbeat();
+      applyMode(); listenApps(); listenReqs(); listenFeed(); listenMatches(); refreshLocToggle(); showTab("feed"); setLive(); paintAv(); creatorPanel(); pendingRoom(); heartbeat(); ensureCreatorFlag();
     });
   }
+  // One-time self-write so OTHER members' screens can show the 👑 Creator badge (creatorBadge() below).
+  // Harmless no-op for every non-admin account.
+  function ensureCreatorFlag() {
+    if (auth.currentUser.email === CREATOR_EMAIL && !ME.creator) { ME.creator = true; updateDoc(doc(db, "users", UID), { creator: true }).catch(function () {}); }
+  }
+  function creatorBadge(u) { return u && u.creator ? ' <span title="Pulse Creator">👑</span>' : ""; }
   // Last-active timestamp (like every other app's "last seen") so the Creator Panel can show who is online, for moderation/abuse monitoring only. Never shown to other members.
   var hbTimer = null;
   function heartbeat() {
@@ -218,7 +224,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
       snap.forEach(function (d) {
         var p = snapData(d); if (blocked.has(p.uid)) return; n++;
         var liked = (p.likedBy || []).indexOf(UID) >= 0;
-        var node = el('<article class="post"><div class="post-head" data-uid="' + esc(p.uid) + '" style="cursor:pointer"><div class="av-sm" style="background:' + g(p.uid) + '">' + ini(p.name) + '</div><div class="who"><div class="name">' + esc(p.name) + '</div><div class="meta">' + ago(ms(p.createdAt)) + '</div></div></div><p class="post-text">' + esc(p.text) + '</p><div class="post-actions"><button class="act like ' + (liked ? "liked" : "") + '"><svg viewBox="0 0 24 24" fill="' + (liked ? "currentColor" : "none") + '" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-4.3-9.3-8.5C.9 9.4 2.4 6 5.6 6c1.9 0 3.2 1.1 4.4 2.5C11.2 7.1 12.5 6 14.4 6c3.2 0 4.7 3.4 2.9 6.5C19 16.7 12 21 12 21Z"/></svg><span class="cnt">' + (p.likedBy || []).length + '</span></button></div></article>');
+        var node = el('<article class="post"><div class="post-head" data-uid="' + esc(p.uid) + '" style="cursor:pointer"><div class="av-sm" style="background:' + g(p.uid) + '">' + ini(p.name) + '</div><div class="who"><div class="name">' + esc(p.name) + creatorBadge(p) + '</div><div class="meta">' + ago(ms(p.createdAt)) + '</div></div></div><p class="post-text">' + esc(p.text) + '</p><div class="post-actions"><button class="act like ' + (liked ? "liked" : "") + '"><svg viewBox="0 0 24 24" fill="' + (liked ? "currentColor" : "none") + '" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-4.3-9.3-8.5C.9 9.4 2.4 6 5.6 6c1.9 0 3.2 1.1 4.4 2.5C11.2 7.1 12.5 6 14.4 6c3.2 0 4.7 3.4 2.9 6.5C19 16.7 12 21 12 21Z"/></svg><span class="cnt">' + (p.likedBy || []).length + '</span></button></div></article>');
         node.querySelector(".like").addEventListener("click", function () {
           updateDoc(d.ref, { likedBy: liked ? arrayRemove(UID) : arrayUnion(UID) }).catch(function (e) { toast(errMsg(e)); });
         });
@@ -243,7 +249,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     if (!queue.length) { deck.innerHTML = '<div class="deck-empty"><div><div style="font-size:42px;margin-bottom:8px">💫</div><div style="font-weight:700;font-size:16px;color:var(--fg);margin-bottom:4px">Abhi itne hi log</div><div style="font-size:13px">Jaise-jaise naye log judenge, yahan dikhenge. Doston ko Pulse bhejo!</div></div></div>'; return; }
     queue.slice(0, 3).reverse().forEach(function (u, i, arr) {
       var top = i === arr.length - 1, depth = arr.length - 1 - i;
-      var c = el('<div class="swipe-card" style="background:' + g(u.id) + ';transform:translateY(' + depth * 14 + 'px) scale(' + (1 - depth * 0.05) + ')"><div class="scrim"></div><div class="avatar-big"' + (u.photo && JPEG.test(u.photo) ? ' style="background:center/cover url(' + u.photo + ')"' : "") + '>' + (u.photo && JPEG.test(u.photo) ? "" : ini(u.name)) + '</div><span class="stamp like">Like</span><span class="stamp nope">Nope</span><div class="info"><h3>' + esc(u.name) + (u.age ? ", " + u.age : "") + vBadge(u) + '</h3><div class="sub">' + esc([u.work, u.city].filter(Boolean).join(" · ") || "Pulse member") + '</div>' + (u.about ? '<p class="about">' + esc(u.about) + '</p>' : '') + '<div class="tags"><span>' + esc(MODE_LABEL[modeOf(u)]) + '</span></div>' + factsFor(u) + '</div></div>');
+      var c = el('<div class="swipe-card" style="background:' + g(u.id) + ';transform:translateY(' + depth * 14 + 'px) scale(' + (1 - depth * 0.05) + ')"><div class="scrim"></div><div class="avatar-big"' + (u.photo && JPEG.test(u.photo) ? ' style="background:center/cover url(' + u.photo + ')"' : "") + '>' + (u.photo && JPEG.test(u.photo) ? "" : ini(u.name)) + '</div><span class="stamp like">Like</span><span class="stamp nope">Nope</span><div class="info"><h3>' + esc(u.name) + (u.age ? ", " + u.age : "") + vBadge(u) + creatorBadge(u) + '</h3><div class="sub">' + esc([u.work, u.city].filter(Boolean).join(" · ") || "Pulse member") + '</div>' + (u.about ? '<p class="about">' + esc(u.about) + '</p>' : '') + '<div class="tags"><span>' + esc(MODE_LABEL[modeOf(u)]) + '</span></div>' + factsFor(u) + '</div></div>');
       deck.appendChild(c);
       if (top) { topCard = c; topUser = u; drag(c); }
     });
@@ -299,7 +305,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   var nearUnsub = null, nearTimer = null;
   function stopNearby() { if (nearUnsub) { nearUnsub(); nearUnsub = null; } clearInterval(nearTimer); nearTimer = null; }
   function invite() {
-    var url = location.origin + location.pathname, text = "Pulse pe aao: dosti, dating, gaana aur live chat. Join karo:";
+    var url = location.origin + location.pathname, text = "Maine Pulse try kiya hai 🚀 — Dosti, Dating/Shaadi, Jobs, AI Saathi, Gaana Studio aur Bhajan Rooms, sab ek hi free app mein. Try karo, mazaa aayega:";
     if (navigator.share) navigator.share({ title: "Pulse", text: text, url: url }).catch(function () {});
     else if (navigator.clipboard) navigator.clipboard.writeText(text + " " + url).then(function () { toast("Invite link copy ho gaya 📋"); }).catch(function () { toast(url); });
     else toast(url);
@@ -351,7 +357,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     Object.keys(PROF_FIELDS).forEach(function (id) { var k = PROF_FIELDS[id], v = $(id).value; upd[k] = NUMF[k] ? (v === "" ? null : +v) : clean(v, k === "cabout" ? 300 : 200); });
     if (!isMateMode(m)) { upd.gender = ME.gender || ""; upd.seeking = ME.seeking || ""; }
     if (upd.ageMin && upd.ageMax && upd.ageMin > upd.ageMax) { toast("Partner age range is wrong"); return; }
-    updateDoc(doc(db, "users", UID), upd).then(function () { Object.assign(ME, upd); applyMode(); listenApps(); $("pName").textContent = ME.name; $("pHandle").textContent = ME.city || ""; toast("Profile save ho gayi ✅"); }).catch(function (e) { toast(errMsg(e)); });
+    updateDoc(doc(db, "users", UID), upd).then(function () { Object.assign(ME, upd); applyMode(); listenApps(); $("pName").innerHTML = esc(ME.name) + creatorBadge(ME); $("pHandle").textContent = ME.city || ""; toast("Profile save ho gayi ✅"); }).catch(function (e) { toast(errMsg(e)); });
   });
 
   // ---- chats ----
@@ -461,7 +467,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     closeMsgListener(); if (!c.ai && nameCache[c.id]) c.name = nameCache[c.id]; activeChat = c;
     if (!c.ai && (!c.name || c.name === "...")) userName(c.id).then(function (n) { c.name = n; if (activeChat === c) { $("convoName").textContent = n; $("convoAv").textContent = ini(n); } });
     var av = $("convoAv"); av.textContent = c.ai ? "✦" : ini(c.name); av.style.background = g(c.id);
-    $("convoName").innerHTML = esc(c.name) + (c.ai ? '<span class="ai-pill">AI</span>' : ""); $("convoStatus").textContent = c.ai ? "Hamesha online" : "";
+    $("convoName").innerHTML = esc(c.name) + creatorBadge(c) + (c.ai ? '<span class="ai-pill">AI</span>' : ""); $("convoStatus").textContent = c.ai ? "Hamesha online" : "";
     $("moreBtn").hidden = !!c.ai; $("medBar").hidden = true; $("callBtn").hidden = $("wtBtn").hidden = !!c.ai;
     var body = $("convoBody"); body.innerHTML = "";
     if (c.ai) {
@@ -852,7 +858,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   // ---- Creator panel (sirf creator email; sirf reports + ginti) ----
   function creatorPanel() {
     var u = auth.currentUser, box = $("creatorBox"); if (!u || u.email !== CREATOR_EMAIL) { box.hidden = true; return; }
-    box.hidden = false; box.innerHTML = '<div class="section-title">Creator Panel</div><div class="st-note">Shows reports and totals only. Private chats and who-blocked-whom are never visible, by design.</div><div id="crStats"></div><div id="crList"></div><div class="st-row" style="margin-top:8px"><input class="bh-in" id="crUid" placeholder="User ID to ban / unban" style="margin:0"><button class="btn-outline" id="crBan" style="padding:0 12px">Ban</button><button class="btn-outline" id="crUnban" style="padding:0 12px">Unban</button></div>';
+    box.hidden = false; box.innerHTML = '<div class="section-title">Creator Panel</div><div class="st-note">Shows reports and totals only. Private chats and who-blocked-whom are never visible, by design.</div><div id="crStats"></div><div id="crOverview"></div><div id="crList"></div><div class="st-row" style="margin-top:8px"><input class="bh-in" id="crUid" placeholder="User ID to ban / unban" style="margin:0"><button class="btn-outline" id="crBan" style="padding:0 12px">Ban</button><button class="btn-outline" id="crUnban" style="padding:0 12px">Unban</button></div>';
     Promise.all([getCountFromServer(collection(db, "users")), getCountFromServer(collection(db, "posts"))]).then(function (r) { $("crStats").innerHTML = '<div class="cr-row">Members: <b>' + r[0].data().count + '</b> · Posts: <b>' + r[1].data().count + '</b></div>'; }).catch(function () {});
     getDocs(query(collection(db, "reports"), orderBy("createdAt", "desc"), limit(30))).then(function (s) {
       var l = $("crList"); l.innerHTML = s.empty ? '<div class="cr-row">No reports 🎉</div>' : "";
@@ -911,6 +917,16 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
       r[1].docs.forEach(function (d) { premiumSet[d.id] = true; });
       r[2].docs.forEach(function (d) { bannedSet[d.id] = true; });
       paintMembers();
+      var sums = {}; ACTIVITY_FIELDS.forEach(function (f) { sums[f.k] = 0; });
+      var verifiedN = 0, now = Date.now(), onlineN = 0;
+      allMembers.forEach(function (u) {
+        ACTIVITY_FIELDS.forEach(function (f) { sums[f.k] += +u[f.k] || 0; });
+        if (u.verified) verifiedN++;
+        var last = ms(u.lastSeen); if (last && now - last < 180000) onlineN++;
+      });
+      var line1 = "Members (last " + allMembers.length + "): Online now: <b>" + onlineN + "</b> · Premium: <b>" + Object.keys(premiumSet).length + "</b> · Verified: <b>" + verifiedN + "</b> · Banned: <b>" + Object.keys(bannedSet).length + "</b>";
+      var line2 = ACTIVITY_FIELDS.map(function (f) { return f.lbl + ": <b>" + sums[f.k] + "</b>"; }).join(" · ");
+      $("crOverview").innerHTML = '<div class="cr-row">' + line1 + '</div><div class="cr-row" style="margin-top:4px;color:var(--faint);font-size:12px">' + line2 + '</div>';
     }).catch(function (e) { $("crMembers").textContent = errMsg(e); });
     $("crMemQ").addEventListener("input", paintMembers);
   }
