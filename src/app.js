@@ -313,7 +313,8 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   $("inviteBtn").addEventListener("click", invite);
   function loadNearby() {
     stopNearby();
-    getDoc(doc(db, "presence", UID)).then(function (mine) {
+    Promise.all([getDoc(doc(db, "presence", UID)), getDoc(doc(db, "premium", UID)).catch(function () { return { exists: function () { return false; } }; })]).then(function (r) {
+      var mine = r[0], myPremium = r[1].exists();
       var box = $("nearbyBox"); box.innerHTML = "";
       if (!mine.exists()) {
         box.appendChild(el('<div class="optin"><div class="halo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg></div><h3>Aas-paas ke log</h3><p>Apni location share karke un logon ko dekho jinhone <b>khud</b> bhi sharing ON ki hai.</p><div class="consent">🔒 <b>Aapki marzi:</b> Sirf aap jab chaho tab share hoga. Jinhone share nahi kiya, unki location, naam ya number kabhi nahi dikhega. Share karne par aapki location lagbhag 1 km ke daayre me <b>mota-mota</b> (rounded) save hoti hai, aur doosre opt-in logon ko sirf doori dikhti hai. Kabhi bhi band kar sakte ho.</div><button class="btn-grad" id="shareLoc" style="width:100%;padding:13px">Location share karo</button></div>'));
@@ -328,13 +329,19 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
         $("stopShare").addEventListener("click", function () { stopNearby(); stopShare().then(loadNearby); });
         var list = el('<div></div>'); box.appendChild(list);
         var since = Timestamp.fromMillis(Date.now() - 6 * 3600e3);
+        var CAP = myPremium ? Infinity : 50;
         nearUnsub = onSnapshot(query(collection(db, "presence"), where("updatedAt", ">", since), limit(200)), function (s) {
-          var rows = [];
-          s.forEach(function (d) { if (d.id === UID || blocked.has(d.id)) return; var p = snapData(d); var k = distKm(m.lat, m.lng, p.lat, p.lng); if (k <= 50) rows.push({ id: d.id, p: p, km: k }); });
+          var rows = [], farCount = 0;
+          s.forEach(function (d) { if (d.id === UID || blocked.has(d.id)) return; var p = snapData(d); var k = distKm(m.lat, m.lng, p.lat, p.lng); if (k <= CAP) rows.push({ id: d.id, p: p, km: k }); else farCount++; });
           rows.sort(function (a, b) { return a.km - b.km; });
           list.innerHTML = "";
-          if (!rows.length) { var em = el('<div class="empty">Abhi aas-paas (50 km) koi aur opt-in user nahi. Doston ko bulao! 👋<br><button class="btn-grad" id="nearInvite" style="margin-top:12px;padding:11px 18px">📨 Invite bhejo</button></div>'); list.appendChild(em); em.querySelector("#nearInvite").addEventListener("click", invite); return; }
-          list.appendChild(el('<div class="section-title">Abhi aas-paas · ' + rows.length + ' log (live)</div>'));
+          if (!rows.length) {
+            var em = el('<div class="empty">Abhi aas-paas (50 km) koi aur opt-in user nahi. Doston ko bulao! 👋<br><button class="btn-grad" id="nearInvite" style="margin-top:12px;padding:11px 18px">📨 Invite bhejo</button></div>'); list.appendChild(em); em.querySelector("#nearInvite").addEventListener("click", invite);
+            if (farCount) list.appendChild(el('<div class="cr-row" style="margin-top:10px;color:var(--faint)">⭐ ' + farCount + ' log 50 km se door bhi opt-in hain — Premium wale members ko doori ki limit nahi hoti, saare opt-in log dikhte hain. Premium Pulse team activate karti hai, payment confirm hone ke baad.</div>'));
+            return;
+          }
+          list.appendChild(el('<div class="section-title">' + (myPremium ? "Aas-paas · " + rows.length + " log (live) ⭐ Premium: door tak bhi" : "Abhi aas-paas · " + rows.length + " log (live)") + '</div>'));
+          if (!myPremium && farCount) list.appendChild(el('<div class="cr-row" style="color:var(--faint);font-size:12px;margin-bottom:4px">+' + farCount + ' log 50 km se door bhi opt-in hain. ⭐ Premium lekar unhe bhi dekho — Pulse team payment confirm hone par activate karti hai.</div>'));
           rows.slice(0, 50).forEach(function (r) {
             var dist = r.km < 1 ? "1 km se kam" : "~" + Math.round(r.km) + " km";
             var row = el('<div class="nearby-row" data-uid="' + esc(r.id) + '"><div class="av-sm" style="width:50px;height:50px;font-size:18px;background:' + g(r.id) + '">' + ini(r.p.name) + '</div><div class="body"><div class="nm">' + esc(r.p.name) + (r.p.age ? ", " + esc(r.p.age) : "") + '</div><div class="meta">📍 ' + dist + ' · ' + esc(r.p.work || r.p.city || "Pulse member") + '</div></div><button class="wave">💬 Chat</button></div>');
