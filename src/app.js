@@ -856,24 +856,41 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
         row.querySelectorAll("button")[1].addEventListener("click", function () { updateDoc(doc(db, "users", d.id), { verified: false, verifyPending: false }).then(function () { return deleteDoc(doc(db, "verifications", d.id)); }).then(function () { row.remove(); toast("Rejected"); }).catch(function (e) { toast(errMsg(e)); }); });
         l.appendChild(row); });
     }).catch(function (e) { $("crVerify").textContent = errMsg(e); });
-    // Members: who joined, their mode, and last-active time — for abuse/fraud monitoring only. Admin-only (see firestore.rules).
-    box.appendChild(el('<div><div class="section-title" style="margin-top:14px">Members (join date · last active)</div><input class="bh-in" id="crMemQ" placeholder="Search by name" style="margin-bottom:8px"><div id="crMembers" class="st-note">Loading…</div></div>'));
-    var allMembers = [];
-    function paintMembers() {
-      var q = ($("crMemQ").value || "").toLowerCase(), now = Date.now();
-      var rows = allMembers.filter(function (u) { return !q || (u.name || "").toLowerCase().indexOf(q) >= 0; });
-      var l = $("crMembers"); l.innerHTML = rows.length ? "" : '<div class="cr-row">No members match.</div>';
-      rows.forEach(function (u) {
-        var last = ms(u.lastSeen), online = last && (now - last) < 180000;
-        var joined = u.createdAt ? ago(ms(u.createdAt)) : "—";
-        var active = last ? (online ? "online now 🟢" : ago(last) + " se offline") : "kabhi active nahi hua";
-        var row = el('<div class="cr-row" data-notr style="flex-wrap:wrap;gap:4px 10px"><b>' + esc(u.name || "(no name)") + '</b>' + chip(u.mode || "friends") + (u.hidden ? chip("paused") : "") + '<span style="color:var(--faint);font-size:12px">joined ' + esc(joined) + ' · ' + esc(active) + '</span><button class="btn-outline" style="padding:2px 10px;margin-left:auto">Fill ID</button></div>');
-        row.querySelector("button").addEventListener("click", function () { $("crUid").value = u.id; window.scrollTo(0, 0); });
-        l.appendChild(row);
+    // Members: who joined, their mode, last-active time, Premium/Ban status — for monitoring + direct action. Admin-only (see firestore.rules).
+    box.appendChild(el('<div><div class="section-title" style="margin-top:14px">Members (join date · last active · Premium/Ban)</div><input class="bh-in" id="crMemQ" placeholder="Search by name" style="margin-bottom:8px"><div id="crMembers" class="st-note">Loading…</div></div>'));
+    var allMembers = [], premiumSet = {}, bannedSet = {};
+    function memberRow(u) {
+      var now = Date.now(), last = ms(u.lastSeen), online = last && (now - last) < 180000;
+      var joined = u.createdAt ? ago(ms(u.createdAt)) : "—";
+      var active = last ? (online ? "online now 🟢" : ago(last) + " se offline") : "kabhi active nahi hua";
+      var isPrem = !!premiumSet[u.id], isBanned = !!bannedSet[u.id];
+      var row = el('<div class="cr-row" data-notr style="flex-wrap:wrap;gap:4px 10px;align-items:center"><b>' + esc(u.name || "(no name)") + '</b>' + chip(u.mode || "friends") + (u.hidden ? chip("paused") : "") + (u.verified ? ' <span title="Identity verified">✔️</span>' : "") + (isPrem ? chip("⭐ Premium") : "") + (isBanned ? chip("🚫 Banned") : "") + '<span style="color:var(--faint);font-size:12px">joined ' + esc(joined) + ' · ' + esc(active) + '</span><div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap"><button class="btn-outline cm-prem" style="padding:2px 10px">' + (isPrem ? "Premium hatao" : "Premium do") + '</button><button class="btn-outline cm-ban" style="padding:2px 10px">' + (isBanned ? "Unban" : "Ban") + '</button></div></div>');
+      row.querySelector(".cm-prem").addEventListener("click", function () {
+        var ref = doc(db, "premium", u.id);
+        (isPrem ? deleteDoc(ref) : setDoc(ref, { at: serverTimestamp(), by: UID })).then(function () { if (isPrem) delete premiumSet[u.id]; else premiumSet[u.id] = true; toast(isPrem ? "Premium removed" : "Premium granted"); paintMembers(); }).catch(function (e) { toast(errMsg(e)); });
       });
+      row.querySelector(".cm-ban").addEventListener("click", function () {
+        if (!isBanned && !window.confirm("Ban " + (u.name || "this member") + "?")) return;
+        var ref = doc(db, "bans", u.id);
+        (isBanned ? deleteDoc(ref) : setDoc(ref, { at: serverTimestamp(), by: UID })).then(function () { if (isBanned) delete bannedSet[u.id]; else bannedSet[u.id] = true; toast(isBanned ? "Unbanned" : "Banned"); paintMembers(); }).catch(function (e) { toast(errMsg(e)); });
+      });
+      return row;
     }
-    getDocs(query(collection(db, "users"), orderBy("createdAt", "desc"), limit(100))).then(function (s) {
-      allMembers = s.docs.map(function (d) { return Object.assign({ id: d.id }, snapData(d)); });
+    function paintMembers() {
+      var q = ($("crMemQ").value || "").toLowerCase();
+      var rows = allMembers.filter(function (u) { return !q || (u.name || "").toLowerCase().indexOf(q) >= 0; });
+      var l = $("crMembers"); l.innerHTML = "";
+      if (!rows.length) { l.appendChild(el('<div class="cr-row">No members match.</div>')); return; }
+      rows.forEach(function (u) { l.appendChild(memberRow(u)); });
+    }
+    Promise.all([
+      getDocs(query(collection(db, "users"), orderBy("createdAt", "desc"), limit(100))),
+      getDocs(collection(db, "premium")).catch(function () { return { docs: [] }; }),
+      getDocs(collection(db, "bans")).catch(function () { return { docs: [] }; })
+    ]).then(function (r) {
+      allMembers = r[0].docs.map(function (d) { return Object.assign({ id: d.id }, snapData(d)); });
+      r[1].docs.forEach(function (d) { premiumSet[d.id] = true; });
+      r[2].docs.forEach(function (d) { bannedSet[d.id] = true; });
       paintMembers();
     }).catch(function (e) { $("crMembers").textContent = errMsg(e); });
     $("crMemQ").addEventListener("input", paintMembers);
