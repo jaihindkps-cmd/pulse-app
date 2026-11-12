@@ -63,6 +63,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     $("aPass").setAttribute("autocomplete", m === "login" ? "current-password" : "new-password");
     $("aName").required = $("aAge").required = m === "signup"; $("authErr").textContent = "";
   }
+  $("pwEye").addEventListener("click", function () { var f = $("aPass"), show = f.type === "password"; f.type = show ? "text" : "password"; this.textContent = show ? "🙈" : "👁"; this.setAttribute("aria-label", show ? "Hide password" : "Show password"); f.focus(); });
   $("segLogin").addEventListener("click", function () { setMode("login"); });
   $("segSignup").addEventListener("click", function () { setMode("signup"); });
 
