@@ -40,7 +40,9 @@ service cloud.firestore {
         && request.resource.data.get('company', '').size() <= 100 && request.resource.data.get('cabout', '').size() <= 300
         && request.resource.data.get('csite', '').size() <= 200 && request.resource.data.get('cvName', '').size() <= 100 && request.resource.data.get('role', '').size() <= 100
         && request.resource.data.get('desig', '').size() <= 100 && request.resource.data.get('community', '').size() <= 100
-        && request.resource.data.get('religion', '').size() <= 60 && request.resource.data.get('prefCity', '').size() <= 100;
+        && request.resource.data.get('religion', '').size() <= 60 && request.resource.data.get('prefCity', '').size() <= 100
+        && (request.resource.data.get('verified', false) == resource.data.get('verified', false) || isAdmin())
+        && (request.resource.data.get('verifyPending', false) == true || request.resource.data.get('verifyPending', false) == resource.data.get('verifyPending', false) || isAdmin());
       allow delete: if loggedIn() && uid == me();
 
       // Saathi AI ki baatein: sirf apni.
@@ -227,6 +229,16 @@ service cloud.firestore {
     match /premium/{uid} {
       allow read: if signedIn() && (uid == me() || isAdmin());
       allow write: if isAdmin();
+    }
+
+    // Identity verification selfies: sirf apna submit kare; sirf apna + admin padh sakte hain; admin hi delete (review ke baad) karta hai.
+    match /verifications/{uid} {
+      allow get: if signedIn() && (uid == me() || isAdmin());
+      allow list: if signedIn() && isAdmin();
+      allow create, update: if signedIn() && uid == me() && notBanned()
+        && request.resource.data.get('photo', '').size() <= 700000 && request.resource.data.get('photo', '').size() > 0
+        && request.resource.data.status == 'pending';
+      allow delete: if isAdmin();
     }
   }
 }

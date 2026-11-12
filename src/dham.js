@@ -47,21 +47,51 @@ export function art(d) {
   return "url(\"data:image/svg+xml;utf8," + encodeURIComponent(svg) + "\")";
 }
 // Asli photo: Wikipedia/Wikimedia Commons se (khule license), browser me live laayi jaati hai. Na mile to generated art dikhti hai.
-var WIKI = { somnath: "Somnath temple", mallikarjuna: "Srisailam", mahakaleshwar: "Mahakaleshwar Jyotirlinga", omkareshwar: "Omkareshwar Temple", kedarnath: "Kedarnath Temple", bhimashankar: "Bhimashankar Temple", kashi: "Kashi Vishwanath Temple", trimbakeshwar: "Trimbakeshwar Shiva Temple", vaidyanath: "Baidyanath Temple, Deoghar", nageshwar: "Nageshvara Jyotirlinga", rameshwaram: "Ramanathaswamy Temple", grishneshwar: "Grishneshwar Temple", amarnath: "Amarnath Temple", vaishno: "Vaishno Devi", kamakhya: "Kamakhya Temple", kalighat: "Kalighat Kali Temple", jwala: "Jwalamukhi Temple", naina: "Naina Devi Temple", vindhyachal: "Vindhyavasini Temple", ambaji: "Ambaji Temple", maihar: "Sharda Devi Temple, Maihar", badrinath: "Badrinath Temple", dwarka: "Dwarkadhish Temple", puri: "Jagannath Temple, Puri" };
-var PK = "pulse_dham_photos_v1";
+var WIKI = {
+  somnath: ["Somnath temple", "Somnath"], mallikarjuna: ["Mallikarjuna Temple, Srisailam", "Srisailam"], mahakaleshwar: ["Mahakaleshwar Jyotirlinga", "Mahakaleshwar Temple"],
+  omkareshwar: ["Omkareshwar Temple", "Omkareshwar"], kedarnath: ["Kedarnath Temple", "Kedarnath"], bhimashankar: ["Bhimashankar Temple"], kashi: ["Kashi Vishwanath Temple"],
+  trimbakeshwar: ["Trimbakeshwar Shiva Temple", "Trimbakeshwar"], vaidyanath: ["Baidyanath Temple, Deoghar", "Baidyanath Dham"], nageshwar: ["Nageshvara Jyotirlinga"],
+  rameshwaram: ["Ramanathaswamy Temple"], grishneshwar: ["Grishneshwar Temple"], amarnath: ["Amarnath Temple", "Amarnath cave"],
+  vaishno: ["Vaishno Devi Temple", "Vaishno Devi"], kamakhya: ["Kamakhya Temple"], kalighat: ["Kalighat Kali Temple"], jwala: ["Jwalamukhi Temple, Kangra", "Jwalamukhi Temple"],
+  naina: ["Naina Devi Temple", "Naina Devi"], vindhyachal: ["Vindhyavasini Temple"], ambaji: ["Ambaji Temple"], maihar: ["Maihar Devi Temple", "Sharda Devi Temple"],
+  badrinath: ["Badrinath Temple"], dwarka: ["Dwarkadhish Temple"], puri: ["Jagannath Temple, Puri"]
+};
+var PK = "pulse_dham_photos_v2";
 export function photoOrArt(d) { return (d.photo ? 'url("' + d.photo + '"), ' : "") + "url(dham/" + d.id + ".jpg), " + art(d); }
-export function loadPhotos(done) {
-  var cache = {}; try { cache = JSON.parse(localStorage.getItem(PK) || "{}"); } catch (e) {}
+// Shared helper: har id ke liye ek ya zyada candidate titles ho sakte hain; jo bhi pehla mile wahi use hota hai.
+// Real (licensed-open) photo Wikimedia Commons se seedha fetch hoti hai; na mile to upar wali generated kalakriti dikhti hai.
+function fetchWikiPhotos(idToTitles, cacheKey, done, apply) {
+  var cache = {}; try { cache = JSON.parse(localStorage.getItem(cacheKey) || "{}"); } catch (e) {}
   var fresh = cache.t && Date.now() - cache.t < 7 * 86400000 && cache.m;
-  function apply(m) { var n = 0; DHAMS.forEach(function (d) { if (m[d.id] && /^https:\/\/upload\.wikimedia\.org\//.test(m[d.id])) { d.photo = m[d.id]; n++; } }); if (n) done(); }
-  if (fresh) { apply(cache.m); return; }
-  var titles = DHAMS.map(function (d) { return WIKI[d.id]; }).filter(Boolean).join("|");
-  fetch("https://en.wikipedia.org/w/api.php?action=query&format=json&origin=*&redirects=1&prop=pageimages&piprop=thumbnail&pithumbsize=640&titles=" + encodeURIComponent(titles)).then(function (r) { return r.json(); }).then(function (j) {
+  if (fresh) { apply(cache.m); if (Object.keys(cache.m).length) done(); return; }
+  var allTitles = []; Object.keys(idToTitles).forEach(function (id) { idToTitles[id].forEach(function (t) { if (allTitles.indexOf(t) < 0) allTitles.push(t); }); });
+  if (!allTitles.length) return;
+  fetch("https://en.wikipedia.org/w/api.php?action=query&format=json&origin=*&redirects=1&prop=pageimages&piprop=thumbnail&pithumbsize=900&titles=" + encodeURIComponent(allTitles.join("|"))).then(function (r) { return r.json(); }).then(function (j) {
     var q = j.query || {}, byTitle = {}, alias = {};
     (q.normalized || []).forEach(function (x) { alias[x.from] = x.to; }); (q.redirects || []).forEach(function (x) { alias[x.from] = x.to; });
     Object.keys(q.pages || {}).forEach(function (k) { var pg = q.pages[k]; if (pg.thumbnail) byTitle[pg.title] = pg.thumbnail.source; });
-    var m = {}; DHAMS.forEach(function (d) { var t = WIKI[d.id], hops = 0; while (alias[t] && hops++ < 4) t = alias[t]; if (byTitle[t]) m[d.id] = byTitle[t]; });
-    try { localStorage.setItem(PK, JSON.stringify({ t: Date.now(), m: m })); } catch (e) {} apply(m);
+    var m = {}; Object.keys(idToTitles).forEach(function (id) {
+      for (var i = 0; i < idToTitles[id].length; i++) { var t = idToTitles[id][i], hops = 0; while (alias[t] && hops++ < 4) t = alias[t]; if (byTitle[t]) { m[id] = byTitle[t]; break; } }
+    });
+    try { localStorage.setItem(cacheKey, JSON.stringify({ t: Date.now(), m: m })); } catch (e) {} apply(m); if (Object.keys(m).length) done();
   }).catch(function () {});
 }
+export function loadPhotos(done) {
+  var idToTitles = {}; DHAMS.forEach(function (d) { if (WIKI[d.id]) idToTitles[d.id] = WIKI[d.id]; });
+  fetchWikiPhotos(idToTitles, PK, done, function (m) { DHAMS.forEach(function (d) { if (m[d.id] && /^https:\/\/upload\.wikimedia\.org\//.test(m[d.id])) d.photo = m[d.id]; }); });
+}
 export function daily() { return DHAMS[Math.floor(Date.now() / 86400000) % DHAMS.length]; }
+
+// Deity artwork for Bhajan Room: classical, traditional depictions (centuries-old iconography),
+// fetched live from Wikimedia Commons the same safe way as temple photos above. Falls back to the
+// app's own gradient + symbol when a photo can't be fetched.
+export var DEITY_WIKI = {
+  Om: ["Om"], Shiv: ["Shiva", "Shiva as Nataraja"], Ram: ["Rama", "Rama (Hindu deity)"], Krishna: ["Krishna", "Krishna (deity)"],
+  Hanuman: ["Hanuman"], Durga: ["Durga", "Durga Puja"], Ganesh: ["Ganesha"], Lakshmi: ["Lakshmi"],
+  Saraswati: ["Saraswati"], Vishnu: ["Vishnu"], "Sai Baba": ["Sai Baba of Shirdi"], Ayyappa: ["Ayyappan", "Sabarimala"]
+};
+var DK = "pulse_deity_photos_v2";
+export function loadDeityPhotos(DEITY, done) {
+  var idToTitles = {}; DEITY.forEach(function (d) { if (DEITY_WIKI[d.n]) idToTitles[d.n] = DEITY_WIKI[d.n]; });
+  fetchWikiPhotos(idToTitles, DK, done, function (m) { DEITY.forEach(function (d) { if (m[d.n] && /^https:\/\/upload\.wikimedia\.org\//.test(m[d.n])) d.photo = m[d.n]; }); });
+}

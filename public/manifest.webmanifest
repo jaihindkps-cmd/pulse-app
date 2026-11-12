@@ -1,8 +1,8 @@
 {
-  "name": "Pulse",
+  "name": "Pulse — Connect, Date, Marry, Work",
   "short_name": "Pulse",
-  "description": "Social, dating, shaadi aur Saathi AI, sab ek jagah",
-  "lang": "hi",
+  "description": "Social feed, dating, matrimony, jobs, verified profiles and an AI companion — all in one app (beta)",
+  "lang": "en",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
@@ -10,7 +10,9 @@
   "background_color": "#0d0b14",
   "theme_color": "#7c4dff",
   "icons": [
-    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }

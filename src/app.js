@@ -8,7 +8,7 @@ import {
 import { initAI, chat as aiChat, json as aiJson, aiWorking } from "./ai.js";
 import { buildSong, Player, renderWav, GENRES } from "./music.js";
 import * as Call from "./call.js";
-import { DHAMS, art as dhamArt, photoOrArt, loadPhotos, daily as dailyDham, kindName, kindSym } from "./dham.js";
+import { DHAMS, art as dhamArt, photoOrArt, loadPhotos, daily as dailyDham, kindName, kindSym, loadDeityPhotos } from "./dham.js";
 import { tr, getLang, setLang, initI18n } from "./i18n.js";
 
 (function () {
@@ -198,7 +198,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     if (!queue.length) { deck.innerHTML = '<div class="deck-empty"><div><div style="font-size:42px;margin-bottom:8px">💫</div><div style="font-weight:700;font-size:16px;color:var(--fg);margin-bottom:4px">Abhi itne hi log</div><div style="font-size:13px">Jaise-jaise naye log judenge, yahan dikhenge. Doston ko Pulse bhejo!</div></div></div>'; return; }
     queue.slice(0, 3).reverse().forEach(function (u, i, arr) {
       var top = i === arr.length - 1, depth = arr.length - 1 - i;
-      var c = el('<div class="swipe-card" style="background:' + g(u.id) + ';transform:translateY(' + depth * 14 + 'px) scale(' + (1 - depth * 0.05) + ')"><div class="scrim"></div><div class="avatar-big"' + (u.photo && JPEG.test(u.photo) ? ' style="background:center/cover url(' + u.photo + ')"' : "") + '>' + (u.photo && JPEG.test(u.photo) ? "" : ini(u.name)) + '</div><span class="stamp like">Like</span><span class="stamp nope">Nope</span><div class="info"><h3>' + esc(u.name) + (u.age ? ", " + u.age : "") + '</h3><div class="sub">' + esc([u.work, u.city].filter(Boolean).join(" · ") || "Pulse member") + '</div>' + (u.about ? '<p class="about">' + esc(u.about) + '</p>' : '') + '<div class="tags"><span>' + esc(MODE_LABEL[modeOf(u)]) + '</span></div>' + factsFor(u) + '</div></div>');
+      var c = el('<div class="swipe-card" style="background:' + g(u.id) + ';transform:translateY(' + depth * 14 + 'px) scale(' + (1 - depth * 0.05) + ')"><div class="scrim"></div><div class="avatar-big"' + (u.photo && JPEG.test(u.photo) ? ' style="background:center/cover url(' + u.photo + ')"' : "") + '>' + (u.photo && JPEG.test(u.photo) ? "" : ini(u.name)) + '</div><span class="stamp like">Like</span><span class="stamp nope">Nope</span><div class="info"><h3>' + esc(u.name) + (u.age ? ", " + u.age : "") + vBadge(u) + '</h3><div class="sub">' + esc([u.work, u.city].filter(Boolean).join(" · ") || "Pulse member") + '</div>' + (u.about ? '<p class="about">' + esc(u.about) + '</p>' : '') + '<div class="tags"><span>' + esc(MODE_LABEL[modeOf(u)]) + '</span></div>' + factsFor(u) + '</div></div>');
       deck.appendChild(c);
       if (top) { topCard = c; topUser = u; drag(c); }
     });
@@ -790,6 +790,14 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     $("crPrem").addEventListener("click", function () { var id = clean($("crUid").value, 60); if (id) setDoc(doc(db, "premium", id), { at: serverTimestamp(), by: UID }).then(function () { toast("Premium granted"); }).catch(function (e) { toast(errMsg(e)); }); });
     $("crUnprem").addEventListener("click", function () { var id = clean($("crUid").value, 60); if (id) deleteDoc(doc(db, "premium", id)).then(function () { toast("Premium removed"); }).catch(function (e) { toast(errMsg(e)); }); });
     $("crUnban").addEventListener("click", function () { var id = clean($("crUid").value, 60); if (id) deleteDoc(doc(db, "bans", id)).then(function () { toast("Unbanned"); }).catch(function (e) { toast(errMsg(e)); }); });
+    box.appendChild(el('<div class="section-title" style="margin-top:14px">Identity verification requests</div><div id="crVerify" class="st-note">Loading…</div>'));
+    getDocs(query(collection(db, "verifications"), orderBy("createdAt", "desc"), limit(20))).then(function (s) {
+      var l = $("crVerify"); l.innerHTML = s.empty ? "No pending requests." : "";
+      s.forEach(function (d) { var r = d.data(), row = el('<div class="cr-row" data-notr style="align-items:center;gap:10px"><div style="width:46px;height:46px;border-radius:10px;background:center/cover url(' + r.photo + ');flex:none"></div><b>' + esc(r.name || d.id) + '</b><button class="btn-grad" style="padding:4px 10px;margin-left:auto">Approve</button><button class="btn-outline" style="padding:4px 10px">Reject</button></div>');
+        row.querySelectorAll("button")[0].addEventListener("click", function () { updateDoc(doc(db, "users", d.id), { verified: true, verifyPending: false }).then(function () { return deleteDoc(doc(db, "verifications", d.id)); }).then(function () { row.remove(); toast("Approved"); }).catch(function (e) { toast(errMsg(e)); }); });
+        row.querySelectorAll("button")[1].addEventListener("click", function () { updateDoc(doc(db, "users", d.id), { verified: false, verifyPending: false }).then(function () { return deleteDoc(doc(db, "verifications", d.id)); }).then(function () { row.remove(); toast("Rejected"); }).catch(function (e) { toast(errMsg(e)); }); });
+        l.appendChild(row); });
+    }).catch(function (e) { $("crVerify").textContent = errMsg(e); });
   }
 
   // ---- Bhajan Room ----
@@ -806,7 +814,9 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     { n: "Om", s: "🕉️", g: "linear-gradient(180deg,#3b1200,#8a3200 55%,#ff9a3c)" }, { n: "Shiv", s: "🔱", g: "linear-gradient(180deg,#0b1030,#2c2a6e 55%,#7aa7ff)" },
     { n: "Ram", s: "🏹", g: "linear-gradient(180deg,#4a1500,#c24a00 55%,#ffcf5c)" }, { n: "Krishna", s: "🪈", g: "linear-gradient(180deg,#061a3a,#0b5c8a 55%,#3de0c8)" },
     { n: "Hanuman", s: "🚩", g: "linear-gradient(180deg,#4d0c00,#d9480f 55%,#ffb347)" }, { n: "Durga", s: "🦁", g: "linear-gradient(180deg,#3a0010,#b3123a 55%,#ffb347)" },
-    { n: "Ganesh", s: "🐘", g: "linear-gradient(180deg,#3d2a00,#c98400 55%,#ffe27a)" }, { n: "Lakshmi", s: "🪷", g: "linear-gradient(180deg,#3a0a2e,#b83280 55%,#ffc2e0)" }
+    { n: "Ganesh", s: "🐘", g: "linear-gradient(180deg,#3d2a00,#c98400 55%,#ffe27a)" }, { n: "Lakshmi", s: "🪷", g: "linear-gradient(180deg,#3a0a2e,#b83280 55%,#ffc2e0)" },
+    { n: "Saraswati", s: "🎻", g: "linear-gradient(180deg,#071c2e,#1a5276 55%,#cfeaff)" }, { n: "Vishnu", s: "🪔", g: "linear-gradient(180deg,#081a3a,#1a4fa0 55%,#9fc8ff)" },
+    { n: "Sai Baba", s: "🕊️", g: "linear-gradient(180deg,#241400,#7a4a12 55%,#ffd98a)" }, { n: "Ayyappa", s: "🏹", g: "linear-gradient(180deg,#120e00,#5b4300 55%,#ffd34d)" }
   ];
   var ROOM = null, roomSnd = null, dhamKind = "";
   function bhajanFor(d) { return BHAJANS[d.k === "S" ? 5 : d.k === "C" && d.id !== "rameshwaram" ? 2 : 3]; }
@@ -849,7 +859,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     }).catch(function (e) { toast(e && e.code === "permission-denied" ? "Cannot join this room" : errMsg(e)); });
   }
   $("bhJoin").addEventListener("click", function () { joinRoom($("bhCode").value); });
-  function theme(i) { var d = DEITY[i] || DEITY[0]; $("roomBg").style.background = d.g; $("bigSym").textContent = d.s; document.querySelectorAll("#deities button").forEach(function (b, j) { b.classList.toggle("on", j === i); }); try { localStorage.setItem("pulse_deity", i); } catch (e) {} }
+  function theme(i) { var d = DEITY[i] || DEITY[0]; $("roomBg").style.background = d.photo ? ("linear-gradient(rgba(0,0,0,.3),rgba(0,0,0,.65)), url(\"" + d.photo + "\") center/cover") : d.g; $("bigSym").textContent = d.photo ? "" : d.s; document.querySelectorAll("#deities button").forEach(function (b, j) { b.classList.toggle("on", j === i); }); try { localStorage.setItem("pulse_deity", i); } catch (e) {} }
   function petals(n) { var box = $("petals"); for (var i = 0; i < n; i++) { var p = document.createElement("span"); p.className = "petal"; p.textContent = ["🌸", "🌼", "🌺", "🪷"][i % 4]; p.style.left = Math.random() * 100 + "%"; p.style.animationDuration = 3 + Math.random() * 3 + "s"; p.style.animationDelay = Math.random() * 0.6 + "s"; box.appendChild(p); setTimeout(function (x) { x.remove(); }, 7000, p); } }
   function paintLine(r) {
     var it = r.items || [], i = Math.max(0, Math.min(it.length - 1, r.line || 0));
@@ -860,6 +870,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     $("roomUI").hidden = false; $("roomLog").innerHTML = "";
     var d = $("deities"); d.innerHTML = ""; DEITY.forEach(function (x, i) { var b = document.createElement("button"); b.textContent = x.s + " " + x.n; b.setAttribute("data-notr", ""); b.addEventListener("click", function () { theme(i); }); d.appendChild(b); });
     var sv = 0; try { sv = +localStorage.getItem("pulse_deity") || 0; } catch (e) {} theme(sv);
+    loadDeityPhotos(DEITY, function () { theme(sv); });
     ROOM.unsubs.push(onSnapshot(doc(db, "rooms", id), function (s) {
       if (!s.exists()) { toast("Room closed"); leaveRoom(); return; }
       var r = snapData(s); ROOM.data = r; ROOM.host = r.host === UID;
@@ -917,7 +928,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   var NUMF = { height: 1, ageMin: 1, ageMax: 1, exp: 1 };
   function fillProfileForm() {
     $("eMode").value = MODE; Object.keys(PROF_FIELDS).forEach(function (id) { var v = ME[PROF_FIELDS[id]]; if (v != null && v !== "") $(id).value = v; });
-    $("hideToggle").classList.toggle("on", !!ME.hidden); cvPaint(); phoneLoad(); sectionsFor($("eMode").value);
+    $("hideToggle").classList.toggle("on", !!ME.hidden); cvPaint(); phoneLoad(); vfPaint(); sectionsFor($("eMode").value);
   }
   function sectionsFor(m) { $("secMate").hidden = !isMateMode(m); $("secMarriage").hidden = m !== "marriage"; $("secSeeker").hidden = m !== "jobseeker"; $("secRecruiter").hidden = m !== "recruiter"; $("eWork").parentNode.firstChild.nodeValue = m === "recruiter" ? "Role at work" : "Occupation"; }
   $("eMode").addEventListener("change", function () { sectionsFor(this.value); });
@@ -971,12 +982,31 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   function chip(t, c) { return '<span class="chip ' + (c || "") + '">' + esc(t) + "</span>"; }
   function stChip(st) { return chip(st, { applied: "acc", invited: "warn", shortlisted: "ok", hired: "ok", rejected: "no", declined: "no", withdrawn: "" }[st] || ""); }
   function renderJobs() {
-    var box = $("jobsBox"), tabs = MODE === "recruiter" ? [["cands", "Candidates"], ["myjobs", "My jobs"], ["post", "Post job"]] : [["jobs", "Jobs"], ["applied", "Applied"], ["invites", "Invites"]];
+    var box = $("jobsBox"), tabs = MODE === "recruiter" ? [["cands", "Candidates"], ["myjobs", "My jobs"], ["post", "Post job"]] : [["jobs", "Jobs"], ["saved", "Saved"], ["applied", "Applied"], ["invites", "Invites"]];
     box.innerHTML = '<div class="seg jobs-seg">' + tabs.map(function (t) { return '<button data-t="' + t[0] + '"' + (jobsTab === t[0] ? ' class="on"' : "") + ">" + t[1] + (t[0] === "invites" && APPS.filter(function (a) { return a.status === "invited"; }).length ? " •" : "") + "</button>"; }).join("") + '</div><div id="jbody"></div>';
     box.querySelectorAll(".jobs-seg button").forEach(function (b) { b.addEventListener("click", function () { jobsTab = b.getAttribute("data-t"); renderJobs(); }); });
-    var f = { jobs: viewJobs, applied: viewApplied, invites: viewInvites, cands: viewCands, myjobs: viewMyJobs, post: viewPost }[jobsTab]; f($("jbody"));
+    var f = { jobs: viewJobs, saved: viewSaved, applied: viewApplied, invites: viewInvites, cands: viewCands, myjobs: viewMyJobs, post: viewPost }[jobsTab]; f($("jbody"));
   }
   var SCAM = '<div class="scam-note">🛡️ Never pay money to get a job or interview. Real employers do not charge fees. Report any job that asks for payment.</div>';
+  var SAVEKEY = "pulse_saved_jobs";
+  function savedIds() { try { return JSON.parse(localStorage.getItem(SAVEKEY) || "[]"); } catch (e) { return []; } }
+  function isSaved(id) { return savedIds().indexOf(id) >= 0; }
+  function toggleSave(id) { var s = savedIds(), i = s.indexOf(id); if (i >= 0) s.splice(i, 1); else s.push(id); try { localStorage.setItem(SAVEKEY, JSON.stringify(s)); } catch (e) {} }
+  function viewSaved(box) {
+    var ids = savedIds(); box.innerHTML = '<div class="empty">Loading…</div>';
+    if (!ids.length) { box.innerHTML = '<div class="empty">No saved jobs yet. Tap ☆ Save on any job to keep it here.</div>'; return; }
+    getDocs(query(collection(db, "jobs"), orderBy("createdAt", "desc"), limit(50))).then(function (s) {
+      var rows = s.docs.map(function (d) { return Object.assign({ id: d.id }, snapData(d)); }).filter(function (j) { return ids.indexOf(j.id) >= 0; });
+      box.innerHTML = rows.length ? "" : '<div class="empty">Saved jobs are no longer available.</div>';
+      rows.forEach(function (j) {
+        var app = APPS.filter(function (a) { return a.jid === j.id; })[0];
+        var c = el('<div class="jcard" data-notr><h4>' + esc(j.title) + '</h4><div class="jm">' + esc(j.company || j.rname) + " · " + esc(j.city || "") + '</div><div>' + chip(j.field || "Other", "acc") + '</div><div class="jrow">' + (app ? stChip(app.status) : (j.status === "closed" ? chip("Closed", "no") : '<button class="btn-grad">Apply</button>')) + '<button class="btn-outline save-b" style="margin-left:6px">Remove</button></div></div>');
+        var b = c.querySelector(".btn-grad"); if (b) b.addEventListener("click", function () { applyJob(j, b); });
+        c.querySelector(".save-b").addEventListener("click", function () { toggleSave(j.id); viewSaved(box); });
+        box.appendChild(c);
+      });
+    }).catch(function (e) { toast(errMsg(e)); });
+  }
   function viewJobs(box) {
     box.innerHTML = SCAM + '<div class="jfilters"><select id="jfField"><option value="">All fields</option>' + FIELDS.map(function (x) { return '<option' + (x === (ME.field || "") ? " selected" : "") + ">" + esc(x) + "</option>"; }).join("") + '</select><input id="jfCity" placeholder="City" value="' + esc(ME.prefCity || "") + '"><select id="jfType"><option value="">Any type</option><option>Full-time</option><option>Part-time</option><option>Contract</option><option>Internship</option><option>Remote</option></select><input id="jfQ" placeholder="Search title / skill"></div><div id="jlist"><div class="empty">Loading...</div></div>';
     var jobsCache = null;
@@ -986,8 +1016,10 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
       if (!rows.length) { l.innerHTML = '<div class="empty">No jobs match yet. Change the filters or check back soon.</div>'; return; }
       rows.forEach(function (j) {
         var app = APPS.filter(function (a) { return a.jid === j.id; })[0];
-        var c = el('<div class="jcard" data-notr><h4>' + esc(j.title) + '</h4><div class="jm">' + esc(j.company || j.rname) + " · " + esc(j.city || "") + " · " + esc(j.type || "") + '</div><div>' + chip(j.field || "Other", "acc") + (j.exp ? chip(j.exp + "+ yrs") : chip("Fresher ok")) + (j.salary ? chip(j.salary) : "") + '</div><div class="jd">' + esc(String(j.desc || "").slice(0, 220)) + '</div><div class="jrow">' + (app ? stChip(app.status) : '<button class="btn-grad">Apply</button>') + '</div></div>');
-        var b = c.querySelector(".btn-grad"); if (b) b.addEventListener("click", function () { applyJob(j, b); }); l.appendChild(c);
+        var c = el('<div class="jcard" data-notr><h4>' + esc(j.title) + '</h4><div class="jm">' + esc(j.company || j.rname) + " · " + esc(j.city || "") + " · " + esc(j.type || "") + '</div><div>' + chip(j.field || "Other", "acc") + (j.exp ? chip(j.exp + "+ yrs") : chip("Fresher ok")) + (j.salary ? chip(j.salary) : "") + '</div><div class="jd">' + esc(String(j.desc || "").slice(0, 220)) + '</div><div class="jrow">' + (app ? stChip(app.status) : '<button class="btn-grad">Apply</button>') + '<button class="btn-outline save-b" style="margin-left:6px">' + (isSaved(j.id) ? "★ Saved" : "☆ Save") + '</button></div></div>');
+        var b = c.querySelector(".btn-grad"); if (b) b.addEventListener("click", function () { applyJob(j, b); });
+        c.querySelector(".save-b").addEventListener("click", function (e) { toggleSave(j.id); e.target.textContent = isSaved(j.id) ? "★ Saved" : "☆ Save"; });
+        l.appendChild(c);
       });
     }
     getDocs(query(collection(db, "jobs"), orderBy("createdAt", "desc"), limit(50))).then(function (s) { jobsCache = s.docs.map(function (d) { return Object.assign({ id: d.id }, snapData(d)); }); paint(); }).catch(function (e) { toast(errMsg(e)); });
@@ -1032,7 +1064,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     }).catch(function (e) { toast(errMsg(e)); });
   }
   function candCard(u) {
-    return el('<div class="jcard" data-notr><h4>' + esc(u.name) + (u.age ? ", " + esc(u.age) : "") + '</h4><div class="jm">' + esc(u.role || u.work || "Job seeker") + " · " + esc(u.city || "") + '</div><div>' + chip(u.field || "Other", "acc") + (u.exp != null && u.exp !== "" ? chip(u.exp + " yrs") : chip("Fresher")) + (u.jobType ? chip(u.jobType) : "") + (u.cvName ? chip("CV on file", "ok") : "") + (u.notice ? chip("Notice: " + u.notice) : "") + '</div><div class="jd">' + esc(u.skills || "") + (u.about ? " — " + esc(String(u.about).slice(0, 160)) : "") + '</div><div class="jrow"></div></div>');
+    return el('<div class="jcard" data-notr><h4>' + esc(u.name) + (u.age ? ", " + esc(u.age) : "") + vBadge(u) + '</h4><div class="jm">' + esc(u.role || u.work || "Job seeker") + " · " + esc(u.city || "") + '</div><div>' + chip(u.field || "Other", "acc") + (u.exp != null && u.exp !== "" ? chip(u.exp + " yrs") : chip("Fresher")) + (u.jobType ? chip(u.jobType) : "") + (u.cvName ? chip("CV on file", "ok") : "") + (u.notice ? chip("Notice: " + u.notice) : "") + '</div><div class="jd">' + esc(u.skills || "") + (u.about ? " — " + esc(String(u.about).slice(0, 160)) : "") + '</div><div class="jrow"></div></div>');
   }
   function showCandidate(uid) { getDoc(doc(db, "users", uid)).then(function (s) { if (!s.exists()) return; var u = s.data(); $("policyText").innerHTML = '<h3>' + esc(u.name) + '</h3><p>' + esc([u.role || u.work, u.city, u.field].filter(Boolean).join(" · ")) + '</p><p><b>Experience:</b> ' + esc(u.exp != null ? u.exp + " years" : "Fresher") + '<br><b>Skills:</b> ' + esc(u.skills || "-") + '<br><b>Job type:</b> ' + esc(u.jobType || "-") + '<br><b>Preferred city:</b> ' + esc(u.prefCity || "-") + '<br><b>Notice:</b> ' + esc(u.notice || "-") + '</p><p>' + esc(u.about || "") + '</p>' + (/^https?:\/\//i.test(u.resume || "") ? '<p><a href="' + esc(u.resume) + '" target="_blank" rel="noopener noreferrer">Resume link</a></p>' : ""); $("policyUI").hidden = false; }).catch(function (e) { toast(errMsg(e)); }); }
   function viewCands(box) {
@@ -1093,14 +1125,24 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     addDoc(collection(db, "reports"), { from: UID, to: UID, reason: ("AUTO: abusive words in " + where).slice(0, 190), auto: true, createdAt: serverTimestamp() }).catch(function () {});
     toast("Please keep Pulse respectful. Abusive messages can lead to a ban."); return true;
   }
+  function biodataRow(label, val) { return val ? '<div class="bio-row"><span class="bio-k">' + esc(label) + '</span><span class="bio-v" data-notr>' + esc(val) + "</span></div>" : ""; }
+  function marriageBiodata(u) {
+    return '<div class="bio-card"><div class="bio-h">Matrimony Biodata</div>'
+      + biodataRow("Age", u.age ? u.age + " yrs" : "") + biodataRow("Height", u.height ? u.height + " cm" : "")
+      + biodataRow("Religion", u.religion) + biodataRow("Mother tongue", u.tongue) + biodataRow("Community", u.community)
+      + biodataRow("Marital status", u.marital) + biodataRow("Education", u.edu) + biodataRow("Diet", u.diet)
+      + biodataRow("City", u.city) + biodataRow("Occupation", u.work)
+      + biodataRow("Looking for", [u.ageMin && u.ageMax ? u.ageMin + "–" + u.ageMax + " yrs" : "", u.seeking && u.seeking !== "Everyone" ? u.seeking : ""].filter(Boolean).join(", "))
+      + "</div>";
+  }
   function openProfile(uid, nm) {
     if (!uid || uid === UID && false) return;
     getDoc(doc(db, "users", uid)).then(function (s) {
       if (!s.exists()) { toast("Profile not found"); return; } var u = s.data(), m = modeOf(u);
       var rows = [u.age ? u.age + " yrs" : "", u.city, u.work, MODE_LABEL[m]].filter(Boolean).join(" · ");
-      var extra = m === "marriage" ? factsFor(u) : (m === "jobseeker" ? '<div class="facts">' + [u.field, u.role, u.exp != null && u.exp !== "" ? u.exp + " yrs exp" : "", u.skills].filter(Boolean).map(function (x) { return "<span>" + esc(x) + "</span>"; }).join("") + "</div>" : (m === "recruiter" ? '<div class="facts">' + [u.company, u.desig].filter(Boolean).map(function (x) { return "<span>" + esc(x) + "</span>"; }).join("") + "</div>" : ""));
+      var extra = m === "marriage" ? marriageBiodata(u) : (m === "jobseeker" ? '<div class="facts">' + [u.field, u.role, u.exp != null && u.exp !== "" ? u.exp + " yrs exp" : "", u.skills].filter(Boolean).map(function (x) { return "<span>" + esc(x) + "</span>"; }).join("") + "</div>" : (m === "recruiter" ? '<div class="facts">' + [u.company, u.desig].filter(Boolean).map(function (x) { return "<span>" + esc(x) + "</span>"; }).join("") + "</div>" : ""));
       var mine = uid === UID;
-      $("policyText").innerHTML = '<div class="pf-top"><div class="av-lg" style="background:' + g(uid) + '">' + esc(ini(u.name)) + '</div><h3 data-notr>' + esc(u.name) + '</h3><div class="jm" data-notr>' + esc(rows) + '</div></div>' + extra + '<p data-notr>' + esc(u.about || "") + '</p><div class="pf-priv">🔒 Email, phone and private details are never shown to other members.</div>' + (mine ? "" : '<div id="pfContactOut" class="st-note" data-notr></div><div class="jrow"><button class="btn-grad" id="pfContact">Request contact number</button><button class="btn-outline" id="pfReport">Report</button><button class="btn-outline" id="pfBlock">Block</button></div>');
+      $("policyText").innerHTML = '<div class="pf-top"><div class="av-lg" style="background:' + g(uid) + '">' + esc(ini(u.name)) + '</div><h3 data-notr>' + esc(u.name) + vBadge(u) + '</h3><div class="jm" data-notr>' + esc(rows) + '</div></div>' + extra + '<p data-notr>' + esc(u.about || "") + '</p><div class="pf-priv">🔒 Email, phone and private details are never shown to other members.</div>' + (mine ? "" : '<div id="pfContactOut" class="st-note" data-notr></div><div class="jrow"><button class="btn-grad" id="pfContact">Request contact number</button><button class="btn-outline" id="pfReport">Report</button><button class="btn-outline" id="pfBlock">Block</button></div>');
       $("policyUI").hidden = false;
       if (!mine) {
         $("pfContact").addEventListener("click", function () { requestContact(uid, $("pfContactOut")); });
@@ -1183,6 +1225,27 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   }
   window.addEventListener("error", function (e) { if (e && e.message && !/ResizeObserver|Script error/.test(e.message)) toast("Something went wrong: " + String(e.message).slice(0, 80)); });
   window.addEventListener("unhandledrejection", function (e) { var r = e && e.reason; if (r && r.code === "permission-denied") return; toast("Something went wrong: " + String((r && r.message) || r || "").slice(0, 80)); });
+
+  // ================= Identity verification (opt-in selfie, reviewed by the Pulse safety team) =================
+  function vfPaint() {
+    var d = $("vfDesc"), b = $("vfBtn");
+    if (ME && ME.verified) { d.textContent = "Verified — your badge is shown to other members. The photo itself is never shown to anyone."; b.textContent = "Re-verify"; }
+    else if (ME && ME.verifyPending) { d.textContent = "Submitted — waiting for our safety team to review. This can take a little time."; b.textContent = "Resubmit"; }
+    else { d.textContent = "Take a quick selfie so our safety team can confirm you are a real person. Shown to members only as a verified badge — the photo itself is never shown to other members."; b.textContent = "Verify"; }
+  }
+  $("vfBtn").addEventListener("click", function () { $("vfInput").click(); });
+  $("vfInput").addEventListener("change", function () {
+    var f = this.files && this.files[0]; this.value = ""; if (!f) return;
+    if (!rate("verify", 3, 60000)) return;
+    shrink(f, 480, 0.75).then(function (data) {
+      if (!window.confirm("Submit this selfie for identity verification? Only our safety team reviews it to confirm you are a real person — it is never shown to other members or used for anything else. Continue?")) return;
+      return setDoc(doc(db, "verifications", UID), { photo: data, name: ME.name, status: "pending", createdAt: serverTimestamp() })
+        .then(function () { return updateDoc(doc(db, "users", UID), { verifyPending: true, verified: false }); })
+        .then(function () { ME.verifyPending = true; ME.verified = false; vfPaint(); toast("Submitted for review"); });
+    }).catch(function (e) { toast(errMsg(e)); });
+  });
+  function vBadge(u) { return u && u.verified ? ' <span title="Identity verified" style="color:#2dbd6e">✔️</span>' : ""; }
+
   // ---- boot ----
   initI18n(); setMode("login");
   fetch("firebase-config.json", { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (cfg) {
