@@ -154,7 +154,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     screens.forEach(function (s) { $("screen-" + s).hidden = s !== name; });
     document.querySelectorAll(".tab").forEach(function (t) { t.classList.toggle("active", t.getAttribute("data-tab") === key); });
     $("screenTitle").textContent = titles[name];
-    try { if (name === "discover") loadDeck(); if (name === "jobs") loadJobs(); } catch (e) { toast("Could not load this screen. Please try again."); } if (name === "nearby") loadNearby(); else stopNearby(); if (name === "studio") renderLib(); if (name === "chats") $("chatDot").hidden = true;
+    try { if (name === "discover") loadDeck(); if (name === "jobs") loadJobs(); } catch (e) { toast("Could not load this screen. Please try again."); } if (name === "nearby") loadNearby(); else stopNearby(); if (name === "studio") renderLib(); if (name === "chats") { $("chatDot").hidden = true; renderChats(); }
   }
   document.querySelectorAll(".tab").forEach(function (t) { t.addEventListener("click", function () { if (UID) showTab(t.getAttribute("data-tab")); }); });
 
@@ -372,7 +372,20 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     updateDoc(doc(db, "matches", c.mid), obj("typing_" + UID, on ? serverTimestamp() : null)).catch(function () {});
   }
   document.addEventListener("visibilitychange", function () { if (!document.hidden) liveStatus(); });
+  function renderJobChats() {
+    var l = $("chatList"); l.innerHTML = "";
+    var who = MODE === "recruiter" ? "r" : "s";
+    var rows = APPS.filter(function (a) { return a.status !== "declined" && a.status !== "withdrawn"; });
+    if (!rows.length) { l.appendChild(el('<div class="empty">' + (MODE === "recruiter" ? "No applicants yet. Candidates you invite or who apply will show up here to message." : "No conversations yet. Apply to a job or accept an invite — the recruiter's chat opens here.") + '</div>')); return; }
+    rows.forEach(function (a) {
+      var title = who === "r" ? a.sname : a.jtitle, sub = who === "r" ? "Applied for " + a.jtitle : a.company;
+      var r = el('<div class="chat-row" tabindex="0" data-notr><div class="chat-av"><div class="av-sm" style="width:50px;height:50px;font-size:18px;background:' + g(a.id) + '">' + ini(title || "?") + '</div></div><div class="body"><div class="top"><span class="nm">' + esc(title || "...") + '</span><span class="tm">' + stChip(a.status) + '</span></div><div class="prev">' + esc(sub || "") + '</div></div></div>');
+      r.addEventListener("click", function () { openThread(a, who); });
+      l.appendChild(r);
+    });
+  }
   function renderChats() {
+    if (isJobMode()) return renderJobChats();
     var l = $("chatList"); l.innerHTML = "";
     function row(c, last, sub, ai) {
       var r = el('<div class="chat-row" tabindex="0"><div class="chat-av"><div class="av-sm" style="width:50px;height:50px;font-size:' + (ai ? 22 : 18) + 'px;background:' + g(c.id) + '">' + (ai ? "✦" : ini(c.name || "?")) + '</div></div><div class="body"><div class="top"><span class="nm">' + esc(c.name || "...") + (ai ? '<span class="ai-pill">AI</span>' : '') + '</span><span class="tm">' + esc(sub) + '</span></div><div class="prev">' + esc(last) + '</div></div></div>');
