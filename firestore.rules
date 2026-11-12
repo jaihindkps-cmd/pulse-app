@@ -28,21 +28,27 @@ service cloud.firestore {
         && request.resource.data.get('city', '').size() <= 40
         && request.resource.data.get('work', '').size() <= 60
         && request.resource.data.get('about', '').size() <= 300;
-      allow update: if loggedIn() && uid == me()
-        && request.resource.data.age == resource.data.age
-        && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 40
-        && request.resource.data.get('city', '').size() <= 40
-        && request.resource.data.get('work', '').size() <= 60
-        && request.resource.data.get('about', '').size() <= 300
-        && request.resource.data.get('photo', '').size() <= 45000
-        && request.resource.data.get('mode', 'friends') in ['friends', 'dating', 'marriage', 'jobseeker', 'recruiter']
-        && request.resource.data.get('skills', '').size() <= 200 && request.resource.data.get('resume', '').size() <= 200
-        && request.resource.data.get('company', '').size() <= 100 && request.resource.data.get('cabout', '').size() <= 300
-        && request.resource.data.get('csite', '').size() <= 200 && request.resource.data.get('cvName', '').size() <= 100 && request.resource.data.get('role', '').size() <= 100
-        && request.resource.data.get('desig', '').size() <= 100 && request.resource.data.get('community', '').size() <= 100
-        && request.resource.data.get('religion', '').size() <= 60 && request.resource.data.get('prefCity', '').size() <= 100
-        && (request.resource.data.get('verified', false) == resource.data.get('verified', false) || isAdmin())
-        && (request.resource.data.get('verifyPending', false) == true || request.resource.data.get('verifyPending', false) == resource.data.get('verifyPending', false) || isAdmin());
+      // Normal self-edit (full profile, own uid only) OR admin flipping ONLY the verified/
+      // verifyPending flags on SOMEONE ELSE's doc (Identity verification Approve/Reject,
+      // and Members panel Ban/Premium never touch this collection at all).
+      allow update: if loggedIn() && (
+        (uid == me()
+          && request.resource.data.age == resource.data.age
+          && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 40
+          && request.resource.data.get('city', '').size() <= 40
+          && request.resource.data.get('work', '').size() <= 60
+          && request.resource.data.get('about', '').size() <= 300
+          && request.resource.data.get('photo', '').size() <= 45000
+          && request.resource.data.get('mode', 'friends') in ['friends', 'dating', 'marriage', 'jobseeker', 'recruiter']
+          && request.resource.data.get('skills', '').size() <= 200 && request.resource.data.get('resume', '').size() <= 200
+          && request.resource.data.get('company', '').size() <= 100 && request.resource.data.get('cabout', '').size() <= 300
+          && request.resource.data.get('csite', '').size() <= 200 && request.resource.data.get('cvName', '').size() <= 100 && request.resource.data.get('role', '').size() <= 100
+          && request.resource.data.get('desig', '').size() <= 100 && request.resource.data.get('community', '').size() <= 100
+          && request.resource.data.get('religion', '').size() <= 60 && request.resource.data.get('prefCity', '').size() <= 100
+          && (request.resource.data.get('verified', false) == resource.data.get('verified', false) || isAdmin())
+          && (request.resource.data.get('verifyPending', false) == true || request.resource.data.get('verifyPending', false) == resource.data.get('verifyPending', false) || isAdmin()))
+        || (isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['verified', 'verifyPending']))
+      );
       allow delete: if loggedIn() && uid == me();
 
       // Saathi AI ki baatein: sirf apni.
@@ -229,6 +235,18 @@ service cloud.firestore {
     match /premium/{uid} {
       allow read: if signedIn() && (uid == me() || isAdmin());
       allow write: if isAdmin();
+    }
+    // Premium payment proof: user khud apna Razorpay payment_id bhejta hai (paisa receive hone ka record),
+    // lekin ye khud se kabhi Premium nahi deta — sirf admin Razorpay dashboard me amount check karke
+    // "premium/{uid}" alag se likhta hai. Isse koi devtools se fake "paid" bata ke Premium nahi le sakta.
+    match /premiumRequests/{uid} {
+      allow get: if signedIn() && (uid == me() || isAdmin());
+      allow list: if signedIn() && isAdmin();
+      allow create: if signedIn() && uid == me() && notBanned()
+        && request.resource.data.paymentId is string && request.resource.data.paymentId.size() > 0 && request.resource.data.paymentId.size() <= 80
+        && request.resource.data.amount is number && request.resource.data.amount > 0 && request.resource.data.amount <= 100000
+        && request.resource.data.status == 'pending';
+      allow delete: if isAdmin();
     }
 
     // Identity verification selfies: sirf apna submit kare; sirf apna + admin padh sakte hain; admin hi delete (review ke baad) karta hai.
