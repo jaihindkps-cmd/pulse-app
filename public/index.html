@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="hi"><head><meta charset="utf-8">
+<html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#7c4dff">
 <title>Pulse</title>
@@ -411,17 +411,51 @@
   .med-note { margin: 10px auto; max-width: 92%; padding: 11px 13px; border-radius: 14px; font-size: 13.5px; line-height: 1.5; background: color-mix(in srgb, var(--accent) 12%, var(--surface)); border: 1px solid var(--line); white-space: pre-wrap; }
   .med-note b { display: block; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); margin-bottom: 3px; }
   .bubble .warn { display: block; margin-top: 6px; font-size: 11.5px; font-weight: 700; color: #d9480f; }
+
+  .lang-btn { font-weight: 800; font-size: 13px; }
+  .chk { flex-direction: row !important; align-items: center; gap: 8px; font-size: 12.5px; } .chk input { width: auto !important; } .chk a { color: var(--accent); }
+  .legal { text-align: center; font-size: 12px; color: var(--muted); margin: 16px 0 90px; line-height: 1.9; } .legal a { color: var(--accent); }
+  .emoji-panel { border-top: 1px solid var(--line); background: var(--surface); max-height: 230px; display: flex; flex-direction: column; } .emoji-panel[hidden] { display: none; }
+  .emo-tabs { display: flex; gap: 4px; overflow-x: auto; padding: 6px 8px; scrollbar-width: none; } .emo-tabs button { flex: none; border: none; background: var(--surface-2); color: var(--fg); border-radius: 999px; padding: 6px 12px; font-size: 12.5px; font-weight: 700; cursor: pointer; font-family: var(--font-body); } .emo-tabs button.on { background: var(--grad); color: #fff; }
+  .emo-grid { overflow-y: auto; padding: 4px 8px 10px; display: flex; flex-wrap: wrap; gap: 2px; } .emo-grid button { border: none; background: transparent; font-size: 26px; padding: 5px; cursor: pointer; border-radius: 10px; line-height: 1; } .emo-grid button:active { background: var(--surface-2); } .emo-grid button.q { font-size: 13px; background: var(--surface-2); padding: 8px 12px; border-radius: 999px; font-family: var(--font-body); color: var(--fg); font-weight: 600; }
+  .chat-img { display: block; max-width: 220px; width: 100%; border-radius: 12px; margin-bottom: 4px; cursor: zoom-in; } .bubble.big-emoji { font-size: 38px; background: transparent !important; box-shadow: none; padding: 2px 6px; }
+  .imgview { position: absolute; inset: 0; z-index: 95; background: rgba(0,0,0,.92); display: flex; align-items: center; justify-content: center; } .imgview[hidden] { display: none; } .imgview img { max-width: 96%; max-height: 92%; border-radius: 8px; }
+  .policy { position: absolute; inset: 0; z-index: 96; background: rgba(0,0,0,.55); display: flex; align-items: flex-end; } .policy[hidden] { display: none; } .policy-box { background: var(--surface); width: 100%; max-height: 85%; overflow-y: auto; border-radius: 22px 22px 0 0; padding: 18px; font-size: 13.5px; line-height: 1.6; } .policy-box h4 { margin: 12px 0 4px; }
+  .bh-hero { text-align: center; background: linear-gradient(160deg, color-mix(in srgb,#ff9a3c 18%, var(--surface)), var(--surface)); } .bh-hero .om { font-size: 54px; line-height: 1; }
+  .bh-in { width: 100%; box-sizing: border-box; font-family: var(--font-body); font-size: 15px; color: var(--fg); background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; outline: none; margin-bottom: 10px; resize: none; } .bh-or { color: var(--muted); font-size: 12px; margin: 12px 0; }
+  .room { position: absolute; inset: 0; z-index: 85; display: flex; flex-direction: column; color: #fff; overflow: hidden; } .room[hidden] { display: none; }
+  .room-bg { position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg,#3b1200,#8a3200 55%,#ff9a3c); transition: background .6s; }
+  .room-top { display: flex; align-items: center; gap: 10px; padding: 12px 14px; } .room-top .icon-btn { background: rgba(255,255,255,.16); color: #fff; } .rn { font-weight: 800; font-size: 17px; } .rs { font-size: 12px; opacity: .8; }
+  .deities { display: flex; gap: 6px; overflow-x: auto; padding: 0 14px 6px; scrollbar-width: none; } .deities button { flex: none; border: 1px solid rgba(255,255,255,.35); background: rgba(255,255,255,.12); color: #fff; border-radius: 999px; padding: 6px 12px; font-size: 12.5px; font-weight: 700; cursor: pointer; font-family: var(--font-body); } .deities button.on { background: #fff; color: #7a2b00; }
+  .room-scene { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; padding: 0 16px; }
+  .big-sym { font-size: 96px; line-height: 1; filter: drop-shadow(0 0 30px rgba(255,200,80,.8)); animation: glow 3s ease-in-out infinite; } @keyframes glow { 50% { transform: scale(1.06); filter: drop-shadow(0 0 46px rgba(255,220,120,1)); } }
+  .diya { width: 96px; margin: -4px 0 8px; } .flame { transform-origin: 60px 50px; animation: flick 1.1s ease-in-out infinite alternate; } @keyframes flick { 0% { transform: scale(1,1) rotate(-2deg); } 100% { transform: scale(.92,1.08) rotate(2deg); } }
+  .lyric-box { text-align: center; width: 100%; max-width: 380px; } .lyric-box .cur { font-size: 25px; font-weight: 800; line-height: 1.3; text-shadow: 0 2px 14px rgba(0,0,0,.4); animation: pop .4s; } .lyric-box .nx { font-size: 15px; opacity: .7; margin-top: 8px; } .lyric-box .pv { font-size: 13px; opacity: .45; margin-bottom: 6px; } @keyframes pop { from { transform: translateY(8px); opacity: 0; } }
+  .room-ctrl { display: flex; justify-content: center; gap: 10px; padding: 8px 0; } .rc { border: none; border-radius: 999px; min-width: 48px; height: 48px; padding: 0 14px; background: rgba(255,255,255,.18); color: #fff; font-size: 20px; cursor: pointer; font-family: var(--font-body); } .rc.big { width: 64px; height: 64px; font-size: 30px; background: linear-gradient(135deg,#ff6a88,#ff9a3c); } .rc.on { background: #fff; color: #7a2b00; } .rc[hidden] { display: none; }
+  .room-chat { background: rgba(0,0,0,.28); padding: 8px 12px calc(10px + env(safe-area-inset-bottom,0px)); } .rchat-log { max-height: 92px; overflow-y: auto; font-size: 13px; line-height: 1.5; } .rchat-log b { opacity: .8; } .rchat-in { display: flex; gap: 8px; margin-top: 6px; } .rchat-in input { flex: 1; min-width: 0; border: none; border-radius: 999px; padding: 10px 14px; font-size: 14px; outline: none; font-family: var(--font-body); }
+  .petals { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 2; } .petal { position: absolute; top: -30px; font-size: 22px; animation: fall linear forwards; } @keyframes fall { to { transform: translateY(110vh) rotate(360deg); } }
+  .cr-row { font-size: 12.5px; padding: 8px 0; border-bottom: 1px solid var(--line); } .cr-row button { margin-left: 6px; }
+
+  .dham-filter { display: flex; gap: 6px; overflow-x: auto; margin: 6px 0 10px; scrollbar-width: none; } .dham-filter button { flex: none; border: 1px solid var(--line); background: var(--surface); color: var(--fg); border-radius: 999px; padding: 7px 13px; font-size: 12.5px; font-weight: 700; cursor: pointer; font-family: var(--font-body); } .dham-filter button.on { background: var(--grad); color: #fff; border-color: transparent; }
+  .dham-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+  .dham-card { position: relative; height: 128px; border-radius: 18px; overflow: hidden; background-size: cover; background-position: center; cursor: pointer; box-shadow: var(--shadow); transition: transform .2s; } .dham-card:active { transform: scale(.97); }
+  .dham-card::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 35%, rgba(0,0,0,.72)); } .dham-card .tx { position: absolute; left: 10px; right: 10px; bottom: 9px; z-index: 1; color: #fff; } .dham-card b { display: block; font-size: 14.5px; line-height: 1.2; text-shadow: 0 1px 6px rgba(0,0,0,.5); } .dham-card span { font-size: 11px; opacity: .85; }
+  .daily { position: relative; height: 170px; border-radius: 22px; overflow: hidden; margin: 4px 0 14px; background-size: cover; background-position: center; color: #fff; box-shadow: var(--shadow); cursor: pointer; } .daily::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,.05), rgba(0,0,0,.75)); }
+  .daily .tx { position: absolute; z-index: 1; left: 14px; right: 14px; bottom: 12px; } .daily .lb { font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; opacity: .85; } .daily h3 { margin: 2px 0 6px; font-size: 22px; text-shadow: 0 2px 10px rgba(0,0,0,.5); } .daily .row { display: flex; gap: 8px; align-items: center; font-size: 12.5px; } .daily button { margin-left: auto; border: none; border-radius: 999px; padding: 8px 14px; font-weight: 800; background: #fff; color: #7a2b00; cursor: pointer; font-family: var(--font-body); }
+  .dham-sheet .hd { height: 170px; border-radius: 16px; background-size: cover; background-position: center; margin-bottom: 12px; }
 </style></head><body>
 <div class="app">
   <header class="topbar">
     <div class="brand"><div class="dot"></div><h1 id="screenTitle">Pulse</h1></div>
     <div class="actions">
       <span class="live-pill off" id="livePill" hidden><i></i><b id="liveTxt">Offline</b></span>
+      <button class="icon-btn lang-btn" id="langBtn" aria-label="Language" title="Language">हि</button>
       <button class="icon-btn" id="themeBtn" aria-label="Theme"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19" stroke-linecap="round"/></svg></button>
     </div>
   </header>
 
   <main class="screen" id="screen-feed">
+    <div class="daily" id="dailyCard"></div>
     <div class="composer">
       <div class="row"><div class="av-sm" id="meAv" style="background:var(--grad)">K</div>
         <textarea id="composerText" rows="1" maxlength="500" placeholder="Kya chal raha hai?"></textarea></div>
@@ -447,6 +481,22 @@
   <main class="screen" id="screen-nearby" hidden><div id="nearbyBox"></div></main>
 
   <main class="screen" id="screen-studio" hidden>
+    <div class="seg" style="margin-top:4px"><button class="on" id="segSongs">🎵 Songs</button><button id="segBhajan">🪔 Bhajan Room</button></div>
+    <div id="bhajanPanel" hidden>
+      <div class="st-card bh-hero"><div class="om">🕉️</div><h3>Bhajan Room</h3><p class="st-sub">Sing together with 2 to 8 people. Everyone sees the same line live, with diya, flowers and bell.</p>
+        <input id="bhName" class="bh-in" maxlength="40" placeholder="Room name (e.g. Evening Aarti)">
+        <select id="bhPick" class="bh-in"></select>
+        <textarea id="bhOwn" class="bh-in" rows="3" maxlength="1500" placeholder="Your own bhajan (one line per row)" hidden></textarea>
+        <button class="btn-grad" id="bhCreate" style="width:100%;padding:13px">Create room</button>
+        <div class="bh-or">or</div>
+        <div class="st-row"><input id="bhCode" class="bh-in" maxlength="8" placeholder="Room code" style="margin:0;text-transform:uppercase"><button class="btn-outline" id="bhJoin" style="padding:0 18px">Join with code</button></div>
+      </div>
+      <div class="section-title">Dham Darshan · Jyotirlinga, Shakti Peetha, Char Dham</div>
+      <div class="dham-filter" id="dhamFilter"><button class="on" data-k="">All</button><button data-k="J">🔱 Jyotirlinga</button><button data-k="S">🪷 Shakti Peetha</button><button data-k="C">🛕 Char Dham</button></div>
+      <div class="dham-grid" id="dhamGrid"></div>
+    </div>
+    <div id="bhajanPanel2" hidden></div>
+    <div id="songsPanel">
     <div class="st-card">
       <h3>🎵 Gaana Studio</h3>
       <p class="st-sub">Bas idea likho. AI bol likhega, dhun aapke phone me hi banegi. Bina server, bina paisa.</p>
@@ -464,6 +514,7 @@
     </div>
     <div class="section-title">Meri banayi dhunein</div>
     <div id="stLib"></div>
+    </div>
   </main>
 
   <main class="screen" id="screen-chats" hidden>
@@ -489,8 +540,12 @@
         <div class="lbl">Location sharing<div class="desc">ON hone par hi aap Nearby me dikhoge</div></div>
         <button class="toggle" id="locToggle" aria-label="Location sharing"></button>
       </div>
+      <div class="setting-row"><div class="lbl">Profile photo<div class="desc">Small photo shown on your swipe card</div></div><button class="btn-outline" id="photoSet" style="padding:8px 14px">Upload</button><input type="file" id="avatarInput" accept="image/*" hidden></div>
+      <div class="setting-row"><div class="lbl">Enable notifications<div class="desc">Alerts when the app is in the background</div></div><button class="btn-outline" id="notifBtn" style="padding:8px 14px">Enable</button></div>
+      <div id="creatorBox" hidden></div>
       <button class="btn-grad" style="width:100%;margin-top:16px;padding:13px" id="inviteBtn">📨 Doston ko bulao (invite link)</button>
       <button class="btn-outline" style="width:100%;margin-top:12px" id="logoutBtn">Logout</button>
+      <div class="legal"><a href="#" class="plink">Privacy Policy &amp; Terms</a> · <a href="#" id="delAcc">Delete my account</a><div>© Pulse</div></div>
     </div>
   </main>
 
@@ -504,13 +559,27 @@
       <button class="icon-btn" id="moreBtn" aria-label="Block ya report" title="Block / Report"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button>
     </div>
     <div class="med-bar" id="medBar" hidden></div>
+    <div class="emoji-panel" id="emojiPanel" hidden><div class="emo-tabs" id="emoTabs"></div><div class="emo-grid" id="emoGrid" data-notr></div></div>
     <div class="convo-body" id="convoBody"></div>
     <div class="convo-input">
+      <button class="icon-btn" id="emojiBtn" aria-label="Emoji" title="Emoji">😊</button><button class="icon-btn" id="photoBtn" aria-label="Send photo" title="Send photo">📷</button><input type="file" id="photoInput" accept="image/*" hidden>
       <input id="msgInput" maxlength="1000" placeholder="Message likho..." autocomplete="off">
       <button class="send-btn" id="sendBtn" aria-label="Bhejo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7Z" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
     </div>
   </section>
 
+  <div class="room" id="roomUI" hidden>
+    <div class="room-bg" id="roomBg"></div><div class="petals" id="petals"></div>
+    <div class="room-top"><button class="icon-btn" id="roomLeave" aria-label="Leave room">✕</button><div style="flex:1;min-width:0"><div class="rn" id="roomName">-</div><div class="rs" id="roomCount"></div></div><button class="icon-btn" id="roomShare" title="Invite to room">📨</button></div>
+    <div class="deities" id="deities"></div>
+    <div class="room-scene"><div class="big-sym" id="bigSym">🕉️</div>
+      <svg class="diya" viewBox="0 0 120 90" aria-hidden="true"><defs><radialGradient id="fl" cx="50%" cy="70%" r="60%"><stop offset="0" stop-color="#fff7c2"/><stop offset=".5" stop-color="#ffb02e"/><stop offset="1" stop-color="#ff6a00"/></radialGradient></defs><path class="flame" d="M60 8c10 14 16 22 10 34-3 6-8 9-10 9s-7-3-10-9C44 30 50 22 60 8Z" fill="url(#fl)"/><path d="M14 54c0 18 20 30 46 30s46-12 46-30c-10 6-28 9-46 9S24 60 14 54Z" fill="#c2681a"/><ellipse cx="60" cy="54" rx="46" ry="9" fill="#e8892b"/></svg>
+      <div class="lyric-box" id="lyricBox" data-notr></div></div>
+    <div class="room-ctrl"><button class="rc" id="rcPrev" hidden>⏮</button><button class="rc big" id="rcFlower">🌸</button><button class="rc" id="rcBell">🔔</button><button class="rc" id="rcSound">🎶</button><button class="rc" id="rcAuto" hidden>▶ Auto</button><button class="rc" id="rcNext" hidden>⏭</button></div>
+    <div class="room-chat"><div class="rchat-log" id="roomLog"></div><div class="rchat-in"><input id="roomMsg" maxlength="200" placeholder="Say Jai... / write a message"><button class="send-btn" id="roomSend" aria-label="Send">➤</button></div></div>
+  </div>
+  <div class="imgview" id="imgView" hidden><img id="imgBig" alt=""></div>
+  <div class="policy" id="policyUI" hidden><div class="policy-box"><button class="icon-btn" id="policyClose" style="float:right">✕</button><div id="policyText"></div></div></div>
   <div class="callui" id="callUI" hidden><div class="callbox"><div class="call-av" id="callAv">A</div><h3 id="callName">-</h3><div class="call-sub" id="callSub"></div>
     <button class="ptt" id="ptt" hidden>🎙 Dabake bolo</button>
     <div class="call-actions"><button class="cbtn ok" id="callAccept" hidden>Uthao</button><button class="cbtn mute" id="callMute" hidden>Mute</button><button class="cbtn no" id="callEnd">Kaato</button></div>
@@ -525,6 +594,7 @@
   </nav>
 
   <div class="auth" id="auth">
+    <button class="icon-btn lang-btn" id="langBtn2" aria-label="Language" style="position:absolute;top:14px;right:14px;z-index:3">हि</button>
     <div class="auth-card">
       <div class="brand" style="justify-content:center;margin-bottom:6px"><div class="dot"></div><h1>Pulse</h1></div>
       <p class="auth-sub">Asli log, asli baatein. Sirf 18+ ke liye.</p>
@@ -544,6 +614,7 @@
           <label>Aapka naam<input id="aName" maxlength="40" autocomplete="name"></label>
           <label>Umar (18+)<input id="aAge" type="number" min="18" max="99" inputmode="numeric"></label>
           <label>Sheher<input id="aCity" maxlength="40" autocomplete="address-level2"></label>
+          <label class="chk"><input type="checkbox" id="aAdult"><span>I am 18+ and accept the <a href="#" class="plink">Privacy Policy &amp; Terms</a></span></label>
           <label>Kya dhoond rahe ho<select id="aLooking"><option>Dosti</option><option>Dating</option><option>Shaadi</option></select></label>
         </div>
         <label>Password<input id="aPass" type="password" required minlength="6" autocomplete="current-password" placeholder="kam se kam 6 akshar"></label>

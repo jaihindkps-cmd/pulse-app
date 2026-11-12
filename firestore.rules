@@ -7,6 +7,9 @@ service cloud.firestore {
     // Asli insaan ka saboot: email verify hona zaroori (link par click). Bina verify ke sirf apni profile ban/dikh sakti hai.
     function signedIn() { return request.auth != null && request.auth.token.email_verified == true; }
     function me() { return request.auth.uid; }
+    // Creator (admin): sirf ye verified email. Isse badalna ho to yahi line badlo.
+    function isAdmin() { return request.auth != null && request.auth.token.email_verified == true && request.auth.token.email == 'jaihindkps@gmail.com'; }
+    function notBanned() { return !exists(/databases/$(database)/documents/bans/$(request.auth.uid)); }
     function inPair(id) { return me() in id.split('_'); }
     function otherOf(id) { return id.split('_')[0] == me() ? id.split('_')[1] : id.split('_')[0]; }
     function swipeLike(a, b) {
@@ -29,13 +32,15 @@ service cloud.firestore {
         && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 40
         && request.resource.data.get('city', '').size() <= 40
         && request.resource.data.get('work', '').size() <= 60
-        && request.resource.data.get('about', '').size() <= 300;
-      allow delete: if false;
+        && request.resource.data.get('about', '').size() <= 300
+        && request.resource.data.get('photo', '').size() <= 45000;
+      allow delete: if loggedIn() && uid == me();
 
       // Saathi AI ki baatein: sirf apni.
       match /saathi/{id} {
         allow read: if signedIn() && uid == me();
         allow create: if signedIn() && uid == me() && request.resource.data.text is string && request.resource.data.text.size() <= 1000;
+        allow delete: if loggedIn() && uid == me();
       }
     }
 
@@ -52,7 +57,7 @@ service cloud.firestore {
     // Feed
     match /posts/{id} {
       allow read: if signedIn();
-      allow create: if signedIn() && request.resource.data.uid == me()
+      allow create: if signedIn() && notBanned() && request.resource.data.uid == me()
         && request.resource.data.text is string && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 500
         && request.resource.data.likedBy.size() == 0;
       // sirf apna like jodna ya hatana
@@ -94,7 +99,7 @@ service cloud.firestore {
       match /messages/{msgId} {
         allow read: if signedIn() && inPair(mid);
         allow create: if signedIn() && inPair(mid)
-          && request.resource.data.from == me()
+          && notBanned() && request.resource.data.from == me()
           && request.resource.data.text is string && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 1000
           && exists(/databases/$(database)/documents/matches/$(mid))
           && !isBlocked(me(), otherOf(mid)) && !isBlocked(otherOf(mid), me());
@@ -114,6 +119,36 @@ service cloud.firestore {
     match /reports/{id} {
       allow create: if signedIn() && request.resource.data.from == me()
         && request.resource.data.get('reason', '').size() <= 200;
+      // Creator sirf reports padh sakta hai (aur kuch nahi).
+      allow read: if isAdmin();
+    }
+
+    // Ban: sirf creator likhta hai; user sirf apni ban-sthiti dekh sakta hai.
+    match /bans/{uid} {
+      allow get: if signedIn() && (uid == me() || isAdmin());
+      allow list: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // Bhajan Room: code (doc id) jaanne wala hi jud sakta hai. List band. Chat sirf members ke liye.
+    match /rooms/{rid} {
+      allow get: if signedIn();
+      allow list: if false;
+      allow create: if signedIn() && notBanned() && request.resource.data.host == me()
+        && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 40
+        && request.resource.data.items is list && request.resource.data.items.size() <= 80
+        && request.resource.data.members == [me()];
+      allow update: if signedIn() && notBanned() && (
+        (resource.data.host == me() && request.resource.data.host == me())
+        || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members', 'flowers', 'updatedAt'])
+            && request.resource.data.members.size() <= 12 && me() in request.resource.data.members));
+      allow delete: if signedIn() && resource.data.host == me();
+      match /msgs/{mid} {
+        allow read: if signedIn() && me() in get(/databases/$(database)/documents/rooms/$(rid)).data.members;
+        allow create: if signedIn() && notBanned() && me() in get(/databases/$(database)/documents/rooms/$(rid)).data.members
+          && request.resource.data.from == me()
+          && request.resource.data.text is string && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 200;
+      }
     }
   }
 }

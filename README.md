@@ -55,7 +55,7 @@ Firestore: roz ~50,000 reads, ~20,000 writes, 1 GB data. Hosting: 10 GB. Login (
 Chhote group (kuch sau log) ke liye kaafi hai. Console me **Usage** tab me dekhte raho. Hadd paar hone par us din ke liye app rukta hai, paisa nahi katta (card jodna padta hi nahi).
 
 ## Naye features (AI, Gaana, Call)
-- **Saathi (asli AI):** Firebase AI Logic (Gemini) se live jawab. Chalane ke liye ek baar: Firebase console > **AI Logic** > Get started > **Gemini Developer API**. Jab tak ON nahi, Saathi simple (alag-alag) jawab deta hai. Crisis wale shabdon par helpline (Tele-MANAS 14416) dikhata hai. Hamesha "AI" label.
+- **Saathi (asli AI):** Firebase AI Logic (Gemini) se live jawab. Chalane ke liye ek baar: Firebase console > **AI Logic** > Get started > **Gemini Developer API**. Jab tak ON nahi, Saathi simple (alag-alag) jawab deta hai. Hamesha "AI" label.
 - **Gaana Studio:** idea likho, AI bol likhta hai, dhun phone me hi banti hai (7 genre), lyrics sync, WAV download, feed pe post. Ye asli gayak ki awaaz nahi hai: dhun instrumental hai, bol phone ki awaaz se padh sakte ho. AI band ho to template se bhi bana deta hai.
 - **Voice call + Walkie-talkie:** matched dost ke chat me upar ke icons. Awaaz seedhi dono phone ke beech (WebRTC). Koi server nahi, isliye kuch network (jaise kuch mobile data) par call na jud paaye to wahi limit hai. Call tabhi ring hoti hai jab doosre ka app khula ho (push notification nahi).
 - **Nearby live:** list apne aap update hoti hai. Profile me "Doston ko bulao" se invite link.

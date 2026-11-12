@@ -3,16 +3,19 @@ import { initializeApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, deleteUser, sendEmailVerification } from "firebase/auth";
 import {
   initializeFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, collection, addDoc, query, where, orderBy, limit,
-  getDocs, onSnapshot, serverTimestamp, arrayUnion, arrayRemove, Timestamp, writeBatch
+  getDocs, onSnapshot, serverTimestamp, arrayUnion, arrayRemove, Timestamp, writeBatch, increment, getCountFromServer
 } from "firebase/firestore";
 import { initAI, chat as aiChat, json as aiJson, aiWorking } from "./ai.js";
 import { buildSong, Player, renderWav, GENRES } from "./music.js";
 import * as Call from "./call.js";
+import { DHAMS, art as dhamArt, photoOrArt, loadPhotos, daily as dailyDham, kindName, kindSym } from "./dham.js";
+import { tr, getLang, setLang, initI18n } from "./i18n.js";
 
 (function () {
   "use strict";
   var $ = function (id) { return document.getElementById(id); };
   var root = document.documentElement;
+  var CREATOR_EMAIL = "jaihindkps@gmail.com";
   var auth, db, UID = null, ME = null, signingUp = false;
   var unsubs = [], blocked = new Set(), nameCache = {};
 
@@ -75,6 +78,7 @@ import * as Call from "./call.js";
       var age = parseInt($("aAge").value, 10), name = clean($("aName").value, 40);
       if (!name) { $("authErr").textContent = "Naam likho"; $("authBtn").disabled = false; return; }
       if (!(age >= 18 && age <= 99)) { $("authErr").textContent = "Ye app sirf 18+ ke liye hai"; $("authBtn").disabled = false; return; }
+      if (!$("aAdult").checked) { $("authErr").textContent = "Please confirm you are 18+ and accept the policy"; $("authBtn").disabled = false; return; }
       signingUp = true;
       p = createUserWithEmailAndPassword(auth, email, pw).then(function (cred) {
         var prof = { name: name, age: age, city: clean($("aCity").value, 40), work: "", about: "", looking: $("aLooking").value, createdAt: serverTimestamp() };
@@ -86,7 +90,7 @@ import * as Call from "./call.js";
   });
   $("logoutBtn").addEventListener("click", function () { signOut(auth).then(function () { toast("Logout ho gaye"); }); });
 
-  function stopAll() { stopNearby(); endCall(false); player.stop(); unsubs.forEach(function (u) { try { u(); } catch (e) {} }); unsubs = []; }
+  function stopAll() { leaveRoom(true); stopNearby(); endCall(false); player.stop(); unsubs.forEach(function (u) { try { u(); } catch (e) {} }); unsubs = []; }
 
   // ---- start / stop ----
   function start() {
@@ -95,7 +99,7 @@ import * as Call from "./call.js";
     $("pName").textContent = ME.name; $("pHandle").textContent = ME.city || "";
     $("eName").value = ME.name || ""; $("eCity").value = ME.city || ""; $("eWork").value = ME.work || ""; $("eAbout").value = ME.about || ""; $("eLooking").value = ME.looking || "Dosti";
     getDocs(query(collection(db, "blocks"), where("blocker", "==", UID))).then(function (s) { blocked = new Set(); s.forEach(function (d) { blocked.add(d.data().blocked); }); }).catch(function () {}).then(function () {
-      listenFeed(); listenMatches(); refreshLocToggle(); showTab("feed"); setLive();
+      listenFeed(); listenMatches(); refreshLocToggle(); showTab("feed"); setLive(); paintAv(); creatorPanel(); pendingRoom();
     });
   }
   function init(cfg) {
@@ -123,7 +127,7 @@ import * as Call from "./call.js";
     if (!u.emailVerified) { showVerify(u); return Promise.resolve(); }
     return getDoc(doc(db, "users", u.uid)).then(function (s) {
       if (!s.exists()) { signOut(auth); showForms(); $("auth").hidden = false; $("authErr").textContent = "Profile nahi mili. Naya account banao."; return; }
-      showForms(); UID = u.uid; ME = Object.assign({}, s.data(), { uid: UID }); start();
+      return getDoc(doc(db, "bans", u.uid)).then(function (b) { if (b.exists()) { signOut(auth); showForms(); $("auth").hidden = false; $("authErr").textContent = "This account has been suspended for breaking the rules."; return; } showForms(); UID = u.uid; ME = Object.assign({}, s.data(), { uid: UID }); start(); });
     }).catch(function (e) { showForms(); $("auth").hidden = false; $("authErr").textContent = errMsg(e); });
   }
   var lastSent = 0;
@@ -156,7 +160,7 @@ import * as Call from "./call.js";
   var postText = $("composerText");
   postText.addEventListener("input", function () { this.style.height = "auto"; this.style.height = this.scrollHeight + "px"; $("postBtn").disabled = !this.value.trim(); $("charCount").textContent = this.value.length + "/500"; });
   $("postBtn").addEventListener("click", function () {
-    var t = clean(postText.value, 500); if (!t) return; this.disabled = true;
+    var t = clean(postText.value, 500); if (!t || !rate("post", 4, 60000)) return; this.disabled = true;
     addDoc(collection(db, "posts"), { uid: UID, name: ME.name, text: t, likedBy: [], createdAt: serverTimestamp() })
       .then(function () { postText.value = ""; postText.style.height = "auto"; $("charCount").textContent = "0/500"; toast("Post ho gaya 🎉"); })
       .catch(function (e) { toast(errMsg(e)); $("postBtn").disabled = false; });
@@ -192,7 +196,7 @@ import * as Call from "./call.js";
     if (!queue.length) { deck.innerHTML = '<div class="deck-empty"><div><div style="font-size:42px;margin-bottom:8px">💫</div><div style="font-weight:700;font-size:16px;color:var(--fg);margin-bottom:4px">Abhi itne hi log</div><div style="font-size:13px">Jaise-jaise naye log judenge, yahan dikhenge. Doston ko Pulse bhejo!</div></div></div>'; return; }
     queue.slice(0, 3).reverse().forEach(function (u, i, arr) {
       var top = i === arr.length - 1, depth = arr.length - 1 - i;
-      var c = el('<div class="swipe-card" style="background:' + g(u.id) + ';transform:translateY(' + depth * 14 + 'px) scale(' + (1 - depth * 0.05) + ')"><div class="scrim"></div><div class="avatar-big">' + ini(u.name) + '</div><span class="stamp like">Like</span><span class="stamp nope">Nope</span><div class="info"><h3>' + esc(u.name) + (u.age ? ", " + u.age : "") + '</h3><div class="sub">' + esc([u.work, u.city].filter(Boolean).join(" · ") || "Pulse member") + '</div>' + (u.about ? '<p class="about">' + esc(u.about) + '</p>' : '') + '<div class="tags"><span>' + esc(u.looking || "Dosti") + '</span></div></div></div>');
+      var c = el('<div class="swipe-card" style="background:' + g(u.id) + ';transform:translateY(' + depth * 14 + 'px) scale(' + (1 - depth * 0.05) + ')"><div class="scrim"></div><div class="avatar-big"' + (u.photo && JPEG.test(u.photo) ? ' style="background:center/cover url(' + u.photo + ')"' : "") + '>' + (u.photo && JPEG.test(u.photo) ? "" : ini(u.name)) + '</div><span class="stamp like">Like</span><span class="stamp nope">Nope</span><div class="info"><h3>' + esc(u.name) + (u.age ? ", " + u.age : "") + '</h3><div class="sub">' + esc([u.work, u.city].filter(Boolean).join(" · ") || "Pulse member") + '</div>' + (u.about ? '<p class="about">' + esc(u.about) + '</p>' : '') + '<div class="tags"><span>' + esc(u.looking || "Dosti") + '</span></div></div></div>');
       deck.appendChild(c);
       if (top) { topCard = c; topUser = u; drag(c); }
     });
@@ -315,7 +319,7 @@ import * as Call from "./call.js";
           if (blocked.has(other) || (ch.doc.metadata && ch.doc.metadata.hasPendingWrites)) return;
           if (ch.type === "modified" && m.lastFrom && m.lastFrom !== UID) maybeIncoming(ch.doc.id, m, other);
           if (ch.type === "added" && !matchWith) { userName(other).then(function (n) { toast("🎉 Naya match: " + n); }); $("chatDot").hidden = false; }
-          else if (ch.type === "modified" && m.lastFrom && m.lastFrom !== UID && ms(m.lastAt) !== lastSeenAt[ch.doc.id] && !(activeChat && activeChat.mid === ch.doc.id)) { userName(other).then(function (n) { toast("💬 " + n + ": " + String(m.lastText).slice(0, 40)); }); $("chatDot").hidden = false; }
+          else if (ch.type === "modified" && m.lastFrom && m.lastFrom !== UID && ms(m.lastAt) !== lastSeenAt[ch.doc.id] && !(activeChat && activeChat.mid === ch.doc.id)) { userName(other).then(function (n) { toast("💬 " + n + ": " + String(m.lastText).slice(0, 40)); pushLocal(n, String(m.lastText).slice(0, 80)); }); $("chatDot").hidden = false; }
         });
       }
       firstMatches = false;
@@ -383,7 +387,9 @@ import * as Call from "./call.js";
 
   function addBubble(m) {
     var sys = $("convoBody").querySelector(".sys"); if (sys) sys.remove();
-    var b = el('<div class="bubble ' + (m.mine ? "me" : "them") + '">' + esc(m.text) + (m.warn ? '<span class="warn">⚠️ Savdhan: paisa, OTP ya bank details kabhi mat bhejo. Shak ho to Report karo.</span>' : '') + '<span class="t">' + hm(m.at) + '</span></div>');
+    var big = !m.img && /^(\p{Extended_Pictographic}|\u200d|\ufe0f|\s){1,3}$/u.test(m.text || "");
+    var b = el('<div class="bubble ' + (m.mine ? "me" : "them") + (big ? " big-emoji" : "") + '">' + (m.img && JPEG.test(m.img) ? '<img class="chat-img" src="' + m.img + '" alt="photo">' : "") + (m.img ? "" : esc(m.text)) + (m.warn ? '<span class="warn">⚠️ Savdhan: paisa, OTP ya bank details kabhi mat bhejo. Shak ho to Report karo.</span>' : '') + '<span class="t">' + hm(m.at) + '</span></div>');
+    var im = b.querySelector(".chat-img"); if (im) im.addEventListener("click", function () { viewImg(m.img); });
     $("convoBody").appendChild(b); $("convoBody").scrollTop = $("convoBody").scrollHeight; return b;
   }
   function closeMsgListener() { if (msgUnsub) { msgUnsub(); msgUnsub = null; } }
@@ -399,7 +405,7 @@ import * as Call from "./call.js";
       getDocs(query(collection(db, "users", UID, "saathi"), orderBy("createdAt", "asc"), limit(60))).then(function (s) {
         if (activeChat !== c) return;
         saathiHist = [];
-        if (s.empty) addBubble({ mine: false, text: "Namaste " + ME.name + " 🙏 Main Saathi hoon, ek AI. Din kaisa raha?", at: Date.now() });
+        if (s.empty) addBubble({ mine: false, text: (getLang() === "en" ? "Hello " : "Namaste ") + ME.name + " 🙏 Main Saathi hoon, ek AI. Din kaisa raha?", at: Date.now() });
         s.forEach(function (d) { var m = snapData(d); addBubble({ mine: m.role === "user", text: m.text, at: ms(m.createdAt) }); saathiHist.push({ role: m.role === "user" ? "user" : "model", text: m.text }); });
       }).catch(function () {});
     } else {
@@ -416,7 +422,7 @@ import * as Call from "./call.js";
             return;
           }
           hist.push({ from: m.from, text: m.text });
-          addBubble({ mine: m.from === UID, text: m.text, at: ms(m.createdAt), warn: m.from !== UID && SCAM_MONEY.test(m.text) });
+          addBubble({ mine: m.from === UID, text: m.text, img: m.img, at: ms(m.createdAt), warn: m.from !== UID && SCAM_MONEY.test(m.text) });
         });
         c.med = med; c.hist = hist; renderMed(); body.scrollTop = body.scrollHeight;
         liveStatus();
@@ -429,7 +435,7 @@ import * as Call from "./call.js";
   var saathiHist = [], fbIdx = 0, saathiBusy = false;
   var SAATHI_SYS = "Tum 'Saathi' ho, Pulse app ka AI companion. Tum ek AI ho, insaan nahi: kabhi insaan hone ka, asli girlfriend/boyfriend hone ka ya bhavnayein 'mehsoos' karne ka dava mat karo; agar koi puche to saaf batao ki tum AI ho. Hinglish me (Roman Hindi) chhote, garm, natural jawab do: 2-4 vakya, kabhi-kabhi ek emoji. Pehle suno aur samjho, phir ek halka sawaal ya chhota sujhaav do. Har baar alag shabdon me bolo, pichhla jawab dohrao mat. Tum doctor/therapist nahi ho; dawa, diagnosis ya kanooni salaah mat do. Gaali, hinsa, nafrat ya vayask-yaun baatein nahi. Koi phone number, address ya doosre logon ki niji jaankari mat maango ya dedo. Agar user khud ko nuksan pahunchane ki baat kare to pyaar se kaho ki kisi apne se ya helpline se turant baat kare.";
   var CRISIS = /(suicide|sucide|khudkushi|khud\s*kushi|mar\s*jana|marna\s*chahta|marna\s*chahti|jaan\s*de|jeena\s*nahi|jeene\s*ka\s*mann\s*nahi|zindagi\s*khatam|khud\s*ko\s*(khatam|nuksan|hurt|maar)|end\s*my\s*life|kill\s*myself|self[\s-]*harm)/i;
-  var CRISIS_REPLY = "Mujhe aapki fikr ho rahi hai, aur aap ye baat share kar paaye, ye zaroori hai. 💜 Main AI hoon aur is waqt aapko asli insaan ki madad chahiye. Abhi kisi apne ko phone karo ya paas baitho. India me Tele-MANAS (free, 24x7): 14416 ya 1-800-891-4416. Khatre me ho to 112. Kya aap abhi surakshit jagah par ho?";
+  var CRISIS_REPLY = "Mujhe aapki fikr ho rahi hai, aur aap ye baat share kar paaye, ye zaroori hai. 💜 Main AI hoon aur is waqt aapko asli insaan ka saath chahiye. Abhi kisi apne ko phone karo ya unke paas chale jao, aur apne sheher ki madad-sewa se baat karo. Kya aap abhi surakshit jagah par ho?";
   var OFFLINE = [
     function (t) { return "Aapne kaha: \"" + t.slice(0, 40) + (t.length > 40 ? "..." : "") + "\". Ye sunke dhyaan aaya. Is baat me sabse bhaari kya lag raha hai? 💜"; },
     function () { return "Main samajh raha hoon. Chalo ek chhoti si cheez: abhi 3 gehri saansein lo, phir mujhe bataao kya sabse pehle theek karna chahoge? 🌱"; },
@@ -460,6 +466,7 @@ import * as Call from "./call.js";
   }
   function sendMsg() {
     var inp = $("msgInput"), t = clean(inp.value, 1000); if (!t || !activeChat) return; var c = activeChat; inp.value = "";
+    if (!rate("msg", 10, 10000)) { inp.value = t; return; }
     if (c.ai) { saathiTalk(c, t); return; }
     if (SCAM_MONEY.test(t) || PII.test(t)) { if (!window.confirm("⚠️ Safety: paisa, OTP, bank details, phone number ya link bhejna risky ho sakta hai. Pehle bharosa banao. Phir bhi bhejna hai?")) { inp.value = t; return; } }
     var b = writeBatch(db), mref = doc(collection(db, "matches", c.mid, "messages"));
@@ -477,7 +484,7 @@ import * as Call from "./call.js";
     if (!activeChat || activeChat.ai) return;
     var body = $("convoBody"); if (body.querySelector(".safety")) return;
     var u = activeChat;
-    var box = el('<div class="ai-note safety">' + esc(u.name) + ' ke saath: <button class="btn-outline" id="doBlock" style="margin:8px 4px 0;padding:8px 14px">Block karo</button><button class="btn-outline" id="doReport" style="margin:8px 4px 0;padding:8px 14px">Report karo</button><button class="btn-outline" id="doMeet" style="margin:8px 4px 0;padding:8px 14px">📍 Safe meet</button><div style="font-size:12px;margin-top:8px;color:var(--muted)">Pehli mulaqat: din me, public jagah, kisi apne ko batakar. Emergency: 112.</div></div>');
+    var box = el('<div class="ai-note safety">' + esc(u.name) + ' ke saath: <button class="btn-outline" id="doBlock" style="margin:8px 4px 0;padding:8px 14px">Block karo</button><button class="btn-outline" id="doReport" style="margin:8px 4px 0;padding:8px 14px">Report karo</button><button class="btn-outline" id="doMeet" style="margin:8px 4px 0;padding:8px 14px">📍 Safe meet</button><div style="font-size:12px;margin-top:8px;color:var(--muted)">Pehli mulaqat: din me, public jagah, kisi apne ko batakar.</div></div>');
     body.appendChild(box); body.scrollTop = 1e9;
     $("doBlock").addEventListener("click", function () {
       setDoc(doc(db, "blocks", UID + "_" + u.id), { blocker: UID, blocked: u.id, createdAt: serverTimestamp() }).then(function () { blocked.add(u.id); toast("Block kar diya"); $("convo").classList.remove("open"); closeMsgListener(); activeChat = null; renderChats(); }).catch(function (e) { toast(errMsg(e)); });
@@ -633,7 +640,7 @@ import * as Call from "./call.js";
   // ---- AI Mediator (dono ki marzi se) + safety ----
   var SCAM_MONEY = /(\botp\b|\bupi\b|paytm|gpay|phonepe|bank\s*(account|details)|account\s*number|card\s*number|\bcvv\b|paise\s*(bhej|do|chahiye)|money\s*(send|transfer)|gift\s*card|crypto|bitcoin|\bloan\b|invest(ment)?\b|udhar)/i;
   var PII = /(\b\d{10}\b|https?:\/\/|www\.)/i;
-  var MED_SYS = "Tum 'Mediator' ho: ek nishpaksh AI jo do logon ki baatcheet me madad karta hai. Dono ne tumhe ye chat padhne ki ijazat di hai. Kisi ka paksh mat lo. Hinglish me, 900 akshar se kam, is tarah likho: 1) Dono ki baat, ek-ek line me (naam se). 2) Jahan dono sehmat hain. 3) Ek chhota agla kadam. 4) Ek vinamr line jo pehla vyakti doosre se keh sake. Agar chat me dhamki, gaali, zabardasti, blackmail ya paisa maangna dikhe to sulah ki jagah saaf kaho ki jisko asurakshit lage wo Block/Report kare aur zaroorat par 112 ya 1091 (mahila helpline) par call kare. Doctor/vakeel jaisi salaah mat do. Koi naya personal data mat maango.";
+  var MED_SYS = "Tum 'Mediator' ho: ek nishpaksh AI jo do logon ki baatcheet me madad karta hai. Dono ne tumhe ye chat padhne ki ijazat di hai. Kisi ka paksh mat lo. Hinglish me, 900 akshar se kam, is tarah likho: 1) Dono ki baat, ek-ek line me (naam se). 2) Jahan dono sehmat hain. 3) Ek chhota agla kadam. 4) Ek vinamr line jo pehla vyakti doosre se keh sake. Agar chat me dhamki, gaali, zabardasti, blackmail ya paisa maangna dikhe to sulah ki jagah saaf kaho ki jisko asurakshit lage wo Block/Report kare aur kisi bharose ke insaan se turant madad le. Doctor/vakeel jaisi salaah mat do. Koi naya personal data mat maango.";
   function medMsg(mid, text, med, touch) {
     var b = writeBatch(db), mref = doc(collection(db, "matches", mid, "messages"));
     b.set(mref, { from: UID, text: String(text).slice(0, 950), med: med, createdAt: serverTimestamp() });
@@ -671,8 +678,223 @@ import * as Call from "./call.js";
     if (navigator.share) navigator.share({ text: text }).catch(function () {}); else if (navigator.clipboard) navigator.clipboard.writeText(text).then(function () { toast("Copy ho gaya. Apne bharose ke insaan ko bhejo 📋"); }); else toast(text);
   }
 
+  // ---- throttle (spam rokne ke liye) ----
+  var rateLog = {};
+  function rate(key, n, ms) { var now = Date.now(), a = (rateLog[key] || []).filter(function (t) { return now - t < ms; }); if (a.length >= n) { toast("Slow down a little 🙏"); rateLog[key] = a; return false; } a.push(now); rateLog[key] = a; return true; }
+
+  // ---- image helper: chhota JPEG (data URL) ----
+  function shrink(file, max, q) {
+    return new Promise(function (res, rej) {
+      var fr = new FileReader(); fr.onerror = function () { rej(new Error("Could not read photo")); };
+      fr.onload = function () { var im = new Image(); im.onerror = function () { rej(new Error("Not a valid image")); }; im.onload = function () {
+        var k = Math.min(1, max / Math.max(im.width, im.height)), w = Math.max(1, Math.round(im.width * k)), h = Math.max(1, Math.round(im.height * k)), c = document.createElement("canvas"); c.width = w; c.height = h;
+        c.getContext("2d").drawImage(im, 0, 0, w, h); res(c.toDataURL("image/jpeg", q)); }; im.src = fr.result; };
+      fr.readAsDataURL(file);
+    });
+  }
+  var JPEG = /^data:image\/jpeg;base64,[A-Za-z0-9+\/=]+$/;
+  function viewImg(src) { if (!JPEG.test(src)) return; $("imgBig").src = src; $("imgView").hidden = false; }
+  $("imgView").addEventListener("click", function () { this.hidden = true; });
+
+  // ---- emoji bhandar ----
+  var EMO = {
+    "Quick": ["Good morning 🌅", "Good night 🌙", "Thank you 🙏", "Sorry 🥺", "Congratulations 🎉", "Happy birthday 🎂", "On my way 🚗", "Missing you 💜", "Call me 📞", "Take care 🤗", "Well done 👏", "Jai Shri Ram 🚩", "Har Har Mahadev 🔱", "Radhe Radhe 🌸", "Eid Mubarak 🌙", "Happy Diwali 🪔"],
+    "Happy": "😀😃😄😁😆🥳🤩😎😊🙂😍🥰😘😻🤗🎉✨👏🙌😇🤠🥹😋😌",
+    "Love": "❤️🧡💛💚💙💜🤍💖💗💓💞💕😍😘🥰💐🌹💍🫶🤝💑💏😻💌🫰",
+    "Sad": "😢😭😞😔🥺😟😥💔😿🫂🌧️🥀🤒😪😓😩😫",
+    "Angry": "😠😡🤬😤🙄😒😑😬👿💢🚫😾🤨",
+    "Funny": "😂🤣😜😝🤪😏🙃😅🤭🫣🤡💀🙈🙉🙊😹🤓",
+    "Wish": "🎂🎁🎈🎊🪔🎆🎇🧨🥂🍰🎄🌅🌙⭐🌟🥳🪁🎶🎤",
+    "Bhakti": "🕉️🙏🪔🔱🛕🌸🌺🪷🌼🔔🐚📿🚩🏹🪈🐘🦚🌿🍃☀️🕌⛪🕍☬",
+    "Hands": "👍👎👌✌️🤞🤟🤙👋🙏💪🫡🤲🫰✋🤝👊🫵👏",
+    "Food": "☕🍵🫖🍕🍔🍟🍛🍜🍣🍰🍫🍎🍉🍿🥭🍨🥘🍚🥛🍪",
+    "Animals": "🐶🐱🐼🦁🐯🐵🐘🦚🐦🦋🐝🐢🐬🦄🐰🐮🐴🦜",
+    "Travel": "🚗🚌✈️🚆🏍️🏖️🏔️🗺️🏠🏨⛺🌆🌃🛕🚲🛺",
+    "Work": "💼💻📱📞📍🕐📅✅❌⚠️🔒💡📚🎓📝📈🤝🏢"
+  };
+  function glyphs(str) { try { var seg = new Intl.Segmenter("en", { granularity: "grapheme" }); return Array.from(seg.segment(str), function (x) { return x.segment; }).filter(function (g) { return g.trim(); }); } catch (e) { return Array.from(str); } }
+  var emoTab = "Quick";
+  function renderEmo() {
+    var tabs = $("emoTabs"), grid = $("emoGrid"); tabs.innerHTML = ""; grid.innerHTML = "";
+    Object.keys(EMO).forEach(function (k) { var b = document.createElement("button"); b.textContent = k; b.className = k === emoTab ? "on" : ""; b.setAttribute("data-notr", ""); b.addEventListener("click", function () { emoTab = k; renderEmo(); }); tabs.appendChild(b); });
+    var items = Array.isArray(EMO[emoTab]) ? EMO[emoTab] : glyphs(EMO[emoTab]);
+    items.forEach(function (g) {
+      var b = document.createElement("button"); b.textContent = g; if (Array.isArray(EMO[emoTab])) b.className = "q";
+      b.addEventListener("click", function () { var i = $("msgInput"); if (Array.isArray(EMO[emoTab])) { i.value = g; sendMsg(); } else { i.value += g; i.focus(); } });
+      grid.appendChild(b);
+    });
+  }
+  $("emojiBtn").addEventListener("click", function () { var p = $("emojiPanel"); p.hidden = !p.hidden; if (!p.hidden) renderEmo(); });
+
+  // ---- chat me photo ----
+  $("photoBtn").addEventListener("click", function () { if (activeChat && !activeChat.ai) $("photoInput").click(); });
+  $("photoInput").addEventListener("change", function () {
+    var f = this.files && this.files[0]; this.value = ""; var c = activeChat; if (!f || !c || c.ai || !rate("photo", 5, 60000)) return;
+    shrink(f, 720, 0.62).then(function (d) { if (d.length > 230000) return shrink(f, 520, 0.5); return d; }).then(function (d) {
+      if (d.length > 300000) throw new Error("Photo is too big");
+      var b = writeBatch(db), mref = doc(collection(db, "matches", c.mid, "messages"));
+      b.set(mref, { from: UID, text: "📷 Photo", img: d, createdAt: serverTimestamp() });
+      b.update(doc(db, "matches", c.mid), { lastText: "📷 Photo", lastAt: serverTimestamp(), lastFrom: UID });
+      return b.commit();
+    }).catch(function (e) { toast(errMsg(e)); });
+  });
+
+  // ---- profile photo ----
+  $("photoSet").addEventListener("click", function () { $("avatarInput").click(); });
+  $("avatarInput").addEventListener("change", function () {
+    var f = this.files && this.files[0]; this.value = ""; if (!f) return;
+    shrink(f, 200, 0.7).then(function (d) { return updateDoc(doc(db, "users", UID), { photo: d }).then(function () { ME.photo = d; paintAv(); toast("Profile photo saved ✅"); }); }).catch(function (e) { toast(errMsg(e)); });
+  });
+  function paintAv() { var a = $("pAv"); if (ME && ME.photo && JPEG.test(ME.photo)) { a.style.background = "center/cover url(" + ME.photo + ")"; a.textContent = ""; } }
+
+  // ---- notifications (app background me ho tab) ----
+  function pushLocal(title, body) { try { if (document.hidden && window.Notification && Notification.permission === "granted") new Notification(title, { body: body, icon: "icon-192.png" }); } catch (e) {} }
+  $("notifBtn").addEventListener("click", function () { if (!window.Notification) { toast("Notifications are not supported here"); return; } Notification.requestPermission().then(function (p) { toast(p === "granted" ? "Notifications on 🔔" : "Notifications blocked"); }); });
+
+  // ---- policy, language, delete ----
+  var POLICY_EN = '<h3>Privacy Policy &amp; Terms</h3><p>Pulse is for people 18+ only.</p><h4>What we store</h4><p>Your profile (name, age, city, work, about, optional small photo), your posts, matches, chat messages and photos you send, and approximate location only if you turn Nearby ON (rounded to about 1 km; deleted when you turn it off).</p><h4>Who can see it</h4><p>Profiles are visible to verified members. Chats are visible only to the two people in them. Saathi AI and AI Mediator send the text you give them to Google Gemini to reply; the Mediator reads a chat only after both people agree. The creator panel shows only reports and totals, never private chats.</p><h4>Your control</h4><p>You can block or report anyone, turn off location any time, and delete your account from the Me tab (this removes your profile, posts and Saathi history; messages you sent in shared chats may remain for the other person).</p><h4>Rules</h4><p>No harassment, threats, scams, nudity, hate or impersonation. Never send money, OTP or bank details to anyone you met here. Accounts that break these rules can be banned. Meet in public places and tell someone you trust.</p>';
+  var POLICY_HI = '<h3>Privacy Policy aur Terms</h3><p>Pulse sirf 18+ ke liye hai.</p><h4>Kya save hota hai</h4><p>Aapki profile (naam, umar, sheher, kaam, about, chhoti photo), posts, match, chat aur bheji hui photos, aur location sirf tab jab aap Nearby ON karo (lagbhag 1 km tak mota-mota, band karte hi hat jaati hai).</p><h4>Kaun dekh sakta hai</h4><p>Profile verified members dekh sakte hain. Chat sirf un do logon ko dikhti hai. Saathi AI aur AI Mediator jawab ke liye text Google Gemini ko bhejte hain; Mediator chat tabhi padhta hai jab dono haan kahein. Creator panel me sirf reports aur ginti dikhti hai, private chat kabhi nahi.</p><h4>Aapka control</h4><p>Kisi ko bhi block ya report karo, location kabhi band karo, aur Me tab se account delete karo (profile, posts, Saathi history hat jaati hai; shared chat me bheje gaye message doosre ke paas rah sakte hain).</p><h4>Niyam</h4><p>Pareshan karna, dhamki, thagi, nagnata, nafrat ya jhoothi pehchaan mana hai. Yahan mile kisi ko paisa, OTP ya bank details mat bhejo. Niyam todne par account ban ho sakta hai. Public jagah par milo aur kisi apne ko batao.</p>';
+  document.addEventListener("click", function (e) { var a = e.target.closest && e.target.closest(".plink"); if (a) { e.preventDefault(); $("policyText").innerHTML = getLang() === "en" ? POLICY_EN : POLICY_HI; $("policyUI").hidden = false; } });
+  $("policyClose").addEventListener("click", function () { $("policyUI").hidden = true; });
+  [$("langBtn"), $("langBtn2")].forEach(function (b) { b.textContent = getLang() === "en" ? "हि" : "EN"; b.addEventListener("click", function () { setLang(getLang() === "en" ? "hi" : "en"); }); });
+  $("delAcc").addEventListener("click", function (e) {
+    e.preventDefault(); if (!UID || !window.confirm("Delete your account permanently? Your profile, posts and Saathi history will be removed. This cannot be undone.")) return;
+    var u = auth.currentUser, id = UID;
+    getDocs(query(collection(db, "posts"), where("uid", "==", id), limit(200))).then(function (s) { return Promise.all(s.docs.map(function (d) { return deleteDoc(d.ref); })); }).catch(function () {})
+      .then(function () { return getDocs(query(collection(db, "users", id, "saathi"), limit(300))).then(function (s) { return Promise.all(s.docs.map(function (d) { return deleteDoc(d.ref); })); }); }).catch(function () {})
+      .then(function () { return deleteDoc(doc(db, "presence", id)).catch(function () {}); })
+      .then(function () { return deleteDoc(doc(db, "users", id)); })
+      .then(function () { return deleteUser(u); })
+      .then(function () { toast("Account deleted"); }).catch(function (er) { toast(er && er.code === "auth/requires-recent-login" ? "Please log in again, then delete" : errMsg(er)); });
+  });
+
+  // ---- Creator panel (sirf creator email; sirf reports + ginti) ----
+  function creatorPanel() {
+    var u = auth.currentUser, box = $("creatorBox"); if (!u || u.email !== CREATOR_EMAIL) { box.hidden = true; return; }
+    box.hidden = false; box.innerHTML = '<div class="section-title">Creator Panel</div><div class="st-note">Shows reports and totals only. Private chats and who-blocked-whom are never visible, by design.</div><div id="crStats"></div><div id="crList"></div><div class="st-row" style="margin-top:8px"><input class="bh-in" id="crUid" placeholder="User ID to ban / unban" style="margin:0"><button class="btn-outline" id="crBan" style="padding:0 12px">Ban</button><button class="btn-outline" id="crUnban" style="padding:0 12px">Unban</button></div>';
+    Promise.all([getCountFromServer(collection(db, "users")), getCountFromServer(collection(db, "posts"))]).then(function (r) { $("crStats").innerHTML = '<div class="cr-row">Members: <b>' + r[0].data().count + '</b> · Posts: <b>' + r[1].data().count + '</b></div>'; }).catch(function () {});
+    getDocs(query(collection(db, "reports"), orderBy("createdAt", "desc"), limit(30))).then(function (s) {
+      var l = $("crList"); l.innerHTML = s.empty ? '<div class="cr-row">No reports 🎉</div>' : "";
+      s.forEach(function (d) { var r = d.data(); var row = el('<div class="cr-row" data-notr>Reported <b>' + esc(r.to) + '</b>: ' + esc(r.reason || "") + ' <button class="btn-outline" style="padding:4px 10px">Fill ID</button></div>'); row.querySelector("button").addEventListener("click", function () { $("crUid").value = r.to; }); l.appendChild(row); });
+    }).catch(function (e) { toast(errMsg(e)); });
+    $("crBan").addEventListener("click", function () { var id = clean($("crUid").value, 60); if (id) setDoc(doc(db, "bans", id), { at: serverTimestamp(), by: UID }).then(function () { toast("Banned"); }).catch(function (e) { toast(errMsg(e)); }); });
+    $("crUnban").addEventListener("click", function () { var id = clean($("crUid").value, 60); if (id) deleteDoc(doc(db, "bans", id)).then(function () { toast("Unbanned"); }).catch(function (e) { toast(errMsg(e)); }); });
+  }
+
+  // ---- Bhajan Room ----
+  var BHAJANS = [
+    { t: "Om Jai Jagdish Hare (Aarti)", l: ["Om Jai Jagdish Hare, Swami Jai Jagdish Hare", "Bhakt jano ke sankat, Das jano ke sankat", "Kshan me door kare, Om Jai Jagdish Hare", "Jo dhyave phal pave, dukh binse man ka", "Swami dukh binse man ka", "Sukh sampati ghar aave, kasht mite tan ka", "Om Jai Jagdish Hare", "Mat pita tum mere, sharan gahun kiski", "Swami sharan gahun kiski", "Tum bin aur na dooja, aas karun jiski", "Om Jai Jagdish Hare"] },
+    { t: "Hanuman Chalisa (opening)", l: ["Shri Guru charan saroj raj, nij man mukur sudhari", "Barnau Raghubar bimal jasu, jo dayaku phal chari", "Buddhiheen tanu jaanike, sumiro Pavan Kumar", "Bal buddhi vidya dehu mohi, harahu kalesh vikar", "Jai Hanuman gyan gun sagar", "Jai Kapis tihun lok ujagar", "Ram doot atulit bal dhama", "Anjani putra Pavan sut nama", "Mahavir vikram Bajrangi", "Kumati nivar sumati ke sangi", "Sankat te Hanuman chhudave", "Man krama bachan dhyan jo lave"] },
+    { t: "Hare Krishna Maha Mantra", l: ["Hare Krishna Hare Krishna", "Krishna Krishna Hare Hare", "Hare Rama Hare Rama", "Rama Rama Hare Hare"] },
+    { t: "Om Namah Shivaya (Dhun)", l: ["Om Namah Shivaya", "Om Namah Shivaya", "Har Har Mahadev", "Om Namah Shivaya", "Shambhu Shankar Namah Shivaya", "Om Namah Shivaya"] },
+    { t: "Shri Ram Stuti (opening)", l: ["Shri Ramchandra kripalu bhajuman, haran bhavbhay darunam", "Nav kanj lochan, kanj mukh, kar kanj, pad kanjarunam", "Siya Ram Siya Ram, Jai Jai Ram", "Jai Siya Ram"] },
+    { t: "Jai Ambe Gauri (Devi Aarti)", l: ["Jai Ambe Gauri, Maiya Jai Shyama Gauri", "Tumko nishdin dhyavat, Hari Brahma Shivri", "Jai Ambe Gauri", "Mang sindoor virajat, tiko mrigmad ko", "Ujjwal se dou naina, chandravadan neeko", "Jai Ambe Gauri"] },
+    { t: "Write my own...", l: null }
+  ];
+  var DEITY = [
+    { n: "Om", s: "🕉️", g: "linear-gradient(180deg,#3b1200,#8a3200 55%,#ff9a3c)" }, { n: "Shiv", s: "🔱", g: "linear-gradient(180deg,#0b1030,#2c2a6e 55%,#7aa7ff)" },
+    { n: "Ram", s: "🏹", g: "linear-gradient(180deg,#4a1500,#c24a00 55%,#ffcf5c)" }, { n: "Krishna", s: "🪈", g: "linear-gradient(180deg,#061a3a,#0b5c8a 55%,#3de0c8)" },
+    { n: "Hanuman", s: "🚩", g: "linear-gradient(180deg,#4d0c00,#d9480f 55%,#ffb347)" }, { n: "Durga", s: "🦁", g: "linear-gradient(180deg,#3a0010,#b3123a 55%,#ffb347)" },
+    { n: "Ganesh", s: "🐘", g: "linear-gradient(180deg,#3d2a00,#c98400 55%,#ffe27a)" }, { n: "Lakshmi", s: "🪷", g: "linear-gradient(180deg,#3a0a2e,#b83280 55%,#ffc2e0)" }
+  ];
+  var ROOM = null, roomSnd = null, dhamKind = "";
+  function bhajanFor(d) { return BHAJANS[d.k === "S" ? 5 : d.k === "C" && d.id !== "rameshwaram" ? 2 : 3]; }
+  function openDham(d) {
+    $("policyText").innerHTML = '<div class="dham-sheet"><div class="hd" style="background-image:' + photoOrArt(d).replace(/"/g, "&quot;") + '"></div><h3>' + esc(d.n) + '</h3><p><b>' + esc(kindName(d.k)) + '</b> · ' + esc(d.p) + '</p><p>' + esc(d.b) + '</p><button class="btn-grad" id="dhamStart" style="width:100%;padding:13px">🪔 Start Aarti room here</button><p class="st-note">Photos load from Wikipedia / Wikimedia Commons; if unavailable, app-made art is shown. Info is brief: please check the temple trust for darshan timings.</p></div>';
+    $("policyUI").hidden = false;
+    $("dhamStart").addEventListener("click", function () { $("policyUI").hidden = true; makeRoom(bhajanFor(d), d); });
+  }
+  function renderDham() {
+    var g = $("dhamGrid"); g.innerHTML = "";
+    DHAMS.filter(function (d) { return !dhamKind || d.k === dhamKind; }).forEach(function (d) {
+      var c = el('<div class="dham-card" data-notr style="background-image:' + photoOrArt(d).replace(/"/g, "&quot;") + '"><div class="tx"><b>' + esc(d.n) + '</b><span>' + kindSym(d.k) + " " + esc(d.p) + '</span></div></div>'); c.addEventListener("click", function () { openDham(d); }); g.appendChild(c);
+    });
+  }
+  document.querySelectorAll("#dhamFilter button").forEach(function (b) { b.addEventListener("click", function () { dhamKind = b.getAttribute("data-k"); document.querySelectorAll("#dhamFilter button").forEach(function (x) { x.classList.toggle("on", x === b); }); renderDham(); }); });
+  renderDham();
+  function paintDaily() { var d = dailyDham(), c = $("dailyCard"); c.style.backgroundImage = photoOrArt(d); c.innerHTML = '<div class="tx" data-notr><div class="lb">Today\'s Darshan</div><h3>' + esc(d.n) + '</h3><div class="row"><span>' + kindSym(d.k) + " " + esc(d.p) + '</span><button>🪔 Aarti</button></div></div>'; c.onclick = function () { if (UID) openDham(d); }; }
+  paintDaily(); loadPhotos(function () { renderDham(); paintDaily(); });
+  BHAJANS.forEach(function (b, i) { $("bhPick").appendChild(new Option(b.t, i)); });
+  $("bhPick").addEventListener("change", function () { $("bhOwn").hidden = BHAJANS[+this.value].l !== null; });
+  $("segSongs").addEventListener("click", function () { $("songsPanel").hidden = false; $("bhajanPanel").hidden = true; $("segSongs").classList.add("on"); $("segBhajan").classList.remove("on"); });
+  $("segBhajan").addEventListener("click", function () { $("songsPanel").hidden = true; $("bhajanPanel").hidden = false; $("segBhajan").classList.add("on"); $("segSongs").classList.remove("on"); });
+  function code6() { var a = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789", s = ""; for (var i = 0; i < 6; i++) s += a[Math.floor(Math.random() * a.length)]; return s; }
+  var dhamPick = null;
+  $("bhCreate").addEventListener("click", function () { makeRoom(BHAJANS[+$("bhPick").value], null); });
+  function makeRoom(b, dham) {
+    b = b, items = b.l || $("bhOwn").value.split("\n").map(function (x) { return clean(x, 120); }).filter(Boolean).slice(0, 60), name = dham ? dham.n + " Aarti" : clean($("bhName").value, 40) || (b.l ? b.t : "Our Bhajan");
+    if (!items.length) { toast("Write at least one line"); return; } if (!rate("room", 3, 60000)) return;
+    var id = code6(), btn = $("bhCreate"); btn.disabled = true;
+    setDoc(doc(db, "rooms", id), { name: name, title: b.l ? b.t : name, host: UID, hostName: ME.name, items: items, line: 0, dham: dham ? dham.id : "", members: [UID], flowers: 0, createdAt: serverTimestamp(), updatedAt: serverTimestamp() })
+      .then(function () { enterRoom(id); }).catch(function (e) { toast(e && e.code === "permission-denied" ? "Rooms need the latest rules (ask the creator to publish them)" : errMsg(e)); }).then(function () { btn.disabled = false; });
+  }
+  function joinRoom(code) {
+    code = clean(code, 8).toUpperCase(); if (!code) return;
+    getDoc(doc(db, "rooms", code)).then(function (s) {
+      if (!s.exists()) { toast("Room not found"); return; }
+      var m = s.data().members || []; if (m.indexOf(UID) >= 0) return enterRoom(code);
+      if (m.length >= 12) { toast("Room is full"); return; }
+      return updateDoc(doc(db, "rooms", code), { members: arrayUnion(UID), updatedAt: serverTimestamp() }).then(function () { addDoc(collection(db, "rooms", code, "msgs"), { from: UID, name: ME.name, text: "🙏 joined", createdAt: serverTimestamp() }).catch(function () {}); enterRoom(code); });
+    }).catch(function (e) { toast(e && e.code === "permission-denied" ? "Cannot join this room" : errMsg(e)); });
+  }
+  $("bhJoin").addEventListener("click", function () { joinRoom($("bhCode").value); });
+  function theme(i) { var d = DEITY[i] || DEITY[0]; $("roomBg").style.background = d.g; $("bigSym").textContent = d.s; document.querySelectorAll("#deities button").forEach(function (b, j) { b.classList.toggle("on", j === i); }); try { localStorage.setItem("pulse_deity", i); } catch (e) {} }
+  function petals(n) { var box = $("petals"); for (var i = 0; i < n; i++) { var p = document.createElement("span"); p.className = "petal"; p.textContent = ["🌸", "🌼", "🌺", "🪷"][i % 4]; p.style.left = Math.random() * 100 + "%"; p.style.animationDuration = 3 + Math.random() * 3 + "s"; p.style.animationDelay = Math.random() * 0.6 + "s"; box.appendChild(p); setTimeout(function (x) { x.remove(); }, 7000, p); } }
+  function paintLine(r) {
+    var it = r.items || [], i = Math.max(0, Math.min(it.length - 1, r.line || 0));
+    $("lyricBox").innerHTML = (it[i - 1] ? '<div class="pv">' + esc(it[i - 1]) + '</div>' : "") + '<div class="cur" key="' + i + '">' + esc(it[i] || "") + '</div>' + (it[i + 1] ? '<div class="nx">' + esc(it[i + 1]) + '</div>' : "");
+  }
+  function enterRoom(id) {
+    leaveRoom(true); ROOM = { id: id, flowers: -1, unsubs: [], host: false, auto: null };
+    $("roomUI").hidden = false; $("roomLog").innerHTML = "";
+    var d = $("deities"); d.innerHTML = ""; DEITY.forEach(function (x, i) { var b = document.createElement("button"); b.textContent = x.s + " " + x.n; b.setAttribute("data-notr", ""); b.addEventListener("click", function () { theme(i); }); d.appendChild(b); });
+    var sv = 0; try { sv = +localStorage.getItem("pulse_deity") || 0; } catch (e) {} theme(sv);
+    ROOM.unsubs.push(onSnapshot(doc(db, "rooms", id), function (s) {
+      if (!s.exists()) { toast("Room closed"); leaveRoom(); return; }
+      var r = snapData(s); ROOM.data = r; ROOM.host = r.host === UID;
+      $("roomName").textContent = r.name; $("roomCount").textContent = (r.members || []).length + " people singing · code " + id;
+      ["rcPrev", "rcNext", "rcAuto"].forEach(function (x) { $(x).hidden = !ROOM.host; });
+      paintLine(r); if (r.dham && ROOM.dham !== r.dham) { ROOM.dham = r.dham; var dd = DHAMS.filter(function (x) { return x.id === r.dham; })[0]; if (dd) { $("roomBg").style.background = "linear-gradient(rgba(0,0,0,.25),rgba(0,0,0,.6)), " + photoOrArt(dd); $("roomBg").style.backgroundSize = "cover"; $("roomBg").style.backgroundPosition = "center"; $("bigSym").textContent = kindSym(dd.k); } }
+      if (ROOM.flowers >= 0 && (r.flowers || 0) > ROOM.flowers) petals(Math.min(12, (r.flowers - ROOM.flowers) * 4)); ROOM.flowers = r.flowers || 0;
+    }, function (e) { toast(errMsg(e)); }));
+    ROOM.unsubs.push(onSnapshot(query(collection(db, "rooms", id, "msgs"), orderBy("createdAt", "asc"), limit(40)), function (s) {
+      var log = $("roomLog"); log.innerHTML = ""; s.forEach(function (d) { var m = snapData(d); log.appendChild(el('<div data-notr><b>' + esc(m.name || "") + ':</b> ' + esc(m.text) + '</div>')); }); log.scrollTop = log.scrollHeight;
+    }, function () {}));
+  }
+  function roomLine(delta) { var r = ROOM && ROOM.data; if (!r || !ROOM.host) return; var n = Math.max(0, Math.min((r.items || []).length - 1, (r.line || 0) + delta)); if (n !== r.line) updateDoc(doc(db, "rooms", ROOM.id), { line: n, updatedAt: serverTimestamp() }).catch(function (e) { toast(errMsg(e)); }); }
+  $("rcPrev").addEventListener("click", function () { roomLine(-1); }); $("rcNext").addEventListener("click", function () { roomLine(1); });
+  $("rcAuto").addEventListener("click", function () {
+    if (!ROOM) return; var b = this;
+    if (ROOM.auto) { clearInterval(ROOM.auto); ROOM.auto = null; b.classList.remove("on"); b.textContent = "▶ Auto"; return; }
+    b.classList.add("on"); b.textContent = "⏸ Auto"; ROOM.auto = setInterval(function () { if (!ROOM || !ROOM.data) return; if ((ROOM.data.line || 0) >= ROOM.data.items.length - 1) { clearInterval(ROOM.auto); ROOM.auto = null; b.classList.remove("on"); b.textContent = "▶ Auto"; return; } roomLine(1); }, 6500);
+  });
+  $("rcFlower").addEventListener("click", function () { if (!ROOM || !rate("flower", 12, 30000)) return; petals(6); updateDoc(doc(db, "rooms", ROOM.id), { flowers: increment(1), updatedAt: serverTimestamp() }).catch(function () {}); });
+  function bell() { try { var AC = window.AudioContext || window.webkitAudioContext, c = new AC(), t = c.currentTime; [523.25, 1046.5, 1568].forEach(function (f, i) { var o = c.createOscillator(), g = c.createGain(); o.frequency.value = f; g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.25 / (i + 1), t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + 2.4); o.connect(g); g.connect(c.destination); o.start(t); o.stop(t + 2.5); }); setTimeout(function () { c.close(); }, 3000); } catch (e) {} }
+  $("rcBell").addEventListener("click", bell);
+  $("rcSound").addEventListener("click", function () {
+    var b = this; if (roomSnd) { roomSnd.stop(); roomSnd = null; b.classList.remove("on"); return; }
+    try {
+      var AC = window.AudioContext || window.webkitAudioContext, c = new AC(), m = c.createGain(); m.gain.value = 0.9; m.connect(c.destination);
+      [130.81, 196, 261.63].forEach(function (f, i) { var o = c.createOscillator(), g = c.createGain(), l = c.createBiquadFilter(); o.type = "triangle"; o.frequency.value = f; g.gain.value = 0.07 / (i + 1); l.type = "lowpass"; l.frequency.value = 900; o.connect(l); l.connect(g); g.connect(m); o.start(); });
+      var beat = 0, tm = setInterval(function () { var t = c.currentTime, o = c.createOscillator(), g = c.createGain(); o.frequency.setValueAtTime(beat % 4 === 0 ? 120 : 190, t); o.frequency.exponentialRampToValueAtTime(70, t + 0.15); g.gain.setValueAtTime(beat % 4 === 0 ? 0.55 : 0.28, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.2); o.connect(g); g.connect(m); o.start(t); o.stop(t + 0.22); beat++; }, 600);
+      roomSnd = { stop: function () { clearInterval(tm); try { c.close(); } catch (e) {} } }; b.classList.add("on");
+    } catch (e) { toast("Sound not supported"); }
+  });
+  function leaveRoom(quiet) {
+    if (!ROOM) return; ROOM.unsubs.forEach(function (u) { try { u(); } catch (e) {} }); if (ROOM.auto) clearInterval(ROOM.auto); if (roomSnd) { roomSnd.stop(); roomSnd = null; $("rcSound").classList.remove("on"); }
+    ROOM = null; $("roomUI").hidden = true; if (!quiet) $("rcAuto").classList.remove("on");
+  }
+  $("roomLeave").addEventListener("click", function () { leaveRoom(); });
+  $("roomSend").addEventListener("click", sendRoomMsg); $("roomMsg").addEventListener("keydown", function (e) { if (e.key === "Enter") sendRoomMsg(); });
+  function sendRoomMsg() { var i = $("roomMsg"), t = clean(i.value, 200); if (!t || !ROOM || !rate("rmsg", 8, 10000)) return; i.value = ""; addDoc(collection(db, "rooms", ROOM.id, "msgs"), { from: UID, name: ME.name, text: t, createdAt: serverTimestamp() }).catch(function (e) { toast(errMsg(e)); }); }
+  $("roomShare").addEventListener("click", function () {
+    if (!ROOM) return; var url = location.origin + location.pathname + "?room=" + ROOM.id, text = "Join my Bhajan Room on Pulse 🪔 Code: " + ROOM.id;
+    if (navigator.share) navigator.share({ title: "Pulse Bhajan Room", text: text, url: url }).catch(function () {}); else if (navigator.clipboard) navigator.clipboard.writeText(text + " " + url).then(function () { toast("Room link copied 📋"); }); else toast(text);
+  });
+  function pendingRoom() { try { var q = new URLSearchParams(location.search).get("room"); if (q) { sessionStorage.setItem("pulse_room", q); history.replaceState(null, "", location.pathname); } var c = sessionStorage.getItem("pulse_room"); if (c && UID) { sessionStorage.removeItem("pulse_room"); showTab("studio"); $("segBhajan").click(); joinRoom(c); } } catch (e) {} }
+
   // ---- boot ----
-  setMode("login");
+  initI18n(); setMode("login");
   fetch("firebase-config.json", { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (cfg) {
     if (!cfg.apiKey || /PASTE|YOUR/i.test(cfg.apiKey)) { $("authErr").textContent = "Setup baaki hai: public/firebase-config.json me Firebase ki details bharo."; return; }
     init(cfg);
