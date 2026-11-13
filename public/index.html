@@ -510,7 +510,7 @@
     <div class="stories" id="storiesBar"></div>
     <div class="composer">
       <div class="row"><div class="av-sm" id="meAv" style="background:var(--grad)">K</div>
-        <textarea id="composerText" rows="1" maxlength="500" placeholder="Kya chal raha hai?"></textarea></div>
+        <textarea id="composerText" rows="1" maxlength="500" placeholder="What's on your mind?"></textarea></div>
       <div class="foot"><span style="font-size:12px;color:var(--faint)" id="charCount">0/500</span><button class="btn-grad" id="postBtn" disabled>Post</button></div>
     </div>
     <div id="feed"></div>
@@ -531,15 +531,15 @@
     <div class="match-pop" id="matchPop">
       <div class="match-avs"><div class="av-sm" style="background:var(--grad)" id="matchMe">K</div><div class="av-sm" id="matchAv" style="background:var(--grad-pink)">A</div></div>
       <h2>Match! 🎉</h2><p id="matchName"></p>
-      <button class="btn-grad" id="matchChat">Message bhejo</button>
-      <button class="btn-outline" style="margin-top:10px;max-width:200px" id="matchKeep">Swipe karte raho</button>
+      <button class="btn-grad" id="matchChat">Send message</button>
+      <button class="btn-outline" style="margin-top:10px;max-width:200px" id="matchKeep">Keep swiping</button>
     </div>
   </main>
 
   <main class="screen" id="screen-nearby" hidden><div id="nearbyBox"></div></main>
 
   <main class="screen" id="screen-studio" hidden>
-    <div class="seg" style="margin-top:4px"><button class="on" id="segSongs">🎵 Songs</button><button id="segBhajan">🪔 Bhajan Room</button></div>
+    <div class="seg" style="margin-top:4px"><button class="on" id="segSongs">🎵 Music</button><button id="segBhajan">🪔 Bhajan Room</button></div>
     <div id="bhajanPanel" hidden>
       <div class="st-card bh-hero"><div class="om">🕉️</div><h3>Bhajan Room</h3><p class="st-sub">Sing together with 2 to 8 people. Everyone sees the same line live, with diya, flowers and bell.</p>
         <input id="bhName" class="bh-in" maxlength="40" placeholder="Room name (e.g. Evening Aarti)">
@@ -556,21 +556,21 @@
     <div id="bhajanPanel2" hidden></div>
     <div id="songsPanel">
     <div class="st-card">
-      <h3>🎵 Gaana Studio</h3>
-      <p class="st-sub">Bas idea likho. AI bol likhega, dhun aapke phone me hi banegi. Bina server, bina paisa.</p>
-      <textarea id="stPrompt" rows="3" maxlength="300" placeholder="Jaise: barish me purani dosti ki yaad, ya Papa ke liye shukriya..."></textarea>
-      <div class="st-row"><select id="stGenre"></select><select id="stMood"><option value="">Mood: AI chune</option><option value="khushi">Khushi</option><option value="udaas">Udaas</option><option value="pyaar">Pyaar</option><option value="josh">Josh</option><option value="shaanti">Shaanti</option></select></div>
-      <button class="btn-grad" id="stMake" style="width:100%;padding:13px">Gaana banao ✨</button>
+      <h3>🎵 Music Studio</h3>
+      <p class="st-sub">Just type an idea. AI writes the lyrics, and the tune is composed right on your phone. No server, no cost.</p>
+      <textarea id="stPrompt" rows="3" maxlength="300" placeholder="e.g.: a memory of old friendship in the rain, or a thank-you note for Dad..."></textarea>
+      <div class="st-row"><select id="stGenre"></select><select id="stMood"><option value="">Mood: let AI choose</option><option value="khushi">Happy</option><option value="udaas">Sad</option><option value="pyaar">Romantic</option><option value="josh">Energetic</option><option value="shaanti">Peaceful</option></select></div>
+      <button class="btn-grad" id="stMake" style="width:100%;padding:13px">Create song ✨</button>
       <div class="st-note" id="stNote"></div>
     </div>
     <div class="st-card" id="stResult" hidden>
       <div class="st-title" id="stTitle"></div><div class="st-meta" id="stMeta"></div>
       <div class="st-bar"><i id="stBar"></i></div>
-      <div class="st-ctrl"><button class="btn-grad" id="stPlay">▶ Chalao</button><button class="btn-outline" id="stWav">⬇ WAV</button><button class="btn-outline" id="stPost">📣 Feed pe</button></div>
-      <label class="st-voice"><input type="checkbox" id="stVoice"> Bol ko awaaz me padho (phone ki awaaz, gayak nahi)</label>
+      <div class="st-ctrl"><button class="btn-grad" id="stPlay">▶ Play</button><button class="btn-outline" id="stWav">⬇ WAV</button><button class="btn-outline" id="stPost">📣 Post to feed</button></div>
+      <label class="st-voice"><input type="checkbox" id="stVoice"> Read the lyrics aloud (phone's voice, not a singer)</label>
       <div class="st-lyrics" id="stLyrics"></div>
     </div>
-    <div class="section-title">Meri banayi dhunein</div>
+    <div class="section-title">My created songs</div>
     <div id="stLib"></div>
     </div>
   </main>
@@ -585,10 +585,10 @@
       <div class="profile-av" id="pAv" style="background:var(--grad)">K</div>
       <h2 id="pName">-</h2><div class="handle" id="pHandle"></div>
       <div class="form" style="margin-top:14px">
-        <label>Naam<input id="eName" maxlength="40"></label>
-        <label>Sheher<input id="eCity" maxlength="40"></label>
-        <label>Kaam<input id="eWork" maxlength="60"></label>
-        <label>Mere baare me<textarea id="eAbout" maxlength="300" rows="3"></textarea></label>
+        <label>Name<input id="eName" maxlength="40"></label>
+        <label>City<input id="eCity" maxlength="40"></label>
+        <label>Work<input id="eWork" maxlength="60"></label>
+        <label>About me<textarea id="eAbout" maxlength="300" rows="3"></textarea></label>
         <label>I am here for<select id="eMode"><option value="friends">Friendship</option><option value="dating">Dating</option><option value="marriage">Marriage</option><option value="jobseeker">Find a job</option><option value="recruiter">Hire talent</option></select></label>
         <label>I am<select id="eGender"><option value="">Select</option><option>Woman</option><option>Man</option><option>Other</option></select></label>
         <div id="secMate"><label>Show me<select id="eSeeking"><option>Everyone</option><option>Women</option><option>Men</option></select></label></div>
@@ -612,7 +612,7 @@
       <div class="section-title">Account settings</div>
       <div class="setting-row">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
-        <div class="lbl">Location sharing<div class="desc">ON hone par hi aap Nearby me dikhoge</div></div>
+        <div class="lbl">Location sharing<div class="desc">You'll show up in Nearby only when this is ON</div></div>
         <button class="toggle" id="locToggle" aria-label="Location sharing"></button>
       </div>
       <div class="setting-row"><div class="lbl">Profile photo<div class="desc">Small photo shown on your swipe card</div></div><button class="btn-outline" id="photoSet" style="padding:8px 14px">Upload</button><input type="file" id="avatarInput" accept="image/*" hidden></div>
@@ -621,7 +621,7 @@
       <div class="setting-row"><div class="lbl">Pause my profile<div class="desc">Hide me from Discover, Nearby and candidate search</div></div><button class="toggle" id="hideToggle" aria-label="Pause profile"></button></div>
       <div class="setting-row"><div class="lbl">Blocked people<div class="desc">Unblock someone you blocked</div></div><button class="btn-outline" id="blockedBtn" style="padding:8px 14px">Manage</button></div>
       <div id="creatorBox" hidden></div>
-      <button class="btn-grad" style="width:100%;margin-top:16px;padding:13px" id="inviteBtn">📨 Doston ko bulao (invite link)</button>
+      <button class="btn-grad" style="width:100%;margin-top:16px;padding:13px" id="inviteBtn">📨 Invite friends (invite link)</button>
       <button class="btn-outline" style="width:100%;margin-top:12px" id="logoutBtn">Logout</button>
       <div class="legal"><a href="#" class="plink">Privacy Policy &amp; Terms</a> · <a href="#" id="delAcc">Delete my account</a><div>© Pulse</div></div>
     </div>
@@ -629,21 +629,21 @@
 
   <section class="convo" id="convo">
     <div class="convo-head">
-      <button class="back" id="convoBack" aria-label="Wapas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 18l-6-6 6-6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button class="back" id="convoBack" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 18l-6-6 6-6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       <div class="av-sm" id="convoAv">A</div>
       <div style="flex:1;min-width:0"><div class="nm" id="convoName">Name</div><div class="st" id="convoStatus"></div></div>
       <button class="icon-btn" id="callBtn" aria-label="Voice call" title="Voice call"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2Z" stroke-linejoin="round"/></svg></button>
       <button class="icon-btn" id="videoCallBtn" aria-label="Video call" title="Video call"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="14" height="12" rx="2.5"/><path d="M16 10.5l5-3v9l-5-3" stroke-linejoin="round"/></svg></button>
       <button class="icon-btn" id="wtBtn" aria-label="Walkie-talkie" title="Walkie-talkie">📻</button>
-      <button class="icon-btn" id="moreBtn" aria-label="Block ya report" title="Block / Report"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button>
+      <button class="icon-btn" id="moreBtn" aria-label="Block or report" title="Block / Report"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button>
     </div>
     <div class="med-bar" id="medBar" hidden></div>
     <div class="emoji-panel" id="emojiPanel" hidden><div class="emo-tabs" id="emoTabs"></div><div class="emo-grid" id="emoGrid" data-notr></div></div>
     <div class="convo-body" id="convoBody"></div>
     <div class="convo-input">
       <button class="icon-btn" id="emojiBtn" aria-label="Emoji" title="Emoji">😊</button><button class="icon-btn" id="photoBtn" aria-label="Send photo" title="Send photo">📷</button><input type="file" id="photoInput" accept="image/*" hidden>
-      <input id="msgInput" maxlength="1000" placeholder="Message likho..." autocomplete="off">
-      <button class="send-btn" id="sendBtn" aria-label="Bhejo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7Z" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <input id="msgInput" maxlength="1000" placeholder="Type a message..." autocomplete="off">
+      <button class="send-btn" id="sendBtn" aria-label="Send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7Z" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
     </div>
   </section>
 
@@ -663,14 +663,14 @@
 
   <div class="policy" id="storyComposerUI" hidden><div class="policy-box">
     <button class="icon-btn" id="storyComposerClose" style="float:right">✕</button>
-    <div class="section-title" style="margin-top:0">Status lagao</div>
-    <div class="st-note">Dikhega sirf <b id="storyModeHint"></b> wale logon ko — 24 ghante baad khud gayab ho jayega.</div>
-    <textarea id="storyText" rows="3" maxlength="150" placeholder="Kya chal raha hai?" class="bh-in" style="margin:10px 0;width:100%"></textarea>
+    <div class="section-title" style="margin-top:0">Post a status</div>
+    <div class="st-note">Visible only to people in <b id="storyModeHint"></b> mode — disappears on its own after 24 hours.</div>
+    <textarea id="storyText" rows="3" maxlength="150" placeholder="What's on your mind?" class="bh-in" style="margin:10px 0;width:100%"></textarea>
     <div id="storyPhotoPreview" style="display:none;margin-bottom:10px;position:relative"><img id="storyPhotoImg" style="max-width:100%;border-radius:12px;display:block"><button class="icon-btn" id="storyPhotoRemove" style="position:absolute;top:6px;right:6px">✕</button></div>
     <input type="file" id="storyPhotoInput" accept="image/*" hidden>
     <div class="st-row">
       <button class="btn-outline" id="storyAddPhoto" type="button" style="padding:8px 14px">📷 Photo</button>
-      <button class="btn-grad" id="storyPostBtn" type="button" style="padding:8px 16px;margin-left:auto">Post karo</button>
+      <button class="btn-grad" id="storyPostBtn" type="button" style="padding:8px 16px;margin-left:auto">Post</button>
     </div>
   </div></div>
 
@@ -685,15 +685,15 @@
       <div class="call-watermark" id="callWatermark" style="top:10%;left:6%"></div>
     </div>
     <div class="call-av" id="callAv">A</div><h3 id="callName">-</h3><div class="call-sub" id="callSub"></div>
-    <div class="call-enc" id="callEnc">🔒 End-to-end encrypted — seedha aapke aur doosre phone ke beech</div>
-    <button class="ptt" id="ptt" hidden>🎙 Dabake bolo</button>
-    <div class="call-actions"><button class="cbtn ok" id="callAccept" hidden>Uthao</button><button class="cbtn mute" id="callMute" hidden>Mute</button><button class="cbtn mute" id="callCam" hidden>Camera off</button><button class="cbtn no" id="callEnd">Kaato</button></div>
+    <div class="call-enc" id="callEnc">🔒 End-to-end encrypted — directly between your phone and theirs</div>
+    <button class="ptt" id="ptt" hidden>🎙 Hold to talk</button>
+    <div class="call-actions"><button class="cbtn ok" id="callAccept" hidden>Accept</button><button class="cbtn mute" id="callMute" hidden>Mute</button><button class="cbtn mute" id="callCam" hidden>Camera off</button><button class="cbtn no" id="callEnd">End</button></div>
     <audio id="callAudio" autoplay playsinline controlsList="nodownload" oncontextmenu="return false"></audio></div></div>
   <nav class="tabbar">
     <button class="tab active" data-tab="feed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10l9-7 9 7v9a2 2 0 0 1-2 2h-4v-6H9v6H5a2 2 0 0 1-2-2v-9Z" stroke-linejoin="round"/></svg>Home</button>
     <button class="tab" data-tab="discover"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-4.3-9.3-8.5C.9 9.4 2.4 6 5.6 6c1.9 0 3.2 1.1 4.4 2.5C11.2 7.1 12.5 6 14.4 6c3.2 0 4.7 3.4 2.9 6.5C19 16.7 12 21 12 21Z" stroke-linejoin="round"/></svg>Discover</button>
     <button class="tab" data-tab="nearby"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>Nearby</button>
-    <button class="tab" data-tab="studio"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13" stroke-linejoin="round"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>Gaana</button>
+    <button class="tab" data-tab="studio"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13" stroke-linejoin="round"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>Music</button>
     <button class="tab" data-tab="chats"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8 8 0 0 1-11.9 7L4 20l1.5-5A8 8 0 1 1 21 11.5Z" stroke-linejoin="round"/></svg>Chats<span class="tab-dot" id="chatDot" hidden></span></button>
     <button class="tab" data-tab="profile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6" stroke-linecap="round"/></svg>Me</button>
   </nav>
@@ -702,32 +702,32 @@
     <button class="icon-btn lang-btn" id="langBtn2" aria-label="Language" style="position:absolute;top:14px;right:14px;z-index:3">हि</button>
     <div class="auth-card">
       <div class="brand" style="justify-content:center;margin-bottom:6px"><div class="dot"></div><h1>Pulse</h1></div>
-      <p class="auth-sub">Asli log, asli baatein. Sirf 18+ ke liye.</p>
-      <div class="auth-chips"><span>💬 Live chat</span><span>💜 Match</span><span>📍 Nearby (aapki marzi)</span><span>✦ Saathi AI</span></div>
+      <p class="auth-sub">Real people, real conversations. For 18+ only.</p>
+      <div class="auth-chips"><span>💬 Live chat</span><span>💜 Match</span><span>📍 Nearby (your choice)</span><span>✦ Saathi AI</span></div>
       <div id="verifyBox" style="display:none;text-align:center">
-        <h2 style="margin:8px 0 6px">Email verify karo</h2>
-        <p class="auth-sub" id="vMsg">Aapko ek verification mail bheji hai. Mail me link par click karo (Spam folder bhi dekho).</p>
-        <button class="btn-grad" id="vDone" type="button" style="width:100%;padding:13px">Maine verify kar liya</button>
-        <button class="btn-outline" id="vResend" type="button" style="width:100%;padding:12px;margin-top:10px">Mail dobara bhejo</button>
-        <button class="btn-outline" id="vOut" type="button" style="width:100%;padding:12px;margin-top:10px">Logout / doosra account</button>
+        <h2 style="margin:8px 0 6px">Verify your email</h2>
+        <p class="auth-sub" id="vMsg">We've sent you a verification email. Click the link in the email (check your Spam folder too).</p>
+        <button class="btn-grad" id="vDone" type="button" style="width:100%;padding:13px">I've verified</button>
+        <button class="btn-outline" id="vResend" type="button" style="width:100%;padding:12px;margin-top:10px">Resend email</button>
+        <button class="btn-outline" id="vOut" type="button" style="width:100%;padding:12px;margin-top:10px">Logout / switch account</button>
         <div class="auth-err" id="vErr" role="alert"></div>
       </div>
-      <div class="seg" id="segBox"><button id="segLogin" class="on">Login</button><button id="segSignup">Naya account</button></div>
+      <div class="seg" id="segBox"><button id="segLogin" class="on">Login</button><button id="segSignup">New account</button></div>
       <button type="button" class="btn-outline" id="googleBtn" style="width:100%;padding:11px;margin:4px 0 10px;display:flex;align-items:center;justify-content:center;gap:8px"><svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.4 29.3 35 24 35c-6.1 0-11-4.9-11-11s4.9-11 11-11c2.8 0 5.3 1 7.3 2.7l5.7-5.7C33.6 6.5 29 4.5 24 4.5 12.9 4.5 4 13.4 4 24.5s8.9 20 20 20 20-8.9 20-20c0-1.4-.1-2.7-.4-4z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 16 19 13 24 13c2.8 0 5.3 1 7.3 2.7l5.7-5.7C33.6 6.5 29 4.5 24 4.5c-7.6 0-14.1 4.3-17.4 10.6l-.3-.4z"/><path fill="#4CAF50" d="M24 44.5c5 0 9.5-1.9 12.9-5l-6-5c-1.9 1.3-4.3 2-6.9 2-5.2 0-9.6-3.3-11.2-7.9l-6.5 5C9.8 40.1 16.3 44.5 24 44.5z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.1-4.1 5.5l6 5C40.9 35.5 44 30.4 44 24.5c0-1.4-.1-2.7-.4-4z"/></svg><span id="googleBtnLbl">Continue with Google</span></button>
-      <div class="auth-or"><span>ya</span></div>
+      <div class="auth-or"><span>or</span></div>
       <form id="authForm" class="form" autocomplete="on">
-        <div id="emailRow"><label>Email<input id="aUser" type="email" required maxlength="80" autocapitalize="none" autocomplete="email" inputmode="email" placeholder="aap@example.com"></label></div>
+        <div id="emailRow"><label>Email<input id="aUser" type="email" required maxlength="80" autocapitalize="none" autocomplete="email" inputmode="email" placeholder="you@example.com"></label></div>
         <div id="signupOnly">
-          <label>Aapka naam<input id="aName" maxlength="40" autocomplete="name"></label>
-          <label>Umar (18+)<input id="aAge" type="number" min="18" max="99" inputmode="numeric"></label>
-          <label>Sheher<input id="aCity" maxlength="40" autocomplete="address-level2"></label>
+          <label>Your name<input id="aName" maxlength="40" autocomplete="name"></label>
+          <label>Age (18+)<input id="aAge" type="number" min="18" max="99" inputmode="numeric"></label>
+          <label>City<input id="aCity" maxlength="40" autocomplete="address-level2"></label>
           <div class="mode-grid" id="modeGrid"><div class="mode-lbl">I am here for</div>
             <button type="button" data-m="friends" class="on"><i>🤝</i>Friendship</button><button type="button" data-m="dating"><i>💜</i>Dating</button><button type="button" data-m="marriage"><i>💍</i>Marriage</button><button type="button" data-m="jobseeker"><i>💼</i>Find a job</button><button type="button" data-m="recruiter"><i>🏢</i>Hire talent</button></div>
           <label>I am<select id="aGender"><option value="">Select</option><option>Woman</option><option>Man</option><option>Other</option></select></label>
           <div id="aMateBox" hidden><label>Show me<select id="aSeeking"><option>Everyone</option><option>Women</option><option>Men</option></select></label></div>
           <label class="chk"><input type="checkbox" id="aAdult"><span>I am 18+. I accept the <a href="#" class="plink">Privacy Policy &amp; Terms</a> and understand this is a <b>beta (testing) version</b></span></label>
         </div>
-        <div id="pwRow"><label>Password<span class="pw-wrap"><input id="aPass" type="password" required minlength="6" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go" placeholder="kam se kam 6 akshar"><button type="button" class="pw-eye" id="pwEye" aria-label="Show password">👁</button></span></label></div>
+        <div id="pwRow"><label>Password<span class="pw-wrap"><input id="aPass" type="password" required minlength="6" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go" placeholder="at least 6 characters"><button type="button" class="pw-eye" id="pwEye" aria-label="Show password">👁</button></span></label></div>
         <div class="auth-err" id="authErr" role="alert"></div>
         <a href="#" id="forgotLink" class="forgot">Forgot password?</a>
         <button class="btn-grad" id="authBtn" type="submit" style="width:100%;padding:13px">Login</button>
@@ -737,5 +737,5 @@
   <div class="toast" id="toast"></div>
 </div>
 
-<script src="app.js?v=4d27d3cbd7" defer></script>
+<script src="app.js?v=0e1408d4de" defer></script>
 <script>if("serviceWorker" in navigator && location.protocol.indexOf("http")===0){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});}</script></body></html>

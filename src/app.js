@@ -28,8 +28,8 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   function ms(v) { return v && v.toMillis ? v.toMillis() : Date.now(); }
   function ago(t) {
     var s = Math.floor((Date.now() - t) / 1000);
-    if (s < 60) return "abhi"; if (s < 3600) return Math.floor(s / 60) + " min pehle";
-    if (s < 86400) return Math.floor(s / 3600) + " ghante pehle"; return Math.floor(s / 86400) + " din pehle";
+    if (s < 60) return "just now"; if (s < 3600) return Math.floor(s / 60) + "m ago";
+    if (s < 86400) return Math.floor(s / 3600) + "h ago"; return Math.floor(s / 86400) + "d ago";
   }
   function hm(t) { var d = new Date(t); return d.getHours() + ":" + String(d.getMinutes()).padStart(2, "0"); }
   function snapData(d) { return d.data({ serverTimestamps: "estimate" }); }
@@ -41,11 +41,11 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   function errMsg(e) {
     var c = (e && e.code) || "";
     var map = {
-      "auth/email-already-in-use": "Ye email pehle se registered hai. Login karo.",
-      "auth/invalid-email": "Email sahi likho.", "auth/weak-password": "Password kam se kam 6 akshar ka rakho.",
-      "auth/invalid-credential": "Email or password is wrong. If you just signed up, verify your email first. Forgot it? Use \"Forgot password?\".", "auth/operation-not-allowed": "Email login is not switched on in Firebase yet (Authentication > Sign-in method > Email/Password).", "auth/unauthorized-domain": "This website address is not allowed in Firebase (Authentication > Settings > Authorized domains).", "auth/invalid-api-key": "App key is invalid. Check firebase-config.json.", "auth/api-key-not-valid.-please-pass-a-valid-api-key.": "App key is invalid. Check firebase-config.json.", "auth/user-disabled": "This account has been disabled.", "auth/missing-password": "Type your password.", "auth/missing-email": "Type your email.", "auth/internal-error": "Server problem. Try again in a minute.", "auth/wrong-password": "Email ya password galat hai.", "auth/user-not-found": "Email ya password galat hai.",
-      "auth/too-many-requests": "Bahut koshish ho gayi. Thodi der baad try karo.", "auth/network-request-failed": "Internet check karo.",
-      "permission-denied": "Ye karne ki ijazat nahi hai.", "unavailable": "Internet check karo."
+      "auth/email-already-in-use": "This email is already registered. Please log in.",
+      "auth/invalid-email": "Please enter a valid email.", "auth/weak-password": "Password must be at least 6 characters.",
+      "auth/invalid-credential": "Email or password is wrong. If you just signed up, verify your email first. Forgot it? Use \"Forgot password?\".", "auth/operation-not-allowed": "Email login is not switched on in Firebase yet (Authentication > Sign-in method > Email/Password).", "auth/unauthorized-domain": "This website address is not allowed in Firebase (Authentication > Settings > Authorized domains).", "auth/invalid-api-key": "App key is invalid. Check firebase-config.json.", "auth/api-key-not-valid.-please-pass-a-valid-api-key.": "App key is invalid. Check firebase-config.json.", "auth/user-disabled": "This account has been disabled.", "auth/missing-password": "Type your password.", "auth/missing-email": "Type your email.", "auth/internal-error": "Server problem. Try again in a minute.", "auth/wrong-password": "Email or password is wrong.", "auth/user-not-found": "Email or password is wrong.",
+      "auth/too-many-requests": "Too many attempts. Please try again shortly.", "auth/network-request-failed": "Please check your internet connection.",
+      "permission-denied": "You don't have permission to do this.", "unavailable": "Please check your internet connection."
     };
     return map[c] || ((e && e.message ? e.message : "Something went wrong") + (c ? " [" + c + "]" : ""));
   }
@@ -60,7 +60,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   function setMode(m) {
     mode = m;
     $("segLogin").classList.toggle("on", m === "login"); $("segSignup").classList.toggle("on", m === "signup");
-    $("signupOnly").hidden = m === "login"; $("authBtn").textContent = m === "login" ? "Login" : "Account banao";
+    $("signupOnly").hidden = m === "login"; $("authBtn").textContent = m === "login" ? "Login" : "Create account";
     $("aPass").setAttribute("autocomplete", m === "login" ? "current-password" : "new-password");
     $("aName").required = $("aAge").required = m === "signup"; $("authErr").textContent = "";
   }
@@ -85,7 +85,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     $("emailRow").style.display = "none"; $("aUser").required = false; $("pwRow").style.display = "none"; $("aPass").required = false;
     $("signupOnly").hidden = false; $("aName").required = true; $("aAge").required = true;
     $("aName").value = u.displayName || ""; $("authErr").textContent = "";
-    $("authBtn").textContent = "Profile complete karo";
+    $("authBtn").textContent = "Complete profile";
   }
   // WhatsApp/Instagram/Facebook jaise in-app browsers (WebView) me Google jaanbujh kar
   // sign-in block ya restrict karta hai (security ke naam par) — isse login "hota hai par
@@ -129,7 +129,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
 
   $("authForm").addEventListener("submit", function (e) {
     e.preventDefault(); $("authErr").textContent = "";
-    if (!auth) { $("authErr").textContent = "App abhi set nahi hui (firebase-config.json khaali hai)."; return; }
+    if (!auth) { $("authErr").textContent = "The app isn't set up yet (firebase-config.json is empty)."; return; }
     if (googleUser) {
       var gu = googleUser, gAge = parseInt($("aAge").value, 10), gName = clean($("aName").value, 40);
       if (!gName) { $("authErr").textContent = "Please enter your name"; return; }
@@ -162,7 +162,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     }
     p.then(function () { $("aPass").value = ""; }).catch(function (err) { signingUp = false; $("authErr").textContent = errMsg(err); }).then(function () { $("authBtn").disabled = false; });
   });
-  $("logoutBtn").addEventListener("click", function () { signOut(auth).then(function () { toast("Logout ho gaye"); }); });
+  $("logoutBtn").addEventListener("click", function () { signOut(auth).then(function () { toast("Logged out"); }); });
 
   function stopAll() { leaveRoom(true); stopNearby(); endCall(false); player.stop(); unsubs.forEach(function (u) { try { u(); } catch (e) {} }); unsubs = []; }
 
@@ -211,7 +211,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   function showForms() { $("verifyBox").style.display = "none"; $("authForm").style.display = ""; $("vErr").textContent = ""; resetAuthChrome(); }
   function showVerify(u) {
     $("auth").hidden = false; $("authForm").style.display = "none"; $("segBox").style.display = "none"; $("verifyBox").style.display = "";
-    $("vMsg").textContent = "Verification mail " + u.email + " par bheji hai. Mail me link par click karo (Spam folder bhi dekho), phir niche button dabao.";
+    $("vMsg").textContent = "A verification email has been sent to " + u.email + ". Click the link in the email (check your Spam folder too), then tap the button below.";
   }
   // Network thoda sa bhi hichke (mobile data switch, weak signal) to Firestore ka getDoc()
   // fail ho sakta hai — isse user ko turant poore login screen pe nahi bhejna (wo "logout ho gaya"
@@ -229,24 +229,24 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
       if (!s.exists()) {
         var isGoogle = (u.providerData || []).some(function (p) { return p.providerId === "google.com"; });
         if (isGoogle) { showGoogleOnboarding(u); return; }
-        signOut(auth); showForms(); $("auth").hidden = false; $("authErr").textContent = "Profile nahi mili. Naya account banao."; return;
+        signOut(auth); showForms(); $("auth").hidden = false; $("authErr").textContent = "No profile found. Please create a new account."; return;
       }
       return getDoc(doc(db, "bans", u.uid)).catch(function () { return { exists: function () { return false; } }; }).then(function (b) { if (b.exists()) { signOut(auth); showForms(); $("auth").hidden = false; $("authErr").textContent = "This account has been suspended for breaking the rules."; return; } showForms(); UID = u.uid; ME = Object.assign({}, s.data(), { uid: UID }); start(); });
     }).catch(function (e) {
-      if (isTransientErr(e) && attempt < 5) { if (attempt === 0) toast("Internet se jud rahe hain..."); setTimeout(function () { afterAuth(u, attempt + 1); }, Math.min(1000 * Math.pow(1.7, attempt), 8000)); return; }
+      if (isTransientErr(e) && attempt < 5) { if (attempt === 0) toast("Reconnecting..."); setTimeout(function () { afterAuth(u, attempt + 1); }, Math.min(1000 * Math.pow(1.7, attempt), 8000)); return; }
       showForms(); $("auth").hidden = false; $("authErr").textContent = errMsg(e);
     });
   }
   var lastSent = 0;
   function sendVerify(u) {
-    if (Date.now() - lastSent < 60000) { $("vErr").textContent = "Thodi der ruko (1 minute), phir dobara bhejo."; return Promise.resolve(); }
+    if (Date.now() - lastSent < 60000) { $("vErr").textContent = "Please wait a minute, then resend."; return Promise.resolve(); }
     lastSent = Date.now();
-    return sendEmailVerification(u).then(function () { $("vErr").textContent = "Mail bhej di gayi."; }).catch(function (e) { lastSent = 0; $("vErr").textContent = errMsg(e); });
+    return sendEmailVerification(u).then(function () { $("vErr").textContent = "Email sent."; }).catch(function (e) { lastSent = 0; $("vErr").textContent = errMsg(e); });
   }
   $("vDone").addEventListener("click", function () {
     var u = auth && auth.currentUser; if (!u) return; $("vErr").textContent = "";
     u.reload().then(function () { return u.getIdToken(true); }).then(function () {
-      if (u.emailVerified) afterAuth(u); else $("vErr").textContent = "Abhi verify nahi hua. Mail ka link kholo, phir dobara dabao.";
+      if (u.emailVerified) afterAuth(u); else $("vErr").textContent = "Not verified yet. Open the link in the email, then tap again.";
     }).catch(function (e) { $("vErr").textContent = errMsg(e); });
   });
   $("vResend").addEventListener("click", function () { if (auth && auth.currentUser) sendVerify(auth.currentUser); });
@@ -309,7 +309,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   function paintStories() {
     var bar = $("storiesBar"); if (!bar) return; bar.innerHTML = "";
     var seen = seenStories();
-    var mine = el('<div class="story" id="stMine"><div class="ring ' + (myStory ? "" : "add") + '">' + (myStory ? ('<div class="av">' + (myStory.photo ? '' : ini(ME.name)) + '</div>') : '<span class="add-plus">+</span>') + '</div><span>' + (myStory ? "Aap" : "Add status") + '</span></div>');
+    var mine = el('<div class="story" id="stMine"><div class="ring ' + (myStory ? "" : "add") + '">' + (myStory ? ('<div class="av">' + (myStory.photo ? '' : ini(ME.name)) + '</div>') : '<span class="add-plus">+</span>') + '</div><span>' + (myStory ? "You" : "Add status") + '</span></div>');
     if (myStory && myStory.photo) mine.querySelector(".av").style.background = "center/cover url(" + myStory.photo + ")"; else if (myStory) mine.querySelector(".av").style.background = g(UID);
     mine.addEventListener("click", function () { if (myStory) openStoryView(myStory, true); else openStoryComposer(); });
     bar.appendChild(mine);
@@ -331,16 +331,16 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   $("storyPhotoRemove").addEventListener("click", function () { storyPhotoData = ""; $("storyPhotoPreview").style.display = "none"; });
   $("storyPostBtn").addEventListener("click", function () {
     var t = clean($("storyText").value, 150);
-    if (!t && !storyPhotoData) { toast("Kuch likho ya photo lagao"); return; }
+    if (!t && !storyPhotoData) { toast("Write something or add a photo"); return; }
     if (!rate("story", 6, 300000)) return;
     this.disabled = true; var btn = this;
     if (t) autoFlag(t, "status");
     addDoc(collection(db, "stories"), { uid: UID, name: ME.name, mode: MODE, text: t, photo: storyPhotoData, createdAt: serverTimestamp() })
-      .then(function () { $("storyComposerUI").hidden = true; toast("Status lag gaya ✅"); bump("cStatus"); })
+      .then(function () { $("storyComposerUI").hidden = true; toast("Status posted ✅"); bump("cStatus"); })
       .catch(function (e) { toast(errMsg(e)); }).then(function () { btn.disabled = false; });
   });
   function openStoryView(s, isMine) {
-    $("svAv").style.background = g(s.uid); $("svAv").textContent = ini(s.name); $("svName").textContent = isMine ? "Aapka status" : esc(s.name);
+    $("svAv").style.background = g(s.uid); $("svAv").textContent = ini(s.name); $("svName").textContent = isMine ? "Your status" : esc(s.name);
     $("svTime").textContent = ago(ms(s.createdAt)); $("svDelete").hidden = !isMine;
     if (s.photo) { $("svPhoto").src = s.photo; $("svPhoto").hidden = false; } else { $("svPhoto").hidden = true; $("svPhoto").src = ""; }
     $("svText").textContent = s.text || "";
@@ -348,7 +348,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   }
   $("svClose").addEventListener("click", function () { $("storyViewUI").hidden = true; });
   $("svDelete").addEventListener("click", function () {
-    var id = $("storyViewUI").dataset.sid; if (!id || !window.confirm("Status delete karein?")) return;
+    var id = $("storyViewUI").dataset.sid; if (!id || !window.confirm("Delete this status?")) return;
     deleteDoc(doc(db, "stories", id)).then(function () { $("storyViewUI").hidden = true; toast("Deleted"); }).catch(function (e) { toast(errMsg(e)); });
   });
 
@@ -400,7 +400,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   $("btnLike").addEventListener("click", function () { swipe("like"); });
   $("btnNope").addEventListener("click", function () { swipe("pass"); });
   var matchWith = null;
-  function showMatch(u) { matchWith = u; $("matchMe").textContent = ini(ME.name); $("matchAv").textContent = ini(u.name); $("matchAv").style.background = g(u.id); $("matchName").textContent = u.name + " ne bhi aapko like kiya 💜"; $("matchPop").classList.add("show"); }
+  function showMatch(u) { matchWith = u; $("matchMe").textContent = ini(ME.name); $("matchAv").textContent = ini(u.name); $("matchAv").style.background = g(u.id); $("matchName").textContent = u.name + " liked you back too 💜"; $("matchPop").classList.add("show"); }
   $("matchKeep").addEventListener("click", function () { $("matchPop").classList.remove("show"); });
   $("matchChat").addEventListener("click", function () { $("matchPop").classList.remove("show"); if (matchWith) { showTab("chats"); openChat({ id: matchWith.id, mid: pairId(UID, matchWith.id), name: matchWith.name }); } });
 
@@ -414,11 +414,11 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     return setDoc(doc(db, "presence", UID), { lat: round2(lat), lng: round2(lng), name: ME.name, age: ME.age, work: ME.work || "", city: ME.city || "", updatedAt: serverTimestamp() });
   }
   function shareLocation() {
-    toast("Location maangi ja rahi hai...");
+    toast("Requesting location...");
     getPos(function (lat, lng) { publishPresence(lat, lng).then(function () { $("locToggle").classList.add("on"); loadNearby(); toast("Location ON"); }).catch(function (e) { toast(errMsg(e)); }); },
-      function () { toast("Location ki permission nahi mili. Browser/phone settings me allow karo."); });
+      function () { toast("Location permission was not granted. Allow it in your browser/phone settings."); });
   }
-  function stopShare() { return deleteDoc(doc(db, "presence", UID)).then(function () { $("locToggle").classList.remove("on"); toast("Location sharing band"); }).catch(function (e) { toast(errMsg(e)); }); }
+  function stopShare() { return deleteDoc(doc(db, "presence", UID)).then(function () { $("locToggle").classList.remove("on"); toast("Location sharing turned off"); }).catch(function (e) { toast(errMsg(e)); }); }
   function refreshLocToggle() { getDoc(doc(db, "presence", UID)).then(function (s) { $("locToggle").classList.toggle("on", s.exists()); }).catch(function () {}); }
   var nearUnsub = null, nearTimer = null;
   function stopNearby() { if (nearUnsub) { nearUnsub(); nearUnsub = null; } clearInterval(nearTimer); nearTimer = null; }
@@ -454,18 +454,18 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
           rows.sort(function (a, b) { return a.km - b.km; });
           list.innerHTML = "";
           if (!rows.length) {
-            var em = el('<div class="empty">Abhi aas-paas (50 km) koi aur opt-in user nahi. Doston ko bulao! 👋<br><button class="btn-grad" id="nearInvite" style="margin-top:12px;padding:11px 18px">📨 Invite bhejo</button></div>'); list.appendChild(em); em.querySelector("#nearInvite").addEventListener("click", invite);
-            if (farCount) list.appendChild(el('<div class="cr-row" style="margin-top:10px;color:var(--faint)">⭐ ' + farCount + ' log 50 km se door bhi opt-in hain — Premium wale members ko doori ki limit nahi hoti, saare opt-in log dikhte hain. Premium Pulse team activate karti hai, payment confirm hone ke baad.</div>'));
+            var em = el('<div class="empty">No other opted-in users nearby (50 km) yet. Invite your friends! 👋<br><button class="btn-grad" id="nearInvite" style="margin-top:12px;padding:11px 18px">📨 Send invite</button></div>'); list.appendChild(em); em.querySelector("#nearInvite").addEventListener("click", invite);
+            if (farCount) list.appendChild(el('<div class="cr-row" style="margin-top:10px;color:var(--faint)">⭐ ' + farCount + ' people are opted in beyond 50 km too — Premium members have no distance limit and see everyone opted in. Premium is activated by the Pulse team after payment is confirmed.</div>'));
             return;
           }
-          list.appendChild(el('<div class="section-title">' + (myPremium ? "Aas-paas · " + rows.length + " log (live) ⭐ Premium: door tak bhi" : "Abhi aas-paas · " + rows.length + " log (live)") + '</div>'));
-          if (!myPremium && farCount) list.appendChild(el('<div class="cr-row" style="color:var(--faint);font-size:12px;margin-bottom:4px">+' + farCount + ' log 50 km se door bhi opt-in hain. ⭐ Premium lekar unhe bhi dekho — Pulse team payment confirm hone par activate karti hai.</div>'));
+          list.appendChild(el('<div class="section-title">' + (myPremium ? "Nearby · " + rows.length + " people (live) ⭐ Premium: further too" : "Nearby right now · " + rows.length + " people (live)") + '</div>'));
+          if (!myPremium && farCount) list.appendChild(el('<div class="cr-row" style="color:var(--faint);font-size:12px;margin-bottom:4px">+' + farCount + ' people are opted in beyond 50 km too. ⭐ Get Premium to see them too — the Pulse team activates it once payment is confirmed.</div>'));
           rows.slice(0, 50).forEach(function (r) {
-            var dist = r.km < 1 ? "1 km se kam" : "~" + Math.round(r.km) + " km";
+            var dist = r.km < 1 ? "less than 1 km" : "~" + Math.round(r.km) + " km";
             var row = el('<div class="nearby-row" data-uid="' + esc(r.id) + '"><div class="av-sm" style="width:50px;height:50px;font-size:18px;background:' + g(r.id) + '">' + ini(r.p.name) + '</div><div class="body"><div class="nm">' + esc(r.p.name) + (r.p.age ? ", " + esc(r.p.age) : "") + '</div><div class="meta">📍 ' + dist + ' · ' + esc(r.p.work || r.p.city || "Pulse member") + '</div></div><button class="wave">💬 Chat</button></div>');
             row.querySelector(".wave").addEventListener("click", function () {
               var mt = matchDocs.filter(function (x) { return x.id === r.id; })[0];
-              if (mt) { showTab("chats"); openChat({ id: r.id, mid: mt.mid, name: r.p.name }); } else toast("Pehle Discover me match karo, phir chat khulega 💜");
+              if (mt) { showTab("chats"); openChat({ id: r.id, mid: mt.mid, name: r.p.name }); } else toast("Match in Discover first, then chat will open 💜");
             });
             list.appendChild(row);
           });
@@ -521,14 +521,14 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   }
   // ---- connection pill: Live / Offline ----
   function setLive() { var on = navigator.onLine !== false, p = $("livePill"); p.hidden = !UID; p.classList.toggle("off", !on); $("liveTxt").textContent = on ? "Live" : "Offline"; }
-  window.addEventListener("online", function () { setLive(); toast("Wapas online 🟢"); }); window.addEventListener("offline", function () { setLive(); toast("Internet nahi hai. Message wapas aate hi chale jaayenge."); });
-  // ---- live status: "likh raha hai...", "Dekha", unread ----
+  window.addEventListener("online", function () { setLive(); toast("Back online 🟢"); }); window.addEventListener("offline", function () { setLive(); toast("No internet. Messages will send once it's back."); });
+  // ---- live status: "typing...", "seen", unread ----
   var lastSeenAt = {}, typingSeen = {}, typingUntil = {}, typingT = null, lastTypingSent = 0, typingOn = false;
   function curMatch() { if (!activeChat || activeChat.ai) return null; for (var i = 0; i < matchDocs.length; i++) if (matchDocs[i].mid === activeChat.mid) return matchDocs[i]; return null; }
   function liveStatus() {
     var c = curMatch(); if (!c) return;
     var left = (typingUntil[c.mid] || 0) - Date.now(), typing = left > 0;
-    $("convoStatus").textContent = typing ? "likh raha hai..." : "";
+    $("convoStatus").textContent = typing ? "typing..." : "";
     var body = $("convoBody"), dots = body.querySelector(".typing");
     if (typing && !dots) { body.appendChild(el('<div class="typing"><i></i><i></i><i></i></div>')); body.scrollTop = body.scrollHeight; }
     if (!typing && dots) dots.remove();
@@ -570,21 +570,21 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
       r.addEventListener("click", function () { openChat(c); });
       l.appendChild(r); return r;
     }
-    row(SAATHI, "Dil ki baat karo. Main AI hoon, sunne ke liye yahin hoon 💜", "", true);
+    row(SAATHI, "Talk about what's on your heart. I'm an AI, here to listen 💜", "", true);
     var shown = matchDocs.filter(function (c) { return !blocked.has(c.id); });
     shown.forEach(function (c) {
-      var r = row({ id: c.id, mid: c.mid, name: nameCache[c.id] || "..." }, c.last ? ((c.lastFrom === UID ? "Aap: " : "") + c.last) : "Match ho gaya! Hi bolo 👋", c.last ? hm(c.at) : "");
+      var r = row({ id: c.id, mid: c.mid, name: nameCache[c.id] || "..." }, c.last ? ((c.lastFrom === UID ? "You: " : "") + c.last) : "You matched! Say hi 👋", c.last ? hm(c.at) : "");
       if (c.unread && !(activeChat && activeChat.mid === c.mid)) { r.querySelector(".prev").classList.add("unread"); r.appendChild(el('<span class="unread-dot">•</span>')); }
       if (!nameCache[c.id]) userName(c.id).then(function (n) { r.querySelector(".nm").textContent = n; r.querySelector(".av-sm").textContent = n.charAt(0).toUpperCase(); });
     });
     $("chatDot").hidden = !shown.some(function (c) { return c.unread && !(activeChat && activeChat.mid === c.mid); });
-    if (!shown.length) l.appendChild(el('<div class="empty">Abhi koi chat nahi. Discover me swipe karo. Match hote hi chat yahan khulegi.</div>'));
+    if (!shown.length) l.appendChild(el('<div class="empty">No chats yet. Swipe in Discover — once you match, the chat opens here.</div>'));
   }
 
   function addBubble(m) {
     var sys = $("convoBody").querySelector(".sys"); if (sys) sys.remove();
     var big = !m.img && /^(\p{Extended_Pictographic}|\u200d|\ufe0f|\s){1,3}$/u.test(m.text || "");
-    var b = el('<div class="bubble ' + (m.mine ? "me" : "them") + (big ? " big-emoji" : "") + '">' + (m.img && JPEG.test(m.img) ? '<img class="chat-img" src="' + m.img + '" alt="photo">' : "") + (m.img ? "" : esc(m.text)) + (m.warn ? '<span class="warn">⚠️ Savdhan: paisa, OTP ya bank details kabhi mat bhejo. Shak ho to Report karo.</span>' : '') + '<span class="t">' + hm(m.at) + '</span></div>');
+    var b = el('<div class="bubble ' + (m.mine ? "me" : "them") + (big ? " big-emoji" : "") + '">' + (m.img && JPEG.test(m.img) ? '<img class="chat-img" src="' + m.img + '" alt="photo">' : "") + (m.img ? "" : esc(m.text)) + (m.warn ? '<span class="warn">⚠️ Caution: never share money, OTPs or bank details. If something feels off, use Report.</span>' : '') + '<span class="t">' + hm(m.at) + '</span></div>');
     var im = b.querySelector(".chat-img"); if (im) im.addEventListener("click", function () { viewImg(m.img); });
     $("convoBody").appendChild(b); $("convoBody").scrollTop = $("convoBody").scrollHeight; return b;
   }
@@ -593,21 +593,21 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     closeMsgListener(); if (!c.ai && nameCache[c.id]) c.name = nameCache[c.id]; activeChat = c;
     if (!c.ai && (!c.name || c.name === "...")) userName(c.id).then(function (n) { c.name = n; if (activeChat === c) { $("convoName").textContent = n; $("convoAv").textContent = ini(n); } });
     var av = $("convoAv"); av.textContent = c.ai ? "✦" : ini(c.name); av.style.background = g(c.id);
-    $("convoName").innerHTML = esc(c.name) + creatorBadge(c) + (c.ai ? '<span class="ai-pill">AI</span>' : ""); $("convoStatus").textContent = c.ai ? "Hamesha online" : "";
+    $("convoName").innerHTML = esc(c.name) + creatorBadge(c) + (c.ai ? '<span class="ai-pill">AI</span>' : ""); $("convoStatus").textContent = c.ai ? "Always online" : "";
     $("moreBtn").hidden = !!c.ai; $("medBar").hidden = true; $("callBtn").hidden = $("wtBtn").hidden = !!c.ai;
     var body = $("convoBody"); body.innerHTML = "";
     if (c.ai) {
-      body.appendChild(el('<div class="ai-note">✦ Saathi ek AI companion hai, asli insaan nahi. Ye baat karne aur sunne ke liye hai, doctor ya counsellor ka vikalp nahi. Zyada pareshan ho to kisi apne se ya helpline se zaroor baat karo.</div>'));
+      body.appendChild(el('<div class="ai-note">✦ Saathi is an AI companion, not a real person. It\'s here to talk and listen — not a substitute for a doctor or counsellor. If you\'re struggling, please talk to someone close to you or a helpline.</div>'));
       getDocs(query(collection(db, "users", UID, "saathi"), orderBy("createdAt", "asc"), limit(60))).then(function (s) {
         if (activeChat !== c) return;
         saathiHist = [];
-        if (s.empty) addBubble({ mine: false, text: (getLang() === "en" ? "Hello " : "Namaste ") + ME.name + " 🙏 Main Saathi hoon, ek AI. Din kaisa raha?", at: Date.now() });
+        if (s.empty) addBubble({ mine: false, text: "Hello " + ME.name + " 🙏 I'm Saathi, an AI. How was your day?", at: Date.now() });
         s.forEach(function (d) { var m = snapData(d); addBubble({ mine: m.role === "user", text: m.text, at: ms(m.createdAt) }); saathiHist.push({ role: m.role === "user" ? "user" : "model", text: m.text }); });
       }).catch(function () {});
     } else {
       msgUnsub = onSnapshot(query(collection(db, "matches", c.mid, "messages"), orderBy("createdAt", "asc"), limit(200)), function (s) {
         body.innerHTML = "";
-        if (s.empty) body.appendChild(el('<div class="sys">Match ho gaya! Pehla message aap bhejo 👋</div>'));
+        if (s.empty) body.appendChild(el('<div class="sys">You matched! Send the first message 👋</div>'));
         var med = { state: "off" }, hist = [];
         s.forEach(function (d) {
           var m = snapData(d); if (m.call && m.call.k === "answer") return;
@@ -629,15 +629,15 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   $("convoBack").addEventListener("click", function () { setTyping(false); $("convo").classList.remove("open"); closeMsgListener(); activeChat = null; renderChats(); });
 
   var saathiHist = [], fbIdx = 0, saathiBusy = false;
-  var SAATHI_SYS = "Tum 'Saathi' ho, Pulse app ka AI companion. Tum ek AI ho, insaan nahi: kabhi insaan hone ka, asli girlfriend/boyfriend hone ka ya bhavnayein 'mehsoos' karne ka dava mat karo; agar koi puche to saaf batao ki tum AI ho. Hinglish me (Roman Hindi) chhote, garm, natural jawab do: 2-4 vakya, kabhi-kabhi ek emoji. Pehle suno aur samjho, phir ek halka sawaal ya chhota sujhaav do. Har baar alag shabdon me bolo, pichhla jawab dohrao mat. Tum doctor/therapist nahi ho; dawa, diagnosis ya kanooni salaah mat do. Gaali, hinsa, nafrat ya vayask-yaun baatein nahi. Koi phone number, address ya doosre logon ki niji jaankari mat maango ya dedo. Agar user khud ko nuksan pahunchane ki baat kare to pyaar se kaho ki kisi apne se ya helpline se turant baat kare.";
+  var SAATHI_SYS = "You are 'Saathi', the Pulse app's AI companion. You are an AI, not a person: never claim to be human, to be a real girlfriend/boyfriend, or to 'feel' emotions; if asked, say plainly that you are an AI. Reply in short, warm, natural English: 2-4 sentences, occasionally one emoji. Listen and understand first, then ask a gentle question or offer a small suggestion. Use different words each time, don't repeat your previous reply. You are not a doctor/therapist; don't give medication, diagnosis or legal advice. No abuse, violence, hate or adult/sexual content. Never ask for or share phone numbers, addresses or other people's private information. If the user talks about harming themselves, gently tell them to talk to someone close to them or a helpline right away.";
   var CRISIS = /(suicide|sucide|khudkushi|khud\s*kushi|mar\s*jana|marna\s*chahta|marna\s*chahti|jaan\s*de|jeena\s*nahi|jeene\s*ka\s*mann\s*nahi|zindagi\s*khatam|khud\s*ko\s*(khatam|nuksan|hurt|maar)|end\s*my\s*life|kill\s*myself|self[\s-]*harm)/i;
-  var CRISIS_REPLY = "Mujhe aapki fikr ho rahi hai, aur aap ye baat share kar paaye, ye zaroori hai. 💜 Main AI hoon aur is waqt aapko asli insaan ka saath chahiye. Abhi kisi apne ko phone karo ya unke paas chale jao, aur apne sheher ki madad-sewa se baat karo. Kya aap abhi surakshit jagah par ho?";
+  var CRISIS_REPLY = "I'm concerned about you, and it matters that you were able to share this. 💜 I'm an AI, and right now you need the support of a real person. Please call someone close to you or go to them right now, and reach out to a helpline in your city. Are you in a safe place right now?";
   var OFFLINE = [
-    function (t) { return "Aapne kaha: \"" + t.slice(0, 40) + (t.length > 40 ? "..." : "") + "\". Ye sunke dhyaan aaya. Is baat me sabse bhaari kya lag raha hai? 💜"; },
-    function () { return "Main samajh raha hoon. Chalo ek chhoti si cheez: abhi 3 gehri saansein lo, phir mujhe bataao kya sabse pehle theek karna chahoge? 🌱"; },
-    function () { return "Bilkul, aap jaldi mein nahi ho. Is baat ka koi ek pal batao jab sab thoda halka laga tha? ✨"; },
-    function () { return "Ye bahut kuch hai sambhalne ko. Isme se kaunsi cheez aapke control me hai aur kaunsi nahi? 🤝"; },
-    function () { return "Sun raha hoon. Thoda aur khol ke bataoge? Kab se aisa lag raha hai? 🙂"; }
+    function (t) { return "You said: \"" + t.slice(0, 40) + (t.length > 40 ? "..." : "") + "\". That caught my attention. What feels heaviest about this? 💜"; },
+    function () { return "I hear you. Let's try something small: take 3 deep breaths right now, then tell me what you'd want to fix first. 🌱"; },
+    function () { return "That's okay, there's no rush. Can you tell me about one moment when things felt a little lighter? ✨"; },
+    function () { return "That's a lot to carry. Which part of it is within your control, and which isn't? 🤝"; },
+    function () { return "I'm listening. Could you open up a bit more? Since when has this been feeling this way? 🙂"; }
   ];
   function offlineReply(t) { var r = OFFLINE[fbIdx++ % OFFLINE.length](t); return r; }
   function saathiTalk(c, t) {
@@ -650,13 +650,13 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     if (saathiBusy) return; saathiBusy = true;
     var typing = el('<div class="typing"><i></i><i></i><i></i></div>'); $("convoBody").appendChild(typing); $("convoBody").scrollTop = 1e9;
     var bub = null;
-    aiChat(SAATHI_SYS + " User ka naam: " + ME.name + ".", saathiHist.slice(-12), function (part) {
+    aiChat(SAATHI_SYS + " User's name: " + ME.name + ".", saathiHist.slice(-12), function (part) {
       if (activeChat !== c) return; typing.remove();
       if (!bub) bub = addBubble({ mine: false, text: part, at: Date.now() });
       else { bub.firstChild.nodeValue = part; $("convoBody").scrollTop = 1e9; }
     }).then(function (full) { typing.remove(); $("convoStatus").textContent = "AI online ✦"; if (activeChat === c && !bub) addBubble({ mine: false, text: full, at: Date.now() }); finish(full); })
       .catch(function () {
-        typing.remove(); var r = offlineReply(t); $("convoStatus").textContent = "AI band: simple jawab";
+        typing.remove(); var r = offlineReply(t); $("convoStatus").textContent = "AI offline: simple reply";
         if (activeChat === c) { if (bub) bub.remove(); addBubble({ mine: false, text: r, at: Date.now() }); } finish(r);
       });
   }
@@ -670,7 +670,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     b.set(mref, { from: UID, text: t, createdAt: serverTimestamp() });
     var upd = { lastText: t, lastAt: serverTimestamp(), lastFrom: UID }; upd["typing_" + UID] = null; typingOn = false; lastTypingSent = 0;
     b.update(doc(db, "matches", c.mid), upd);
-    b.commit().then(function () { bump("cMsgs"); }).catch(function (e) { toast(e && e.code === "permission-denied" ? "Ye user available nahi hai" : errMsg(e)); });
+    b.commit().then(function () { bump("cMsgs"); }).catch(function (e) { toast(e && e.code === "permission-denied" ? "This user is not available" : errMsg(e)); });
   }
   $("sendBtn").addEventListener("click", sendMsg);
   $("msgInput").addEventListener("keydown", function (e) { if (e.key === "Enter") sendMsg(); });
@@ -684,7 +684,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     var box = el('<div class="ai-note safety">' + esc(u.name) + ' ke saath: <button class="btn-outline" id="doBlock" style="margin:8px 4px 0;padding:8px 14px">Block karo</button><button class="btn-outline" id="doReport" style="margin:8px 4px 0;padding:8px 14px">Report karo</button><button class="btn-outline" id="doMeet" style="margin:8px 4px 0;padding:8px 14px">📍 Safe meet</button><div style="font-size:12px;margin-top:8px;color:var(--muted)">Pehli mulaqat: din me, public jagah, kisi apne ko batakar.</div></div>');
     body.appendChild(box); body.scrollTop = 1e9;
     $("doBlock").addEventListener("click", function () {
-      setDoc(doc(db, "blocks", UID + "_" + u.id), { blocker: UID, blocked: u.id, createdAt: serverTimestamp() }).then(function () { blocked.add(u.id); toast("Block kar diya"); $("convo").classList.remove("open"); closeMsgListener(); activeChat = null; renderChats(); }).catch(function (e) { toast(errMsg(e)); });
+      setDoc(doc(db, "blocks", UID + "_" + u.id), { blocker: UID, blocked: u.id, createdAt: serverTimestamp() }).then(function () { blocked.add(u.id); toast("Blocked"); $("convo").classList.remove("open"); closeMsgListener(); activeChat = null; renderChats(); }).catch(function (e) { toast(errMsg(e)); });
     });
     $("doMeet").addEventListener("click", function () { safeMeet(u); });
     $("doReport").addEventListener("click", function () {
@@ -709,9 +709,9 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     return { title: clean(j.title, 60) || "Meri dhun", minor: !!j.minor, bpm: +j.bpm || 0, lines: lines };
   }
   function showSong(meta) {
-    player.stop(); $("stPlay").textContent = "▶ Chalao"; $("stBar").style.width = "0";
+    player.stop(); $("stPlay").textContent = "▶ Play"; $("stBar").style.width = "0";
     curMeta = meta; curSong = buildSong({ genre: meta.genre, bpm: meta.bpm, minor: meta.minor, title: meta.title, lines: meta.lines });
-    $("stTitle").textContent = meta.title; $("stMeta").textContent = GENRES[meta.genre].name + " · " + curSong.bpm + " BPM · " + Math.round(curSong.duration) + " sec · AI bol + browser me bani dhun";
+    $("stTitle").textContent = meta.title; $("stMeta").textContent = GENRES[meta.genre].name + " · " + curSong.bpm + " BPM · " + Math.round(curSong.duration) + " sec · AI lyrics + tune made in your browser";
     var box = $("stLyrics"); box.innerHTML = ""; var last = "";
     meta.lines.forEach(function (l, i) { if (l.section !== last) { box.appendChild(el('<div class="sec">' + esc(l.section) + '</div>')); last = l.section; } box.appendChild(el('<div class="ln" data-i="' + i + '">' + esc(l.text) + '</div>')); });
     $("stResult").hidden = false;
@@ -725,34 +725,34 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   }
   $("stMake").addEventListener("click", function () {
     var idea = clean($("stPrompt").value, 300), genre = $("stGenre").value, mood = $("stMood").value, btn = this;
-    if (!idea) { toast("Pehle gaane ka idea likho"); return; }
-    btn.disabled = true; $("stNote").textContent = "AI bol likh raha hai...";
-    aiJson(SONG_SYS, "Idea: " + idea + "\nGenre: " + GENRES[genre].name + (mood ? "\nMood: " + mood : "")).then(normSong).then(function (sp) { if (!sp) throw new Error("bad"); $("stNote").textContent = "AI ne bol likhe ✦"; return sp; })
-      .catch(function () { $("stNote").textContent = "AI abhi band hai, isliye simple template se bana. (Firebase me AI Logic ON karoge to asli AI bol aayenge.)"; return fallbackSong(idea, genre, mood); })
+    if (!idea) { toast("Type a song idea first"); return; }
+    btn.disabled = true; $("stNote").textContent = "AI is writing the lyrics...";
+    aiJson(SONG_SYS, "Idea: " + idea + "\nGenre: " + GENRES[genre].name + (mood ? "\nMood: " + mood : "")).then(normSong).then(function (sp) { if (!sp) throw new Error("bad"); $("stNote").textContent = "AI wrote the lyrics ✦"; return sp; })
+      .catch(function () { $("stNote").textContent = "AI is off right now, so this was made from a simple template. (Turn on AI Logic in Firebase for real AI-written lyrics.)"; return fallbackSong(idea, genre, mood); })
       .then(function (sp) { var meta = { title: sp.title, genre: genre, bpm: sp.bpm, minor: sp.minor, lines: sp.lines }; showSong(meta); saveLib(meta); })
       .catch(function (e) { toast(errMsg(e)); }).then(function () { btn.disabled = false; });
   });
   function speak(t) { try { if ($("stVoice").checked && window.speechSynthesis) { speechSynthesis.cancel(); var u = new SpeechSynthesisUtterance(t); u.lang = "hi-IN"; u.rate = 0.9; u.pitch = 1.05; speechSynthesis.speak(u); } } catch (e) {} }
   $("stPlay").addEventListener("click", function () {
     if (!curSong) return;
-    if (player.playing) { player.stop(); try { speechSynthesis.cancel(); } catch (e) {} this.textContent = "▶ Chalao"; return; }
-    var btn = this; btn.textContent = "⏹ Roko";
+    if (player.playing) { player.stop(); try { speechSynthesis.cancel(); } catch (e) {} this.textContent = "▶ Play"; return; }
+    var btn = this; btn.textContent = "⏹ Stop";
     bump("cSongs");
     player.play(curSong, {
       onLine: function (i) { document.querySelectorAll("#stLyrics .ln").forEach(function (n) { n.classList.toggle("on", +n.getAttribute("data-i") === i); }); if (i >= 0) speak(curMeta.lines[i].text); },
       onTick: function (s, t) { $("stBar").style.width = Math.min(100, s / t * 100) + "%"; },
-      onEnd: function () { btn.textContent = "▶ Chalao"; $("stBar").style.width = "0"; }
-    }).catch(function (e) { btn.textContent = "▶ Chalao"; toast(errMsg(e)); });
+      onEnd: function () { btn.textContent = "▶ Play"; $("stBar").style.width = "0"; }
+    }).catch(function (e) { btn.textContent = "▶ Play"; toast(errMsg(e)); });
   });
   $("stWav").addEventListener("click", function () {
-    if (!curSong) return; var btn = this; btn.disabled = true; btn.textContent = "Ban raha hai...";
-    renderWav(curSong).then(function (r) { var a = document.createElement("a"); a.href = URL.createObjectURL(r.blob); a.download = (curMeta.title || "pulse-gaana").replace(/[^\w\-]+/g, "_") + ".wav"; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000); toast("WAV download ho gaya ⬇"); })
+    if (!curSong) return; var btn = this; btn.disabled = true; btn.textContent = "Creating...";
+    renderWav(curSong).then(function (r) { var a = document.createElement("a"); a.href = URL.createObjectURL(r.blob); a.download = (curMeta.title || "pulse-gaana").replace(/[^\w\-]+/g, "_") + ".wav"; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000); toast("WAV downloaded ⬇"); })
       .catch(function (e) { toast(errMsg(e)); }).then(function () { btn.disabled = false; btn.textContent = "⬇ WAV"; });
   });
   $("stPost").addEventListener("click", function () {
     if (!curMeta) return; var btn = this; btn.disabled = true;
     var txt = clean("🎵 " + curMeta.title + " (" + GENRES[curMeta.genre].name + ", Pulse Gaana Studio AI)\n" + curMeta.lines.slice(0, 4).map(function (l) { return l.text; }).join(" / "), 500);
-    addDoc(collection(db, "posts"), { uid: UID, name: ME.name, text: txt, likedBy: [], createdAt: serverTimestamp() }).then(function () { toast("Feed pe post ho gaya 🎉"); bump("cPosts"); }).catch(function (e) { toast(errMsg(e)); }).then(function () { btn.disabled = false; });
+    addDoc(collection(db, "posts"), { uid: UID, name: ME.name, text: txt, likedBy: [], createdAt: serverTimestamp() }).then(function () { toast("Posted to feed 🎉"); bump("cPosts"); }).catch(function (e) { toast(errMsg(e)); }).then(function () { btn.disabled = false; });
   });
 
   // ---- Voice/video call + walkie-talkie (WebRTC; signaling Firestore messages se) ----
@@ -801,12 +801,12 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     } else if (st === "disconnected") {
       // Network hichki -- turant call mat kaato, kuch second recover hone do (jaise WhatsApp/Meet karte hain)
       if (CALL.connected && !discoTimer) {
-        $("callSub").textContent = "Reconnect ho raha hai...";
+        $("callSub").textContent = "Reconnecting...";
         try { if (CALL.pc && CALL.pc.restartIce) CALL.pc.restartIce(); } catch (e) {}
-        discoTimer = setTimeout(function () { if (CALL && !CALL.ending) endCall(true, "Connection toot gaya (network)."); }, 15000);
+        discoTimer = setTimeout(function () { if (CALL && !CALL.ending) endCall(true, "Connection lost (network)."); }, 15000);
       }
     } else if ((st === "failed" || st === "closed") && !CALL.ending) {
-      endCall(true, "Connection nahi ban paya (network). Dobara try karo.");
+      endCall(true, "Could not connect (network issue). Please try again.");
     }
   }
   function setMic(on) { if (CALL && CALL.stream) CALL.stream.getAudioTracks().forEach(function (t) { t.enabled = on; }); }
@@ -816,27 +816,27 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     cur.unsub = onSnapshot(query(collection(db, "matches", cur.mid, "messages"), orderBy("createdAt", "desc"), limit(8)), function (s) {
       s.forEach(function (d) {
         var m = d.data(); if (!m.call || m.call.id !== cur.id || m.from === UID || CALL !== cur) return;
-        if (m.call.k === "answer" && cur.role === "out" && !cur.answered && cur.pc) { cur.answered = true; Call.applyAnswer(cur.pc, m.call.sdp).catch(function () { endCall(true, "Call jud nahi paayi"); }); }
-        if (m.call.k === "end") endCall(false, cur.connected ? "Call khatam" : "Call nahi uthi");
+        if (m.call.k === "answer" && cur.role === "out" && !cur.answered && cur.pc) { cur.answered = true; Call.applyAnswer(cur.pc, m.call.sdp).catch(function () { endCall(true, "Call could not connect"); }); }
+        if (m.call.k === "end") endCall(false, cur.connected ? "Call ended" : "Call not answered");
       });
     });
   }
   var CALL_LABEL = { call: "📞 Voice call", walkie: "📻 Walkie-talkie", video: "🎥 Video call" };
   function startCall(mode) {
     if (!activeChat || activeChat.ai || CALL) return;
-    if (!Call.supported()) { toast("Is browser me call nahi chalti. Chrome/Android app use karo."); return; }
+    if (!Call.supported()) { toast("Calls don't work in this browser. Please use Chrome or the Android app."); return; }
     var c = activeChat, id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6), isVideo = mode === "video";
     Call.getMedia(isVideo).then(function (stream) {
       CALL = { mid: c.mid, id: id, role: "out", mode: mode, stream: stream, name: c.name, peer: c.id };
-      callSetup(c.name, "Ring ho rahi hai...", { walkie: mode === "walkie", video: isVideo });
+      callSetup(c.name, "Ringing...", { walkie: mode === "walkie", video: isVideo });
       if (isVideo) { var lv = $("callLocalVideo"); lv.srcObject = stream; lv.play().catch(function () {}); }
       return Call.makeOffer(stream, onRemote, onState).then(function (o) {
         if (!CALL || CALL.id !== id) { o.pc.close(); return; }
         CALL.pc = o.pc; watchCall();
-        CALL.timeout = setTimeout(function () { if (CALL && CALL.id === id && !CALL.connected) endCall(true, "Jawab nahi mila"); }, 45000);
+        CALL.timeout = setTimeout(function () { if (CALL && CALL.id === id && !CALL.connected) endCall(true, "No answer"); }, 45000);
         return callMsg(c.mid, CALL_LABEL[mode] || CALL_LABEL.call, { k: "offer", id: id, mode: mode, sdp: o.sdp }, true).then(function (r) { bump("cCalls"); return r; });
       });
-    }).catch(function (e) { endCall(false); toast(e && e.name === "NotAllowedError" ? (isVideo ? "Camera/Mic ki permission chahiye. Browser settings me allow karo." : "Mic ki permission chahiye. Browser settings me allow karo.") : errMsg(e)); });
+    }).catch(function (e) { endCall(false); toast(e && e.name === "NotAllowedError" ? (isVideo ? "Camera/mic permission is needed. Allow it in your browser settings." : "Mic permission is needed. Allow it in your browser settings.") : errMsg(e)); });
   }
   function endCall(notify, msg) {
     var c = CALL; if (!c) return; c.ending = true; CALL = null; clearInterval(callTick); clearTimeout(c.timeout); clearTimeout(discoTimer); discoTimer = null; stopWatermark();
@@ -856,27 +856,27 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
       if (!offer || ended[offer.id]) return;
       userName(other).then(function (n) {
         if (CALL) return; CALL = { mid: mid, id: offer.id, role: "in", mode: offer.mode, offer: offer.sdp, name: n, peer: other };
-        var sub = offer.mode === "walkie" ? "📻 Walkie-talkie aa raha hai" : offer.mode === "video" ? "🎥 Video call aa rahi hai" : "📞 Aapko call aa rahi hai";
+        var sub = offer.mode === "walkie" ? "📻 Walkie-talkie incoming" : offer.mode === "video" ? "🎥 Incoming video call" : "📞 Incoming call";
         callSetup(n, sub, { incoming: true, video: offer.mode === "video" }); try { navigator.vibrate && navigator.vibrate([300, 150, 300]); } catch (e) {}
         watchCall(); CALL.timeout = setTimeout(function () { if (CALL && CALL.id === offer.id && !CALL.connected) endCall(false, "Missed call"); }, 40000);
       });
     }).catch(function () {});
   }
   $("callAccept").addEventListener("click", function () {
-    var c = CALL; if (!c || c.role !== "in") return; this.hidden = true; $("callSub").textContent = "Jud rahe hain..."; var isVideo = c.mode === "video";
+    var c = CALL; if (!c || c.role !== "in") return; this.hidden = true; $("callSub").textContent = "Connecting..."; var isVideo = c.mode === "video";
     Call.getMedia(isVideo).then(function (stream) {
       c.stream = stream;
       if (isVideo) { var lv = $("callLocalVideo"); lv.srcObject = stream; lv.hidden = false; lv.play().catch(function () {}); $("callRemoteVideo").hidden = false; $("callUI").classList.add("video-on"); }
       return Call.makeAnswer(stream, c.offer, onRemote, onState);
     })
       .then(function (a) { c.pc = a.pc; $("callMute").hidden = c.mode === "walkie"; $("ptt").hidden = c.mode !== "walkie"; $("callCam").hidden = !isVideo; return callMsg(c.mid, "📞 Jawab", { k: "answer", id: c.id, sdp: a.sdp }, false); })
-      .catch(function (e) { endCall(true); toast(e && e.name === "NotAllowedError" ? (isVideo ? "Camera/Mic ki permission chahiye" : "Mic ki permission chahiye") : errMsg(e)); });
+      .catch(function (e) { endCall(true); toast(e && e.name === "NotAllowedError" ? (isVideo ? "Camera/mic permission is needed" : "Mic permission is needed") : errMsg(e)); });
   });
   $("callEnd").addEventListener("click", function () { endCall(true); });
   $("callMute").addEventListener("click", function () { if (!CALL) return; var on = this.classList.toggle("on"); setMic(!on); this.textContent = on ? "Unmute" : "Mute"; });
   $("callCam").addEventListener("click", function () { if (!CALL) return; var off = this.classList.toggle("on"); setCam(!off); this.textContent = off ? "Camera on" : "Camera off"; });
   document.addEventListener("visibilitychange", function () { Call.reacquireWakeLockIfNeeded(); });
-  (function () { var p = $("ptt"); function dn(e) { e.preventDefault(); setMic(true); p.classList.add("live"); p.textContent = "🎙 Bol rahe ho..."; } function up() { setMic(false); p.classList.remove("live"); p.textContent = "🎙 Dabake bolo"; }
+  (function () { var p = $("ptt"); function dn(e) { e.preventDefault(); setMic(true); p.classList.add("live"); p.textContent = "🎙 Speaking..."; } function up() { setMic(false); p.classList.remove("live"); p.textContent = "🎙 Hold to talk"; }
     p.addEventListener("pointerdown", dn); p.addEventListener("pointerup", up); p.addEventListener("pointerleave", up); p.addEventListener("pointercancel", up); })();
   $("callBtn").addEventListener("click", function () { startCall("call"); });
   $("videoCallBtn").addEventListener("click", function () { startCall("video"); });
@@ -901,16 +901,16 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     else h = '<span class="tx">✅ Mediator ON (dono ki marzi). Kabhi bhi band kar sakte ho.</span><button id="medHelp">Madad maango</button><button class="o" id="medOff">Band karo</button>';
     bar.innerHTML = h; bar.hidden = false;
     var q = function (id, f) { var n = $(id); if (n) n.addEventListener("click", f); };
-    q("medAsk", function () { medMsg(c.mid, "Mediator ki request bheji gayi. Doosre ki haan chahiye.", { k: "ask" }, true); });
+    q("medAsk", function () { medMsg(c.mid, "Mediator request sent. Waiting for the other person to agree.", { k: "ask" }, true); });
     q("medYes", function () { medMsg(c.mid, "Dono ne haan kaha. AI Mediator ON.", { k: "yes" }, true); });
     q("medNo", function () { medMsg(c.mid, "Mediator ki request radd.", { k: "no" }, false); });
-    q("medOff", function () { medMsg(c.mid, "Mediator band kar diya gaya.", { k: "off" }, false); });
+    q("medOff", function () { medMsg(c.mid, "Mediator turned off.", { k: "off" }, false); });
     q("medHelp", function () { mediate(c); });
   }
   var medBusy = false;
   function mediate(c) {
-    if (medBusy || !c.hist || !c.hist.length) { toast(c.hist && c.hist.length ? "Ruko..." : "Pehle thodi baat to karo"); return; }
-    medBusy = true; var btn = $("medHelp"); if (btn) { btn.disabled = true; btn.textContent = "Soch raha hai..."; }
+    if (medBusy || !c.hist || !c.hist.length) { toast(c.hist && c.hist.length ? "Please wait..." : "Chat a bit first"); return; }
+    medBusy = true; var btn = $("medHelp"); if (btn) { btn.disabled = true; btn.textContent = "Thinking..."; }
     var names = {}; names[UID] = ME.name; names[c.id] = c.name;
     var tr = c.hist.slice(-12).map(function (m) { return (names[m.from] || "?") + ": " + m.text; }).join("\n");
     var fallback = "AI abhi band hai, to ek simple tareeka:\n1) Ek-ek karke apni baat 'main ... mehsoos karta/karti hoon' se shuru karo.\n2) Doosre ko bina beech me toke poora suno.\n3) Jahan sehmat ho wo likho, phir ek chhota hal chuno.\n4) Dhamki ya zabardasti lage to Block/Report karo.";
@@ -918,9 +918,9 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
       .then(function (t) { return medMsg(c.mid, "🤝 AI Mediator: " + t, { k: "say" }, true); }).then(function () { medBusy = false; });
   }
   function safeMeet(u) {
-    var where = window.prompt("Kahan aur kab milna hai? (jaise: Phoenix Mall, Lucknow, kal 5 baje)"); if (!where) return;
-    var text = "Safety check: main " + u.name + " (Pulse match) se milne ja raha/rahi hoon. Jagah/samay: " + where.slice(0, 120) + ". Kripya 1 ghante baad mujhe call karke check karna.";
-    if (navigator.share) navigator.share({ text: text }).catch(function () {}); else if (navigator.clipboard) navigator.clipboard.writeText(text).then(function () { toast("Copy ho gaya. Apne bharose ke insaan ko bhejo 📋"); }); else toast(text);
+    var where = window.prompt("Where and when are you meeting? (e.g. Phoenix Mall, Lucknow, tomorrow 5pm)"); if (!where) return;
+    var text = "Safety check: I'm meeting " + u.name + " (Pulse match). Place/time: " + where.slice(0, 120) + ". Please call to check on me in an hour.";
+    if (navigator.share) navigator.share({ text: text }).catch(function () {}); else if (navigator.clipboard) navigator.clipboard.writeText(text).then(function () { toast("Copied. Send it to someone you trust 📋"); }); else toast(text);
   }
 
   // ---- activity counters (admin monitoring only -- counts, never message content) ----
@@ -1085,11 +1085,11 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     function memberRow(u) {
       var now = Date.now(), last = ms(u.lastSeen), online = last && (now - last) < 180000;
       var joined = u.createdAt ? ago(ms(u.createdAt)) : "—";
-      var active = last ? (online ? "online now 🟢" : ago(last) + " se offline") : "kabhi active nahi hua";
+      var active = last ? (online ? "online now 🟢" : "offline since " + ago(last)) : "never active";
       var isPrem = !!premiumSet[u.id], isBanned = !!bannedSet[u.id];
       var acts = ACTIVITY_FIELDS.filter(function (f) { return +u[f.k] > 0; }).map(function (f) { return u[f.k] + " " + f.lbl; });
       var actLine = acts.length ? acts.join(" · ") : "No activity yet";
-      var row = el('<div class="cr-row" data-notr style="flex-wrap:wrap;gap:4px 10px;align-items:center"><b>' + esc(u.name || "(no name)") + '</b>' + chip(u.mode || "friends") + (u.hidden ? chip("paused") : "") + (u.verified ? ' <span title="Identity verified">✔️</span>' : "") + (isPrem ? chip("⭐ Premium") : "") + (isBanned ? chip("🚫 Banned") : "") + '<span style="color:var(--faint);font-size:12px">joined ' + esc(joined) + ' · ' + esc(active) + '</span><div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap"><button class="btn-outline cm-prem" style="padding:2px 10px">' + (isPrem ? "Premium hatao" : "Premium do") + '</button><button class="btn-outline cm-ban" style="padding:2px 10px">' + (isBanned ? "Unban" : "Ban") + '</button></div><div style="width:100%;color:var(--faint);font-size:12px">' + esc(actLine) + '</div></div>');
+      var row = el('<div class="cr-row" data-notr style="flex-wrap:wrap;gap:4px 10px;align-items:center"><b>' + esc(u.name || "(no name)") + '</b>' + chip(u.mode || "friends") + (u.hidden ? chip("paused") : "") + (u.verified ? ' <span title="Identity verified">✔️</span>' : "") + (isPrem ? chip("⭐ Premium") : "") + (isBanned ? chip("🚫 Banned") : "") + '<span style="color:var(--faint);font-size:12px">joined ' + esc(joined) + ' · ' + esc(active) + '</span><div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap"><button class="btn-outline cm-prem" style="padding:2px 10px">' + (isPrem ? "Remove Premium" : "Grant Premium") + '</button><button class="btn-outline cm-ban" style="padding:2px 10px">' + (isBanned ? "Unban" : "Ban") + '</button></div><div style="width:100%;color:var(--faint);font-size:12px">' + esc(actLine) + '</div></div>');
       row.querySelector(".cm-prem").addEventListener("click", function () {
         var ref = doc(db, "premium", u.id);
         (isPrem ? deleteDoc(ref) : setDoc(ref, { at: serverTimestamp(), by: UID })).then(function () { if (isPrem) delete premiumSet[u.id]; else premiumSet[u.id] = true; toast(isPrem ? "Premium removed" : "Premium granted"); paintMembers(); }).catch(function (e) { toast(errMsg(e)); });
@@ -1592,7 +1592,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   // ---- boot ----
   initI18n(); setMode("login");
   fetch("firebase-config.json", { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (cfg) {
-    if (!cfg.apiKey || /PASTE|YOUR/i.test(cfg.apiKey)) { $("authErr").textContent = "Setup baaki hai: public/firebase-config.json me Firebase ki details bharo."; return; }
+    if (!cfg.apiKey || /PASTE|YOUR/i.test(cfg.apiKey)) { $("authErr").textContent = "Setup incomplete: fill in Firebase details in public/firebase-config.json."; return; }
     init(cfg);
-  }).catch(function () { $("authErr").textContent = "Config nahi mili (firebase-config.json)."; });
+  }).catch(function () { $("authErr").textContent = "Config not found (firebase-config.json)."; });
 })();
