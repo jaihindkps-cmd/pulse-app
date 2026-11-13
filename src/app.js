@@ -183,7 +183,17 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     $("auth").hidden = false; $("authForm").style.display = "none"; $("segBox").style.display = "none"; $("verifyBox").style.display = "";
     $("vMsg").textContent = "Verification mail " + u.email + " par bheji hai. Mail me link par click karo (Spam folder bhi dekho), phir niche button dabao.";
   }
-  function afterAuth(u) {
+  // Network thoda sa bhi hichke (mobile data switch, weak signal) to Firestore ka getDoc()
+  // fail ho sakta hai — isse user ko turant poore login screen pe nahi bhejna (wo "logout ho gaya"
+  // jaisa lagta hai jabki session asli me valid hi hota hai). Aise transient errors pe chup-chaap
+  // kuch baar retry karo, sirf genuine "no profile"/"banned" case me hi login screen dikhao.
+  function isTransientErr(e) {
+    var c = (e && e.code) || "";
+    if (!navigator.onLine) return true;
+    return c === "unavailable" || c === "deadline-exceeded" || c === "resource-exhausted" || c === "cancelled" || c === "internal" || c === "auth/network-request-failed";
+  }
+  function afterAuth(u, attempt) {
+    attempt = attempt || 0;
     if (!u.emailVerified) { showVerify(u); return Promise.resolve(); }
     return getDoc(doc(db, "users", u.uid)).then(function (s) {
       if (!s.exists()) {
@@ -192,7 +202,10 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
         signOut(auth); showForms(); $("auth").hidden = false; $("authErr").textContent = "Profile nahi mili. Naya account banao."; return;
       }
       return getDoc(doc(db, "bans", u.uid)).catch(function () { return { exists: function () { return false; } }; }).then(function (b) { if (b.exists()) { signOut(auth); showForms(); $("auth").hidden = false; $("authErr").textContent = "This account has been suspended for breaking the rules."; return; } showForms(); UID = u.uid; ME = Object.assign({}, s.data(), { uid: UID }); start(); });
-    }).catch(function (e) { showForms(); $("auth").hidden = false; $("authErr").textContent = errMsg(e); });
+    }).catch(function (e) {
+      if (isTransientErr(e) && attempt < 5) { if (attempt === 0) toast("Internet se jud rahe hain..."); setTimeout(function () { afterAuth(u, attempt + 1); }, Math.min(1000 * Math.pow(1.7, attempt), 8000)); return; }
+      showForms(); $("auth").hidden = false; $("authErr").textContent = errMsg(e);
+    });
   }
   var lastSent = 0;
   function sendVerify(u) {
