@@ -433,6 +433,15 @@
   .chat-img { display: block; max-width: 220px; width: 100%; border-radius: 12px; margin-bottom: 4px; cursor: zoom-in; } .bubble.big-emoji { font-size: 38px; background: transparent !important; box-shadow: none; padding: 2px 6px; }
   .imgview { position: absolute; inset: 0; z-index: 95; background: rgba(0,0,0,.92); display: flex; align-items: center; justify-content: center; } .imgview[hidden] { display: none; } .imgview img { max-width: 96%; max-height: 92%; border-radius: 8px; }
   .policy { position: absolute; inset: 0; z-index: 96; background: rgba(0,0,0,.55); display: flex; align-items: flex-end; } .policy[hidden] { display: none; } .policy-box { background: var(--surface); width: 100%; max-height: 85%; overflow-y: auto; border-radius: 22px 22px 0 0; padding: 18px; font-size: 13.5px; line-height: 1.6; } .policy-box h4 { margin: 12px 0 4px; }
+  /* ---------- Status viewer (Stories bar CSS already existed above, unused — wiring it up now) ---------- */
+  .storyview { position: absolute; inset: 0; z-index: 97; background: #000; display: flex; flex-direction: column; } .storyview[hidden] { display: none; }
+  .storyview .sv-top { display: flex; align-items: center; gap: 10px; padding: 14px; }
+  .storyview .sv-meta { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .storyview .sv-meta b { color: #fff; font-size: 14px; }
+  .storyview .sv-meta span { font-size: 11px; color: rgba(255,255,255,.6); }
+  .storyview .sv-body { flex: 1; display: flex; align-items: center; justify-content: center; padding: 16px; overflow: auto; }
+  .storyview .sv-body img { max-width: 100%; max-height: 70vh; border-radius: 12px; }
+  .storyview #svText { color: #fff; font-size: 21px; text-align: center; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
   .bh-hero { text-align: center; background: linear-gradient(160deg, color-mix(in srgb,#ff9a3c 18%, var(--surface)), var(--surface)); } .bh-hero .om { font-size: 54px; line-height: 1; }
   .bh-in { width: 100%; box-sizing: border-box; font-family: var(--font-body); font-size: 15px; color: var(--fg); background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; outline: none; margin-bottom: 10px; resize: none; } .bh-or { color: var(--muted); font-size: 12px; margin: 12px 0; }
   .room { position: absolute; inset: 0; z-index: 85; display: flex; flex-direction: column; color: #fff; overflow: hidden; } .room[hidden] { display: none; }
@@ -498,6 +507,7 @@
 
   <main class="screen" id="screen-feed">
     <div class="daily" id="dailyCard"></div>
+    <div class="stories" id="storiesBar"></div>
     <div class="composer">
       <div class="row"><div class="av-sm" id="meAv" style="background:var(--grad)">K</div>
         <textarea id="composerText" rows="1" maxlength="500" placeholder="Kya chal raha hai?"></textarea></div>
@@ -649,6 +659,24 @@
   <div class="thread" id="thread" hidden><div class="room-top" style="color:var(--fg)"><button class="icon-btn" id="thClose">←</button><div style="flex:1;min-width:0"><div class="rn" id="thTitle">-</div><div class="rs" id="thSub"></div></div></div><div class="th-log" id="thLog"></div><div class="rchat-in" style="padding:10px 12px"><input id="thMsg" maxlength="500" placeholder="Write a message..."><button class="send-btn" id="thSend">➤</button></div></div>
   <div class="imgview" id="imgView" hidden><img id="imgBig" alt=""></div>
   <div class="policy" id="policyUI" hidden><div class="policy-box"><button class="icon-btn" id="policyClose" style="float:right">✕</button><div id="policyText"></div></div></div>
+
+  <div class="policy" id="storyComposerUI" hidden><div class="policy-box">
+    <button class="icon-btn" id="storyComposerClose" style="float:right">✕</button>
+    <div class="section-title" style="margin-top:0">Status lagao</div>
+    <div class="st-note">Dikhega sirf <b id="storyModeHint"></b> wale logon ko — 24 ghante baad khud gayab ho jayega.</div>
+    <textarea id="storyText" rows="3" maxlength="150" placeholder="Kya chal raha hai?" class="bh-in" style="margin:10px 0;width:100%"></textarea>
+    <div id="storyPhotoPreview" style="display:none;margin-bottom:10px;position:relative"><img id="storyPhotoImg" style="max-width:100%;border-radius:12px;display:block"><button class="icon-btn" id="storyPhotoRemove" style="position:absolute;top:6px;right:6px">✕</button></div>
+    <input type="file" id="storyPhotoInput" accept="image/*" hidden>
+    <div class="st-row">
+      <button class="btn-outline" id="storyAddPhoto" type="button" style="padding:8px 14px">📷 Photo</button>
+      <button class="btn-grad" id="storyPostBtn" type="button" style="padding:8px 16px;margin-left:auto">Post karo</button>
+    </div>
+  </div></div>
+
+  <div class="storyview" id="storyViewUI" hidden>
+    <div class="sv-top"><div class="av-sm" id="svAv" style="background:var(--grad)">K</div><div class="sv-meta"><b id="svName"></b><span id="svTime"></span></div><button class="icon-btn" id="svDelete" title="Delete" hidden>🗑</button><button class="icon-btn" id="svClose">✕</button></div>
+    <div class="sv-body"><img id="svPhoto" hidden alt=""><div id="svText"></div></div>
+  </div>
   <div class="callui" id="callUI" hidden><div class="callbox">
     <div class="call-video-wrap" id="callVideoWrap">
       <video id="callRemoteVideo" autoplay playsinline disablePictureInPicture oncontextmenu="return false"></video>
@@ -708,5 +736,5 @@
   <div class="toast" id="toast"></div>
 </div>
 
-<script src="app.js?v=c115fa1616" defer></script>
+<script src="app.js?v=da44a43f46" defer></script>
 <script>if("serviceWorker" in navigator && location.protocol.indexOf("http")===0){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});}</script></body></html>

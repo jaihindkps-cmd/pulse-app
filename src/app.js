@@ -166,7 +166,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     $("pName").innerHTML = esc(ME.name) + creatorBadge(ME); $("pHandle").textContent = ME.city || "";
     $("eName").value = ME.name || ""; $("eCity").value = ME.city || ""; $("eWork").value = ME.work || ""; $("eAbout").value = ME.about || "";
     getDocs(query(collection(db, "blocks"), where("blocker", "==", UID))).then(function (s) { blocked = new Set(); s.forEach(function (d) { blocked.add(d.data().blocked); }); }).catch(function () {}).then(function () {
-      applyMode(); listenApps(); listenReqs(); listenFeed(); listenMatches(); refreshLocToggle(); showTab("feed"); setLive(); paintAv(); creatorPanel(); pendingRoom(); heartbeat(); ensureCreatorFlag();
+      applyMode(); listenApps(); listenReqs(); listenFeed(); listenStories(); listenMatches(); refreshLocToggle(); showTab("feed"); setLive(); paintAv(); creatorPanel(); pendingRoom(); heartbeat(); ensureCreatorFlag();
     });
   }
   // One-time self-write so OTHER members' screens can show the 👑 Creator badge (creatorBadge() below).
@@ -281,6 +281,69 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
       if (!n) f.innerHTML = '<div class="empty">Abhi koi post nahi. Pehli post aap likho! ✍️</div>';
     }, function (e) { toast(errMsg(e)); }));
   }
+
+  // ---- status / stories (24-ghante wali, sirf apne jaise mode wale logon ko dikhti hai) ----
+  var storyGroups = [], myStory = null, storyPhotoData = "";
+  function seenStories() { try { return JSON.parse(localStorage.getItem("pulse_seenStories") || "{}"); } catch (e) { return {}; } }
+  function markSeen(id) { var s = seenStories(); s[id] = Date.now(); var keys = Object.keys(s); if (keys.length > 300) keys.slice(0, keys.length - 300).forEach(function (k) { delete s[k]; }); try { localStorage.setItem("pulse_seenStories", JSON.stringify(s)); } catch (e) {} }
+  function listenStories() {
+    var cutoff = Timestamp.fromMillis(Date.now() - 24 * 3600000);
+    unsubs.push(onSnapshot(query(collection(db, "stories"), where("mode", "==", MODE), where("createdAt", ">=", cutoff), orderBy("createdAt", "desc"), limit(100)), function (snap) {
+      var byUser = {}, mine = null;
+      snap.forEach(function (d) {
+        var s = Object.assign({ id: d.id }, snapData(d)); if (blocked.has(s.uid)) return;
+        if (s.uid === UID) { if (!mine) mine = s; return; }
+        if (!byUser[s.uid]) byUser[s.uid] = s;
+      });
+      myStory = mine; storyGroups = Object.keys(byUser).map(function (k) { return byUser[k]; }).sort(function (a, b) { return ms(b.createdAt) - ms(a.createdAt); });
+      paintStories();
+    }, function () {}));
+  }
+  function paintStories() {
+    var bar = $("storiesBar"); if (!bar) return; bar.innerHTML = "";
+    var seen = seenStories();
+    var mine = el('<div class="story" id="stMine"><div class="ring ' + (myStory ? "" : "add") + '">' + (myStory ? ('<div class="av">' + (myStory.photo ? '' : ini(ME.name)) + '</div>') : '<span class="add-plus">+</span>') + '</div><span>' + (myStory ? "Aap" : "Add status") + '</span></div>');
+    if (myStory && myStory.photo) mine.querySelector(".av").style.background = "center/cover url(" + myStory.photo + ")"; else if (myStory) mine.querySelector(".av").style.background = g(UID);
+    mine.addEventListener("click", function () { if (myStory) openStoryView(myStory, true); else openStoryComposer(); });
+    bar.appendChild(mine);
+    storyGroups.forEach(function (s) {
+      var node = el('<div class="story"><div class="ring ' + (seen[s.id] ? "seen" : "") + '"><div class="av" style="background:' + (s.photo ? ("center/cover url(" + s.photo + ")") : g(s.uid)) + '">' + (s.photo ? "" : ini(s.name)) + '</div></div><span>' + esc(s.name) + '</span></div>');
+      node.addEventListener("click", function () { markSeen(s.id); node.querySelector(".ring").classList.add("seen"); openStoryView(s, false); });
+      bar.appendChild(node);
+    });
+  }
+  function openStoryComposer() {
+    $("storyModeHint").textContent = MODE_LABEL[MODE] || "aapke"; $("storyText").value = ""; storyPhotoData = ""; $("storyPhotoPreview").style.display = "none"; $("storyComposerUI").hidden = false;
+  }
+  $("storyComposerClose").addEventListener("click", function () { $("storyComposerUI").hidden = true; });
+  $("storyAddPhoto").addEventListener("click", function () { $("storyPhotoInput").click(); });
+  $("storyPhotoInput").addEventListener("change", function () {
+    var f = this.files && this.files[0]; this.value = ""; if (!f) return;
+    shrink(f, 640, 0.6).then(function (d) { storyPhotoData = d; $("storyPhotoImg").src = d; $("storyPhotoPreview").style.display = ""; }).catch(function (e) { toast(errMsg(e)); });
+  });
+  $("storyPhotoRemove").addEventListener("click", function () { storyPhotoData = ""; $("storyPhotoPreview").style.display = "none"; });
+  $("storyPostBtn").addEventListener("click", function () {
+    var t = clean($("storyText").value, 150);
+    if (!t && !storyPhotoData) { toast("Kuch likho ya photo lagao"); return; }
+    if (!rate("story", 6, 300000)) return;
+    this.disabled = true; var btn = this;
+    if (t) autoFlag(t, "status");
+    addDoc(collection(db, "stories"), { uid: UID, name: ME.name, mode: MODE, text: t, photo: storyPhotoData, createdAt: serverTimestamp() })
+      .then(function () { $("storyComposerUI").hidden = true; toast("Status lag gaya ✅"); bump("cStatus"); })
+      .catch(function (e) { toast(errMsg(e)); }).then(function () { btn.disabled = false; });
+  });
+  function openStoryView(s, isMine) {
+    $("svAv").style.background = g(s.uid); $("svAv").textContent = ini(s.name); $("svName").textContent = isMine ? "Aapka status" : esc(s.name);
+    $("svTime").textContent = ago(ms(s.createdAt)); $("svDelete").hidden = !isMine;
+    if (s.photo) { $("svPhoto").src = s.photo; $("svPhoto").hidden = false; } else { $("svPhoto").hidden = true; $("svPhoto").src = ""; }
+    $("svText").textContent = s.text || "";
+    $("storyViewUI").hidden = false; $("storyViewUI").dataset.sid = s.id;
+  }
+  $("svClose").addEventListener("click", function () { $("storyViewUI").hidden = true; });
+  $("svDelete").addEventListener("click", function () {
+    var id = $("storyViewUI").dataset.sid; if (!id || !window.confirm("Status delete karein?")) return;
+    deleteDoc(doc(db, "stories", id)).then(function () { $("storyViewUI").hidden = true; toast("Deleted"); }).catch(function (e) { toast(errMsg(e)); });
+  });
 
   // ---- discover ----
   var queue = [], dragging = false, sx = 0, cx = 0, topCard = null, topUser = null, busy = false;
@@ -865,7 +928,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     { k: "cPosts", lbl: "Posts" }, { k: "cMsgs", lbl: "Msgs" }, { k: "cSwipes", lbl: "Swipes" },
     { k: "cMatches", lbl: "Matches" }, { k: "cApps", lbl: "Applications" }, { k: "cJobs", lbl: "Jobs posted" },
     { k: "cCalls", lbl: "Calls" }, { k: "cSongs", lbl: "Songs played" }, { k: "cRooms", lbl: "Aarti rooms" },
-    { k: "cAi", lbl: "AI chats" }
+    { k: "cAi", lbl: "AI chats" }, { k: "cStatus", lbl: "Status posts" }
   ];
 
   // ---- throttle (spam rokne ke liye) ----

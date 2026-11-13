@@ -75,6 +75,21 @@ service cloud.firestore {
       allow delete: if signedIn() && uid == me();
     }
 
+    // Status/Stories: 24-ghante ki ephemeral post, sirf apne "mode" (friends/dating/marriage/
+    // jobseeker/recruiter) ke logon ko dikhti hai — client query + ye rule dono isko lagu karte hain.
+    // Purani (24hr se zyada) stories khud query se chhup jaati hain, delete karna zaroori nahi.
+    match /stories/{id} {
+      allow get: if signedIn();
+      allow list: if signedIn() && resource.data.mode == myMode();
+      allow create: if signedIn() && notBanned() && request.resource.data.uid == me()
+        && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 40
+        && request.resource.data.mode == myMode()
+        && request.resource.data.get('text', '').size() <= 150
+        && request.resource.data.get('photo', '').size() <= 400000
+        && (request.resource.data.get('text', '').size() > 0 || request.resource.data.get('photo', '').size() > 0);
+      allow delete: if signedIn() && (resource.data.uid == me() || isAdmin());
+    }
+
     // Feed
     match /posts/{id} {
       allow read: if signedIn();
