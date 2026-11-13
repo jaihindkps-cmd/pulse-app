@@ -18,6 +18,10 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/swipes/$(a + '_' + b)).data.kind == 'like';
     }
     function isBlocked(a, b) { return exists(/databases/$(database)/documents/blocks/$(a + '_' + b)); }
+    // Dating/Marriage mode me gender zaroori hai (client-side check devtools se bypass ho sakti thi —
+    // ye wahi check server (rules) side pe pakka karti hai, taaki koi bina gender bataye "Show me"
+    // filter ko galat tarike se skip na kar sake).
+    function genderOkFor(data) { return !(data.get('mode', 'friends') in ['dating', 'marriage']) || data.get('gender', '').size() > 0; }
 
     // Profile: sab logged-in log dekh sakte hain, sirf apni badal sakte hain. 18+ zaroori.
     match /users/{uid} {
@@ -27,7 +31,8 @@ service cloud.firestore {
         && request.resource.data.age is number && request.resource.data.age >= 18 && request.resource.data.age <= 99
         && request.resource.data.get('city', '').size() <= 40
         && request.resource.data.get('work', '').size() <= 60
-        && request.resource.data.get('about', '').size() <= 300;
+        && request.resource.data.get('about', '').size() <= 300
+        && genderOkFor(request.resource.data);
       // Normal self-edit (full profile, own uid only) OR admin flipping ONLY the verified/
       // verifyPending flags on SOMEONE ELSE's doc (Identity verification Approve/Reject,
       // and Members panel Ban/Premium never touch this collection at all).
@@ -40,6 +45,7 @@ service cloud.firestore {
           && request.resource.data.get('about', '').size() <= 300
           && request.resource.data.get('photo', '').size() <= 45000
           && request.resource.data.get('mode', 'friends') in ['friends', 'dating', 'marriage', 'jobseeker', 'recruiter']
+          && genderOkFor(request.resource.data)
           && request.resource.data.get('skills', '').size() <= 200 && request.resource.data.get('resume', '').size() <= 200
           && request.resource.data.get('company', '').size() <= 100 && request.resource.data.get('cabout', '').size() <= 300
           && request.resource.data.get('csite', '').size() <= 200 && request.resource.data.get('cvName', '').size() <= 100 && request.resource.data.get('role', '').size() <= 100

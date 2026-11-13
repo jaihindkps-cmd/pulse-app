@@ -1,6 +1,6 @@
 // Pulse (Firebase version): Auth + Firestore + Hosting, sab free (Spark) plan par.
 import { initializeApp } from "firebase/app";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut, deleteUser, sendEmailVerification, sendPasswordResetEmail } from "firebase/auth";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup, signInWithRedirect, getRedirectResult, setPersistence, browserLocalPersistence, GoogleAuthProvider, onAuthStateChanged, signOut, deleteUser, sendEmailVerification, sendPasswordResetEmail } from "firebase/auth";
 import {
   initializeFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, collection, addDoc, query, where, orderBy, limit,
   getDocs, onSnapshot, serverTimestamp, arrayUnion, arrayRemove, Timestamp, writeBatch, increment, getCountFromServer
@@ -87,13 +87,33 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     $("aName").value = u.displayName || ""; $("authErr").textContent = "";
     $("authBtn").textContent = "Profile complete karo";
   }
+  // WhatsApp/Instagram/Facebook jaise in-app browsers (WebView) me Google jaanbujh kar
+  // sign-in block ya restrict karta hai (security ke naam par) — isse login "hota hai par
+  // tikta nahi" jaisa lagta hai: har baar wapas email dalni padti hai. Ye koi Pulse ka bug
+  // nahi, Google ka WebView-level restriction hai — isko detect karke seedha bata dete hain.
+  function isInAppWebView() {
+    var ua = navigator.userAgent || "";
+    return /FBAN|FBAV|Instagram|Line\/|MicroMessenger|WhatsApp|Snapchat|TikTok/i.test(ua) || (/; wv\)/i.test(ua) && /Android/i.test(ua));
+  }
+  if (isInAppWebView()) {
+    var note = el('<div class="st-note" style="margin-top:6px">Agar Google se sign-in baar-baar atak raha hai: ye link kisi app (WhatsApp/Instagram) ke andar khula hua lagta hai — upar-right "⋮" menu se "Open in Chrome/Browser" chuno, phir Google se login karo. Chrome/Safari me sign-in hamesha ke liye save rehta hai.</div>');
+    var gb = $("googleBtn"); if (gb && gb.parentNode) gb.parentNode.insertBefore(note, gb.nextSibling);
+  }
   $("googleBtn").addEventListener("click", function () {
     if (!auth) { $("authErr").textContent = "App abhi set nahi hui (firebase-config.json khaali hai)."; return; }
     var btn = this; btn.disabled = true; $("googleBtnLbl").textContent = "Jud rahe hain...";
-    signInWithPopup(auth, new GoogleAuthProvider()).catch(function (e) {
-      btn.disabled = false; $("googleBtnLbl").textContent = "Continue with Google";
-      if (e && (e.code === "auth/popup-closed-by-user" || e.code === "auth/cancelled-popup-request")) return;
-      $("authErr").textContent = errMsg(e);
+    setPersistence(auth, browserLocalPersistence).catch(function () {}).then(function () {
+      return signInWithPopup(auth, new GoogleAuthProvider());
+    }).catch(function (e) {
+      var code = e && e.code;
+      if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") { btn.disabled = false; $("googleBtnLbl").textContent = "Continue with Google"; return; }
+      // Popup kaam na kare (blocked / unsupported in this environment, jo in-app browsers me aam hai)
+      // to redirect flow try karo — WebView me ye popup se zyada reliable hai.
+      if (code === "auth/popup-blocked" || code === "auth/operation-not-supported-in-this-environment" || code === "auth/web-storage-unsupported") {
+        signInWithRedirect(auth, new GoogleAuthProvider()).catch(function (e2) { btn.disabled = false; $("googleBtnLbl").textContent = "Continue with Google"; $("authErr").textContent = errMsg(e2); });
+        return;
+      }
+      btn.disabled = false; $("googleBtnLbl").textContent = "Continue with Google"; $("authErr").textContent = errMsg(e);
     });
   });
   $("pwEye").addEventListener("click", function () { var f = $("aPass"), show = f.type === "password"; f.type = show ? "text" : "password"; this.textContent = show ? "🙈" : "👁"; this.setAttribute("aria-label", show ? "Hide password" : "Show password"); f.focus(); });
@@ -167,6 +187,9 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     auth = getAuth(app);
     db = initializeFirestore(app, { experimentalAutoDetectLongPolling: true });
     initAI(app);
+    // Agar Google sign-in redirect-flow se hua tha (popup kaam nahi kiya), uska result/error yahan aata hai.
+    // Session to onAuthStateChanged se hi ban jata hai — ye sirf kisi redirect-error ko silently lost hone se bachata hai.
+    getRedirectResult(auth).catch(function (e) { if (e && e.code && e.code !== "auth/no-auth-event") $("authErr").textContent = errMsg(e); });
     onAuthStateChanged(auth, function (u) {
       if (u) {
         if (signingUp) return;
@@ -938,8 +961,35 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   // ---- Creator panel (sirf creator email; sirf reports + ginti) ----
   function creatorPanel() {
     var u = auth.currentUser, box = $("creatorBox"); if (!u || u.email !== CREATOR_EMAIL) { box.hidden = true; return; }
-    box.hidden = false; box.innerHTML = '<div class="section-title">Creator Panel</div><div class="st-note">Shows reports and totals only. Private chats and who-blocked-whom are never visible, by design.</div><div id="crStats"></div><div id="crOverview"></div><div id="crList"></div><div class="st-row" style="margin-top:8px"><input class="bh-in" id="crUid" placeholder="User ID to ban / unban" style="margin:0"><button class="btn-outline" id="crBan" style="padding:0 12px">Ban</button><button class="btn-outline" id="crUnban" style="padding:0 12px">Unban</button></div>';
-    Promise.all([getCountFromServer(collection(db, "users")), getCountFromServer(collection(db, "posts"))]).then(function (r) { $("crStats").innerHTML = '<div class="cr-row">Members: <b>' + r[0].data().count + '</b> · Posts: <b>' + r[1].data().count + '</b></div>'; }).catch(function () {});
+    box.hidden = false; box.innerHTML = '<div class="section-title">Creator Panel</div><div class="st-note">Shows reports and totals only. Private chats and who-blocked-whom are never visible, by design.</div><div id="crNew" class="cr-row" style="display:none;background:var(--grad);color:#fff;border-radius:10px;padding:8px 10px;margin-bottom:6px"></div><div id="crStats"></div><div id="crGrowth"></div><div id="crOverview"></div><div id="crList"></div><div class="st-row" style="margin-top:8px"><input class="bh-in" id="crUid" placeholder="User ID to ban / unban" style="margin:0"><button class="btn-outline" id="crBan" style="padding:0 12px">Ban</button><button class="btn-outline" id="crUnban" style="padding:0 12px">Unban</button></div>';
+    // Owner ko (Facebook/Insta owner jaisa) pata chalna chahiye kitne log join kar rahe hain aur
+    // kaunse mode me — ye sab sirf "count" queries hain (Firestore free quota me cheap), har document
+    // padhna nahi padta.
+    (function () {
+      var now = new Date(), todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0);
+      var weekStart = new Date(now.getTime() - 7 * 86400000);
+      var todayCut = Timestamp.fromDate(todayStart), weekCut = Timestamp.fromDate(weekStart);
+      var MODES = [["friends", "Friendship"], ["dating", "Dating"], ["marriage", "Marriage"], ["jobseeker", "Job seekers"], ["recruiter", "Recruiters"]];
+      var lastVisit = +localStorage.getItem("crLastVisit") || 0;
+      Promise.all([
+        getCountFromServer(collection(db, "users")),
+        getCountFromServer(collection(db, "posts")),
+        getCountFromServer(query(collection(db, "users"), where("createdAt", ">=", todayCut))),
+        getCountFromServer(query(collection(db, "users"), where("createdAt", ">=", weekCut))),
+        getCountFromServer(collection(db, "reports")),
+        lastVisit ? getCountFromServer(query(collection(db, "users"), where("createdAt", ">=", Timestamp.fromMillis(lastVisit)))) : Promise.resolve(null),
+        lastVisit ? getCountFromServer(query(collection(db, "reports"), where("createdAt", ">=", Timestamp.fromMillis(lastVisit)))) : Promise.resolve(null)
+      ].concat(MODES.map(function (m) { return getCountFromServer(query(collection(db, "users"), where("mode", "==", m[0]))); }))).then(function (r) {
+        $("crStats").innerHTML = '<div class="cr-row">Members: <b>' + r[0].data().count + '</b> · Naye aaj: <b>' + r[2].data().count + '</b> · Naye is hafte: <b>' + r[3].data().count + '</b> · Posts: <b>' + r[1].data().count + '</b> · Total reports: <b>' + r[4].data().count + '</b></div>';
+        var modeLine = MODES.map(function (m, i) { return m[1] + ": <b>" + r[7 + i].data().count + "</b>"; }).join(" · ");
+        $("crGrowth").innerHTML = '<div class="cr-row" style="color:var(--faint);font-size:12px">Mode breakdown — ' + modeLine + '</div>';
+        if (lastVisit && r[5] && r[6]) {
+          var nn = r[5].data().count, nr = r[6].data().count;
+          if (nn || nr) { var box2 = $("crNew"); box2.style.display = ""; box2.textContent = "Pichli baar check kiya tha " + ago(lastVisit) + " pehle — tab se " + nn + " naye members aur " + nr + " naye reports aaye hain."; }
+        }
+        localStorage.setItem("crLastVisit", String(Date.now()));
+      }).catch(function () {});
+    })();
     getDocs(query(collection(db, "reports"), orderBy("createdAt", "desc"), limit(30))).then(function (s) {
       var l = $("crList"); l.innerHTML = s.empty ? '<div class="cr-row">No reports 🎉</div>' : "";
       s.forEach(function (d) { var r = d.data(); var row = el('<div class="cr-row" data-notr>Reported <b>' + esc(r.to) + '</b>: ' + esc(r.reason || "") + ' <button class="btn-outline" style="padding:4px 10px">Fill ID</button> <button class="btn-grad cb" style="padding:4px 10px">Ban</button> <button class="btn-outline cd" style="padding:4px 10px">Dismiss</button></div>'); row.querySelector("button").addEventListener("click", function () { $("crUid").value = r.to; });
