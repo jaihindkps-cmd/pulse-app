@@ -68,6 +68,16 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     googleUser = null; $("emailRow").style.display = ""; $("pwRow").style.display = ""; $("aUser").required = true;
     $("segBox").style.display = ""; $("googleBtn").style.display = ""; $("googleBtn").disabled = false; $("googleBtnLbl").textContent = "Continue with Google";
     document.querySelector(".auth-or").style.display = "";
+    resetModeGrid();
+  }
+  // Har baar signup form naya khulta hai (fresh page load, ya logout ke baad), "I am here for" wapas
+  // "Friendship" pe reset ho, taaki pichhli session ka mode chup-chaap carry na ho.
+  function resetModeGrid() {
+    signMode = "friends";
+    var g = $("modeGrid"); if (!g) return;
+    g.querySelectorAll("button").forEach(function (x) { x.classList.toggle("on", x.getAttribute("data-m") === "friends"); });
+    var box = $("aMateBox"); if (box) box.hidden = true;
+    var gSel = $("aGender"), sSel = $("aSeeking"); if (gSel) gSel.value = ""; if (sSel) sSel.value = "Everyone";
   }
   function showGoogleOnboarding(u) {
     googleUser = u; $("auth").hidden = false; $("authForm").style.display = ""; $("segBox").style.display = "none"; $("verifyBox").style.display = "none";
@@ -98,6 +108,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
       if (!gName) { $("authErr").textContent = "Naam likho"; return; }
       if (!(gAge >= 18 && gAge <= 99)) { $("authErr").textContent = "Ye app sirf 18+ ke liye hai"; return; }
       if (!$("aAdult").checked) { $("authErr").textContent = "Please confirm you are 18+ and accept the policy"; return; }
+      if (isMateMode(signMode) && !$("aGender").value) { $("authErr").textContent = "Apna gender chuno (\"I am\"), taaki sahi logon se match ho"; return; }
       $("authBtn").disabled = true;
       var gProf = { name: gName, age: gAge, city: clean($("aCity").value, 40), work: "", about: "", looking: ({ friends: "Dosti", dating: "Dating", marriage: "Shaadi" })[signMode] || "Dosti", mode: signMode, gender: isMateMode(signMode) ? $("aGender").value : "", seeking: isMateMode(signMode) ? $("aSeeking").value : "", hidden: false, consentV: "2026-11", consentAt: serverTimestamp(), createdAt: serverTimestamp() };
       setDoc(doc(db, "users", gu.uid), gProf).then(function () { googleUser = null; UID = gu.uid; ME = Object.assign({}, gProf, { uid: UID }); return afterAuth(gu); })
@@ -114,6 +125,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
       if (!name) { $("authErr").textContent = "Naam likho"; $("authBtn").disabled = false; return; }
       if (!(age >= 18 && age <= 99)) { $("authErr").textContent = "Ye app sirf 18+ ke liye hai"; $("authBtn").disabled = false; return; }
       if (!$("aAdult").checked) { $("authErr").textContent = "Please confirm you are 18+ and accept the policy"; $("authBtn").disabled = false; return; }
+      if (isMateMode(signMode) && !$("aGender").value) { $("authErr").textContent = "Apna gender chuno (\"I am\"), taaki sahi logon se match ho"; $("authBtn").disabled = false; return; }
       signingUp = true;
       p = createUserWithEmailAndPassword(auth, email, pw).then(function (cred) {
         var prof = { name: name, age: age, city: clean($("aCity").value, 40), work: "", about: "", looking: ({ friends: "Dosti", dating: "Dating", marriage: "Shaadi" })[signMode] || "Dosti", mode: signMode, gender: isMateMode(signMode) ? $("aGender").value : "", seeking: isMateMode(signMode) ? $("aSeeking").value : "", hidden: false, consentV: "2026-11", consentAt: serverTimestamp(), createdAt: serverTimestamp() };
@@ -363,6 +375,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     var m = $("eMode").value, upd = { name: clean($("eName").value, 40) || ME.name, city: clean($("eCity").value, 40), work: clean($("eWork").value, 60), about: clean($("eAbout").value, 300), mode: m, looking: ({ friends: "Dosti", dating: "Dating", marriage: "Shaadi" })[m] || "Dosti" };
     Object.keys(PROF_FIELDS).forEach(function (id) { var k = PROF_FIELDS[id], v = $(id).value; upd[k] = NUMF[k] ? (v === "" ? null : +v) : clean(v, k === "cabout" ? 300 : 200); });
     if (!isMateMode(m)) { upd.gender = ME.gender || ""; upd.seeking = ME.seeking || ""; }
+    if (isMateMode(m) && !upd.gender) { toast("Apna gender chuno (\"I am\"), taaki sahi logon se match ho"); return; }
     if (upd.ageMin && upd.ageMax && upd.ageMin > upd.ageMax) { toast("Partner age range is wrong"); return; }
     updateDoc(doc(db, "users", UID), upd).then(function () { Object.assign(ME, upd); applyMode(); listenApps(); $("pName").innerHTML = esc(ME.name) + creatorBadge(ME); $("pHandle").textContent = ME.city || ""; toast("Profile save ho gayi ✅"); }).catch(function (e) { toast(errMsg(e)); });
   });
@@ -1109,6 +1122,18 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   FIELDS.forEach(function (f) { $("eField").appendChild(new Option(f, f)); });
   var signMode = "friends";
   document.querySelectorAll("#modeGrid button").forEach(function (b) { b.addEventListener("click", function () { signMode = b.getAttribute("data-m"); document.querySelectorAll("#modeGrid button").forEach(function (x) { x.classList.toggle("on", x === b); }); $("aMateBox").hidden = !isMateMode(signMode); }); });
+  // "I am" chunte hi "Show me" khud opposite gender pe chala jaata hai (jab tak user ne use khud na badla ho) --
+  // taaki "Everyone" default rehne se gender filter bekaar na ho jaaye.
+  function wireGenderDefault(genderId, seekingId) {
+    var seekTouched = false;
+    $(seekingId).addEventListener("change", function () { seekTouched = true; });
+    $(genderId).addEventListener("change", function () {
+      if (seekTouched) return;
+      var v = $(genderId).value;
+      $(seekingId).value = v === "Woman" ? "Men" : v === "Man" ? "Women" : "Everyone";
+    });
+  }
+  wireGenderDefault("aGender", "aSeeking"); wireGenderDefault("eGender", "eSeeking");
   var PROF_FIELDS = { eReligion: "religion", eTongue: "tongue", eCommunity: "community", eMarital: "marital", eHeight: "height", eEdu: "edu", eDiet: "diet", eManaged: "managed", eAgeMin: "ageMin", eAgeMax: "ageMax", eField: "field", eRole: "role", eSkills: "skills", eExp: "exp", eJobType: "jobType", ePrefCity: "prefCity", eNotice: "notice", eResume: "resume", eCompany: "company", eDesig: "desig", eCAbout: "cabout", eCSite: "csite", eGender: "gender", eSeeking: "seeking" };
   var NUMF = { height: 1, ageMin: 1, ageMax: 1, exp: 1 };
   function fillProfileForm() {
