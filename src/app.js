@@ -89,26 +89,33 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   }
   // WhatsApp/Instagram/Facebook jaise in-app browsers (WebView) me Google jaanbujh kar
   // sign-in block ya restrict karta hai (security ke naam par) — isse login "hota hai par
-  // tikta nahi" jaisa lagta hai: har baar wapas email dalni padti hai. Ye koi Pulse ka bug
-  // nahi, Google ka WebView-level restriction hai — isko detect karke seedha bata dete hain.
+  // tikta nahi" jaisa lagta hai. Isko detect karke seedha bata dete hain.
   function isInAppWebView() {
     var ua = navigator.userAgent || "";
     return /FBAN|FBAV|Instagram|Line\/|MicroMessenger|WhatsApp|Snapchat|TikTok/i.test(ua) || (/; wv\)/i.test(ua) && /Android/i.test(ua));
   }
+  // Mobile par signInWithPopup ka asli root-cause bug: Safari/Chrome mobile popup ko ek alag
+  // storage partition me treat karte hain (ITP / third-party-context jaisa), isliye login ho to
+  // jaata hai par session is hi tab/page par save nahi hota — app band karke dobara kholo to phir
+  // login maangta hai, jabki Google apna khud ka session yaad rakhta hai (isliye dubara click karte
+  // hi turant ho jaata hai — confusing hai lekin ye session-persistence ka failure hai, login ka nahi).
+  // signInWithRedirect isse bachata hai kyunki ye ek poora page-navigation hai, popup nahi — isliye
+  // mobile par hamesha redirect use karo; desktop par popup (zyada smooth UX, ye bug wahan nahi aata).
+  function isMobileDevice() { return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || "") || (window.matchMedia && window.matchMedia("(max-width: 820px)").matches); }
   if (isInAppWebView()) {
-    var note = el('<div class="st-note" style="margin-top:6px">Agar Google se sign-in baar-baar atak raha hai: ye link kisi app (WhatsApp/Instagram) ke andar khula hua lagta hai — upar-right "⋮" menu se "Open in Chrome/Browser" chuno, phir Google se login karo. Chrome/Safari me sign-in hamesha ke liye save rehta hai.</div>');
+    var note = el('<div class="st-note" style="margin-top:6px">If Google sign-in keeps failing to stay signed in: this page looks like it is open inside another app\'s (WhatsApp/Instagram) built-in browser — tap the "⋮" menu and choose "Open in Chrome/Browser", then sign in with Google there. Sign-in stays saved reliably in Chrome/Safari.</div>');
     var gb = $("googleBtn"); if (gb && gb.parentNode) gb.parentNode.insertBefore(note, gb.nextSibling);
   }
   $("googleBtn").addEventListener("click", function () {
-    if (!auth) { $("authErr").textContent = "App abhi set nahi hui (firebase-config.json khaali hai)."; return; }
-    var btn = this; btn.disabled = true; $("googleBtnLbl").textContent = "Jud rahe hain...";
+    if (!auth) { $("authErr").textContent = "The app isn't configured yet (firebase-config.json is empty)."; return; }
+    var btn = this; btn.disabled = true; $("googleBtnLbl").textContent = "Connecting...";
     setPersistence(auth, browserLocalPersistence).catch(function () {}).then(function () {
+      if (isMobileDevice()) return signInWithRedirect(auth, new GoogleAuthProvider());
       return signInWithPopup(auth, new GoogleAuthProvider());
     }).catch(function (e) {
       var code = e && e.code;
       if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") { btn.disabled = false; $("googleBtnLbl").textContent = "Continue with Google"; return; }
-      // Popup kaam na kare (blocked / unsupported in this environment, jo in-app browsers me aam hai)
-      // to redirect flow try karo — WebView me ye popup se zyada reliable hai.
+      // Popup kaam na kare (blocked / unsupported in this environment) to redirect flow try karo.
       if (code === "auth/popup-blocked" || code === "auth/operation-not-supported-in-this-environment" || code === "auth/web-storage-unsupported") {
         signInWithRedirect(auth, new GoogleAuthProvider()).catch(function (e2) { btn.disabled = false; $("googleBtnLbl").textContent = "Continue with Google"; $("authErr").textContent = errMsg(e2); });
         return;
