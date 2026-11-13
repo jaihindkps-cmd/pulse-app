@@ -1,10 +1,45 @@
-// Voice call (WebRTC). Signaling Firestore ke messages se hoti hai (koi server nahi). Awaaz seedhi dono phone ke beech jaati hai.
+// Voice/video call (WebRTC). Signaling Firestore ke messages se hoti hai (koi server nahi).
+// Media (awaaz/video) seedhi dono phone ke beech peer-to-peer jaati hai -- kabhi Pulse ke server se nahi guzarti.
+// WebRTC har connection ko DTLS-SRTP se compulsory encrypt karta hai, isliye ye already end-to-end encrypted hai
+// (Firestore sirf signaling -- offer/answer handshake -- carry karta hai, kabhi actual audio/video nahi).
 var ICE = { iceServers: [{ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] }] };
 
 export function supported() { return !!(window.RTCPeerConnection && navigator.mediaDevices && navigator.mediaDevices.getUserMedia); }
 
-export function getMic() {
-  return navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }, video: false });
+export function getMic() { return getMedia(false); }
+
+export function getMedia(withVideo) {
+  return navigator.mediaDevices.getUserMedia({
+    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+    video: withVideo ? { facingMode: "user", width: { ideal: 480 }, height: { ideal: 640 } } : false
+  });
+}
+
+// ---- Screen Wake Lock: screen ko auto-sleep se roke taaki call ke beech awaaz/video band na ho.
+// Note: phone ka power button manually daba kar lock karne par browser/OS khud call ko suspend kar sakta
+// hai -- is limit ko koi web page JS se poora nahi hata sakta, sirf native app (foreground service) se hota hai.
+var wakeLock = null;
+export function requestWakeLock() {
+  try {
+    if (!("wakeLock" in navigator)) return Promise.resolve(null);
+    return navigator.wakeLock.request("screen").then(function (wl) { wakeLock = wl; return wl; }).catch(function () { return null; });
+  } catch (e) { return Promise.resolve(null); }
+}
+export function releaseWakeLock() { try { if (wakeLock) { wakeLock.release().catch(function () {}); wakeLock = null; } } catch (e) {} }
+export function reacquireWakeLockIfNeeded() {
+  if (wakeLock && document.visibilityState === "visible") { try { requestWakeLock(); } catch (e) {} }
+}
+
+// ---- Media Session: Android/Chrome ko batata hai ye ek active media session hai, background me chalu rakhne me madad karta hai.
+export function setMediaSession(title) {
+  try {
+    if (!("mediaSession" in navigator)) return;
+    navigator.mediaSession.metadata = new MediaMetadata({ title: title || "Pulse Call", artist: "Pulse" });
+    navigator.mediaSession.playbackState = "playing";
+  } catch (e) {}
+}
+export function clearMediaSession() {
+  try { if ("mediaSession" in navigator) { navigator.mediaSession.playbackState = "none"; navigator.mediaSession.metadata = null; } } catch (e) {}
 }
 
 function waitIce(pc, ms) {

@@ -636,12 +636,20 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     addDoc(collection(db, "posts"), { uid: UID, name: ME.name, text: txt, likedBy: [], createdAt: serverTimestamp() }).then(function () { toast("Feed pe post ho gaya 🎉"); bump("cPosts"); }).catch(function (e) { toast(errMsg(e)); }).then(function () { btn.disabled = false; });
   });
 
-  // ---- Voice call + walkie-talkie (WebRTC; signaling Firestore messages se) ----
-  var CALL = null, callTick = null;
+  // ---- Voice/video call + walkie-talkie (WebRTC; signaling Firestore messages se) ----
+  // Media seedhi dono phone ke beech jaati hai (peer-to-peer) -- WebRTC spec ke mutabik har call
+  // DTLS-SRTP se compulsory encrypt hoti hai, isliye ye already end-to-end encrypted hai. Firestore
+  // sirf signaling (offer/answer handshake) carry karta hai, kabhi actual awaaz/video nahi.
+  var CALL = null, callTick = null, wmTimer = null, discoTimer = null;
   function callShow(show) { $("callUI").hidden = !show; }
   function callSetup(name, sub, opts) {
     $("callName").textContent = name; $("callSub").textContent = sub; $("callAv").textContent = (name || "?").charAt(0).toUpperCase();
-    $("callAccept").hidden = !opts.incoming; $("callMute").hidden = !!opts.incoming || opts.walkie; $("ptt").hidden = !opts.walkie || !!opts.incoming; $("callMute").classList.remove("on"); $("callMute").textContent = "Mute"; callShow(true);
+    $("callAccept").hidden = !opts.incoming; $("callMute").hidden = !!opts.incoming || opts.walkie; $("ptt").hidden = !opts.walkie || !!opts.incoming;
+    $("callMute").classList.remove("on"); $("callMute").textContent = "Mute";
+    $("callCam").hidden = !opts.video || !!opts.incoming; $("callCam").classList.remove("on"); $("callCam").textContent = "Camera off";
+    $("callUI").classList.toggle("video-on", !!opts.video);
+    $("callLocalVideo").hidden = !opts.video; $("callRemoteVideo").hidden = !opts.video;
+    callShow(true);
   }
   function callMsg(mid, text, call, touchMatch) {
     var b = writeBatch(db), mref = doc(collection(db, "matches", mid, "messages"));
@@ -649,14 +657,41 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     if (touchMatch) b.update(doc(db, "matches", mid), { lastText: text, lastAt: serverTimestamp(), lastFrom: UID });
     return b.commit();
   }
-  function onRemote(stream) { var a = $("callAudio"); a.srcObject = stream; a.play().catch(function () {}); }
+  function onRemote(stream) {
+    var hasVideo = stream.getVideoTracks().length > 0;
+    if (hasVideo) { var v = $("callRemoteVideo"); v.srcObject = stream; v.play().catch(function () {}); }
+    var a = $("callAudio"); a.srcObject = hasVideo ? null : stream; if (!hasVideo) a.play().catch(function () {});
+  }
+  function startWatermark() {
+    stopWatermark();
+    var w = $("callWatermark"); w.textContent = (ME.name || "Pulse") + " · " + UID.slice(0, 6);
+    function move() { w.style.top = (8 + Math.random() * 70) + "%"; w.style.left = (4 + Math.random() * 60) + "%"; }
+    move(); wmTimer = setInterval(move, 9000);
+  }
+  function stopWatermark() { clearInterval(wmTimer); wmTimer = null; }
   function onState(st) {
     if (!CALL) return;
-    if (st === "connected" && !CALL.connected) { CALL.connected = true; clearTimeout(CALL.timeout); CALL.t0 = Date.now(); if (CALL.mode === "walkie" && !CALL.muteInit) { CALL.muteInit = true; setMic(false); $("ptt").hidden = false; $("callAccept").hidden = true; }
-      callTick = setInterval(function () { if (!CALL) return; var s = Math.floor((Date.now() - CALL.t0) / 1000); $("callSub").textContent = (CALL.mode === "walkie" ? "Walkie-talkie · " : "Call · ") + Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); }, 500); }
-    if ((st === "failed" || st === "closed") && !CALL.ending) endCall(true, "Connection nahi ban paya (network). Dobara try karo.");
+    if (st === "connected") {
+      clearTimeout(discoTimer); discoTimer = null;
+      if (!CALL.connected) { CALL.connected = true; clearTimeout(CALL.timeout); CALL.t0 = Date.now();
+        if (CALL.mode === "walkie" && !CALL.muteInit) { CALL.muteInit = true; setMic(false); $("ptt").hidden = false; $("callAccept").hidden = true; }
+        Call.requestWakeLock(); Call.setMediaSession(CALL.mode === "video" ? "Pulse Video Call" : CALL.mode === "walkie" ? "Pulse Walkie-talkie" : "Pulse Call");
+        if (CALL.mode === "video") startWatermark();
+        callTick = setInterval(function () { if (!CALL) return; var s = Math.floor((Date.now() - CALL.t0) / 1000); $("callSub").textContent = (CALL.mode === "walkie" ? "Walkie-talkie · " : CALL.mode === "video" ? "Video call · " : "Call · ") + Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); }, 500);
+      } else { $("callSub").textContent = (CALL.mode === "walkie" ? "Walkie-talkie" : CALL.mode === "video" ? "Video call" : "Call"); }
+    } else if (st === "disconnected") {
+      // Network hichki -- turant call mat kaato, kuch second recover hone do (jaise WhatsApp/Meet karte hain)
+      if (CALL.connected && !discoTimer) {
+        $("callSub").textContent = "Reconnect ho raha hai...";
+        try { if (CALL.pc && CALL.pc.restartIce) CALL.pc.restartIce(); } catch (e) {}
+        discoTimer = setTimeout(function () { if (CALL && !CALL.ending) endCall(true, "Connection toot gaya (network)."); }, 15000);
+      }
+    } else if ((st === "failed" || st === "closed") && !CALL.ending) {
+      endCall(true, "Connection nahi ban paya (network). Dobara try karo.");
+    }
   }
   function setMic(on) { if (CALL && CALL.stream) CALL.stream.getAudioTracks().forEach(function (t) { t.enabled = on; }); }
+  function setCam(on) { if (CALL && CALL.stream) CALL.stream.getVideoTracks().forEach(function (t) { t.enabled = on; }); }
   function watchCall() {
     var cur = CALL; if (!cur) return;
     cur.unsub = onSnapshot(query(collection(db, "matches", cur.mid, "messages"), orderBy("createdAt", "desc"), limit(8)), function (s) {
@@ -667,53 +702,65 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
       });
     });
   }
+  var CALL_LABEL = { call: "📞 Voice call", walkie: "📻 Walkie-talkie", video: "🎥 Video call" };
   function startCall(mode) {
     if (!activeChat || activeChat.ai || CALL) return;
     if (!Call.supported()) { toast("Is browser me call nahi chalti. Chrome/Android app use karo."); return; }
-    var c = activeChat, id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-    Call.getMic().then(function (stream) {
+    var c = activeChat, id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6), isVideo = mode === "video";
+    Call.getMedia(isVideo).then(function (stream) {
       CALL = { mid: c.mid, id: id, role: "out", mode: mode, stream: stream, name: c.name, peer: c.id };
-      callSetup(c.name, "Ring ho rahi hai...", { walkie: mode === "walkie" });
+      callSetup(c.name, "Ring ho rahi hai...", { walkie: mode === "walkie", video: isVideo });
+      if (isVideo) { var lv = $("callLocalVideo"); lv.srcObject = stream; lv.play().catch(function () {}); }
       return Call.makeOffer(stream, onRemote, onState).then(function (o) {
         if (!CALL || CALL.id !== id) { o.pc.close(); return; }
         CALL.pc = o.pc; watchCall();
         CALL.timeout = setTimeout(function () { if (CALL && CALL.id === id && !CALL.connected) endCall(true, "Jawab nahi mila"); }, 45000);
-        return callMsg(c.mid, mode === "walkie" ? "📻 Walkie-talkie" : "📞 Voice call", { k: "offer", id: id, mode: mode, sdp: o.sdp }, true).then(function (r) { bump("cCalls"); return r; });
+        return callMsg(c.mid, CALL_LABEL[mode] || CALL_LABEL.call, { k: "offer", id: id, mode: mode, sdp: o.sdp }, true).then(function (r) { bump("cCalls"); return r; });
       });
-    }).catch(function (e) { endCall(false); toast(e && e.name === "NotAllowedError" ? "Mic ki permission chahiye. Browser settings me allow karo." : errMsg(e)); });
+    }).catch(function (e) { endCall(false); toast(e && e.name === "NotAllowedError" ? (isVideo ? "Camera/Mic ki permission chahiye. Browser settings me allow karo." : "Mic ki permission chahiye. Browser settings me allow karo.") : errMsg(e)); });
   }
   function endCall(notify, msg) {
-    var c = CALL; if (!c) return; c.ending = true; CALL = null; clearInterval(callTick); clearTimeout(c.timeout);
+    var c = CALL; if (!c) return; c.ending = true; CALL = null; clearInterval(callTick); clearTimeout(c.timeout); clearTimeout(discoTimer); discoTimer = null; stopWatermark();
+    Call.releaseWakeLock(); Call.clearMediaSession();
     if (c.unsub) try { c.unsub(); } catch (e) {}
     if (c.stream) c.stream.getTracks().forEach(function (t) { t.stop(); }); if (c.pc) try { c.pc.close(); } catch (e) {}
-    $("callAudio").srcObject = null; callShow(false);
+    $("callAudio").srcObject = null; $("callRemoteVideo").srcObject = null; $("callLocalVideo").srcObject = null;
+    $("callUI").classList.remove("video-on"); callShow(false);
     if (notify && c.mid) callMsg(c.mid, "📞 Call khatam", { k: "end", id: c.id }, true).catch(function () {});
     if (msg) toast(msg);
   }
   function maybeIncoming(mid, m, other) {
-    if (CALL || !/^(📞 Voice|📻)/.test(m.lastText || "") || Date.now() - ms(m.lastAt) > 40000) return;
+    if (CALL || !/^(📞 Voice|📻|🎥)/.test(m.lastText || "") || Date.now() - ms(m.lastAt) > 40000) return;
     getDocs(query(collection(db, "matches", mid, "messages"), orderBy("createdAt", "desc"), limit(6))).then(function (s) {
       if (CALL) return; var offer = null, ended = {};
       s.forEach(function (d) { var x = d.data(); if (!x.call) return; if (x.call.k === "end") ended[x.call.id] = 1; else if (x.call.k === "offer" && x.from !== UID && !offer) offer = x.call; });
       if (!offer || ended[offer.id]) return;
       userName(other).then(function (n) {
         if (CALL) return; CALL = { mid: mid, id: offer.id, role: "in", mode: offer.mode, offer: offer.sdp, name: n, peer: other };
-        callSetup(n, offer.mode === "walkie" ? "📻 Walkie-talkie aa raha hai" : "📞 Aapko call aa rahi hai", { incoming: true }); try { navigator.vibrate && navigator.vibrate([300, 150, 300]); } catch (e) {}
+        var sub = offer.mode === "walkie" ? "📻 Walkie-talkie aa raha hai" : offer.mode === "video" ? "🎥 Video call aa rahi hai" : "📞 Aapko call aa rahi hai";
+        callSetup(n, sub, { incoming: true, video: offer.mode === "video" }); try { navigator.vibrate && navigator.vibrate([300, 150, 300]); } catch (e) {}
         watchCall(); CALL.timeout = setTimeout(function () { if (CALL && CALL.id === offer.id && !CALL.connected) endCall(false, "Missed call"); }, 40000);
       });
     }).catch(function () {});
   }
   $("callAccept").addEventListener("click", function () {
-    var c = CALL; if (!c || c.role !== "in") return; this.hidden = true; $("callSub").textContent = "Jud rahe hain...";
-    Call.getMic().then(function (stream) { c.stream = stream; return Call.makeAnswer(stream, c.offer, onRemote, onState); })
-      .then(function (a) { c.pc = a.pc; $("callMute").hidden = c.mode === "walkie"; $("ptt").hidden = c.mode !== "walkie"; return callMsg(c.mid, "📞 Jawab", { k: "answer", id: c.id, sdp: a.sdp }, false); })
-      .catch(function (e) { endCall(true); toast(e && e.name === "NotAllowedError" ? "Mic ki permission chahiye" : errMsg(e)); });
+    var c = CALL; if (!c || c.role !== "in") return; this.hidden = true; $("callSub").textContent = "Jud rahe hain..."; var isVideo = c.mode === "video";
+    Call.getMedia(isVideo).then(function (stream) {
+      c.stream = stream;
+      if (isVideo) { var lv = $("callLocalVideo"); lv.srcObject = stream; lv.hidden = false; lv.play().catch(function () {}); $("callRemoteVideo").hidden = false; $("callUI").classList.add("video-on"); }
+      return Call.makeAnswer(stream, c.offer, onRemote, onState);
+    })
+      .then(function (a) { c.pc = a.pc; $("callMute").hidden = c.mode === "walkie"; $("ptt").hidden = c.mode !== "walkie"; $("callCam").hidden = !isVideo; return callMsg(c.mid, "📞 Jawab", { k: "answer", id: c.id, sdp: a.sdp }, false); })
+      .catch(function (e) { endCall(true); toast(e && e.name === "NotAllowedError" ? (isVideo ? "Camera/Mic ki permission chahiye" : "Mic ki permission chahiye") : errMsg(e)); });
   });
   $("callEnd").addEventListener("click", function () { endCall(true); });
   $("callMute").addEventListener("click", function () { if (!CALL) return; var on = this.classList.toggle("on"); setMic(!on); this.textContent = on ? "Unmute" : "Mute"; });
+  $("callCam").addEventListener("click", function () { if (!CALL) return; var off = this.classList.toggle("on"); setCam(!off); this.textContent = off ? "Camera on" : "Camera off"; });
+  document.addEventListener("visibilitychange", function () { Call.reacquireWakeLockIfNeeded(); });
   (function () { var p = $("ptt"); function dn(e) { e.preventDefault(); setMic(true); p.classList.add("live"); p.textContent = "🎙 Bol rahe ho..."; } function up() { setMic(false); p.classList.remove("live"); p.textContent = "🎙 Dabake bolo"; }
     p.addEventListener("pointerdown", dn); p.addEventListener("pointerup", up); p.addEventListener("pointerleave", up); p.addEventListener("pointercancel", up); })();
   $("callBtn").addEventListener("click", function () { startCall("call"); });
+  $("videoCallBtn").addEventListener("click", function () { startCall("video"); });
   $("wtBtn").addEventListener("click", function () { startCall("walkie"); });
 
   // ---- AI Mediator (dono ki marzi se) + safety ----
@@ -846,7 +893,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   $("notifBtn").addEventListener("click", function () { if (!window.Notification) { toast("Notifications are not supported here"); return; } Notification.requestPermission().then(function (p) { toast(p === "granted" ? "Notifications on 🔔" : "Notifications blocked"); }); });
 
   // ---- policy, language, delete ----
-  var POLICY_EN = '<h3>Terms of Use &amp; Privacy Policy</h3><p><i>Version 2026-11 (Beta). Please read carefully before using Pulse.</i></p><h4>1. Eligibility and acceptance</h4><p>Pulse is available only to persons aged 18 or above who are legally competent to enter into a contract. By creating an account or using the service you accept these Terms and this Policy. If you do not agree, do not use the service.</p><h4>2. Beta service</h4><p>Pulse is a beta (testing) service. Features may change, be interrupted or be withdrawn without notice, and data may be reset. The service is provided on an &quot;as is&quot; and &quot;as available&quot; basis without warranties of any kind, to the fullest extent permitted by law.</p><h4>3. Information we process</h4><p>Account data (email address, display name, age, city, occupation, profile text, optional photo and role-specific details such as job or matrimonial attributes); content you create (posts, messages, images, CVs you choose to upload); records of consent; and, only if you enable Nearby, approximate location rounded to about 1 km. Your email address and phone number are not displayed to other members. A phone number, if you add one, is released only to a member you approve, subject to the Premium conditions in clause 6.</p><h4>4. Purposes and sharing</h4><p>We process data to operate the service, match and connect members, prevent abuse and comply with law. Profiles are visible to verified members according to the mode you choose. A CV is shared only with the recruiter of a job you apply to. AI features (Saathi, AI Mediator, Gaana Studio) transmit the text you submit to Google Gemini to generate replies; the Mediator reads a conversation only after both participants agree. Infrastructure is provided by Google Firebase. We do not sell personal data.</p><h4>5. Conduct and enforcement</h4><p>You must not harass, threaten, defraud, impersonate, post unlawful, obscene, hateful or infringing content, solicit money, OTPs or banking details, or misuse another member data. We may remove content, restrict features or suspend accounts, including automatically flagged accounts after review. Members may block and report any account.</p><h4>6. Contact details and Premium</h4><p>Requesting another member contact number requires Premium status and the explicit approval of that member, who may revoke access at any time. Premium is activated manually by the Pulse team once payment is confirmed. Any attempt to obtain contact details by other means is prohibited.</p><h4>7. Recruitment and matrimonial notices</h4><p>Pulse does not verify employers, candidates, or matrimonial claims and is not a party to any employment, engagement or marriage arrangement. Never pay a fee to obtain a job or interview. Verify identity, credentials and family details independently and meet only in public places.</p><h4>8. Your rights</h4><p>You may edit your profile, pause visibility, turn off location, withdraw applications, revoke contact approvals and delete your account from the Me tab, which removes your profile, posts, CV and AI history. Messages sent in shared conversations may remain visible to the other participant. Requests and complaints may be made through the in-app Report function.</p><h4>9. Limitation of liability and governing law</h4><p>To the extent permitted by law, Pulse and its owner are not liable for member conduct, meetings between members, or indirect or consequential loss. These Terms are governed by the laws of India and subject to the courts of competent jurisdiction in India.</p>';
+  var POLICY_EN = '<h3>Terms of Use &amp; Privacy Policy</h3><p><i>Version 2026-11 (Beta). Please read carefully before using Pulse.</i></p><h4>1. Eligibility and acceptance</h4><p>Pulse is available only to persons aged 18 or above who are legally competent to enter into a contract. By creating an account or using the service you accept these Terms and this Policy. If you do not agree, do not use the service.</p><h4>2. Beta service</h4><p>Pulse is a beta (testing) service. Features may change, be interrupted or be withdrawn without notice, and data may be reset. The service is provided on an &quot;as is&quot; and &quot;as available&quot; basis without warranties of any kind, to the fullest extent permitted by law.</p><h4>3. Information we process</h4><p>Account data (email address, display name, age, city, occupation, profile text, optional photo and role-specific details such as job or matrimonial attributes); content you create (posts, messages, images, CVs you choose to upload); records of consent; and, only if you enable Nearby, approximate location rounded to about 1 km. Your email address and phone number are not displayed to other members. A phone number, if you add one, is released only to a member you approve, subject to the Premium conditions in clause 6.</p><h4>4. Purposes and sharing</h4><p>We process data to operate the service, match and connect members, prevent abuse and comply with law. Profiles are visible to verified members according to the mode you choose. A CV is shared only with the recruiter of a job you apply to. AI features (Saathi, AI Mediator, Gaana Studio) transmit the text you submit to Google Gemini to generate replies; the Mediator reads a conversation only after both participants agree. Infrastructure is provided by Google Firebase. We do not sell personal data. Voice and video calls connect directly between the two members&#39; devices (peer-to-peer) and are encrypted end-to-end using the WebRTC standard (DTLS-SRTP); call audio and video never pass through or are stored on Pulse&#39;s servers, and Pulse has no feature to record a call without the visible on-screen notice and consent of both participants. No app, including Pulse, can prevent another participant from recording or photographing their own screen during a call; do not share anything in a call you would not want recorded.</p><h4>5. Conduct and enforcement</h4><p>You must not harass, threaten, defraud, impersonate, post unlawful, obscene, hateful or infringing content, solicit money, OTPs or banking details, or misuse another member data. We may remove content, restrict features or suspend accounts, including automatically flagged accounts after review. Members may block and report any account.</p><h4>6. Contact details and Premium</h4><p>Requesting another member contact number requires Premium status and the explicit approval of that member, who may revoke access at any time. Premium is activated manually by the Pulse team once payment is confirmed. Any attempt to obtain contact details by other means is prohibited.</p><h4>7. Recruitment and matrimonial notices</h4><p>Pulse does not verify employers, candidates, or matrimonial claims and is not a party to any employment, engagement or marriage arrangement. Never pay a fee to obtain a job or interview. Verify identity, credentials and family details independently and meet only in public places.</p><h4>8. Your rights</h4><p>You may edit your profile, pause visibility, turn off location, withdraw applications, revoke contact approvals and delete your account from the Me tab, which removes your profile, posts, CV and AI history. Messages sent in shared conversations may remain visible to the other participant. Requests and complaints may be made through the in-app Report function.</p><h4>9. Limitation of liability and governing law</h4><p>To the extent permitted by law, Pulse and its owner are not liable for member conduct, meetings between members, or indirect or consequential loss. These Terms are governed by the laws of India and subject to the courts of competent jurisdiction in India.</p>';
   var POLICY_HI = '<p><b>नोट:</b> यह कानूनी दस्तावेज़ अंग्रेज़ी में है और वही मान्य है। (This legal text in English is the binding version.)</p>' + POLICY_EN;
   document.addEventListener("click", function (e) { var a = e.target.closest && e.target.closest(".plink"); if (a) { e.preventDefault(); $("policyText").innerHTML = getLang() === "en" ? POLICY_EN : POLICY_HI; $("policyUI").hidden = false; } });
   $("policyClose").addEventListener("click", function () { $("policyUI").hidden = true; });
