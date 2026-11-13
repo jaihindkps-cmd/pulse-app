@@ -590,7 +590,8 @@
         <label>Kaam<input id="eWork" maxlength="60"></label>
         <label>Mere baare me<textarea id="eAbout" maxlength="300" rows="3"></textarea></label>
         <label>I am here for<select id="eMode"><option value="friends">Friendship</option><option value="dating">Dating</option><option value="marriage">Marriage</option><option value="jobseeker">Find a job</option><option value="recruiter">Hire talent</option></select></label>
-        <div id="secMate"><label>I am<select id="eGender"><option value="">Select</option><option>Woman</option><option>Man</option><option>Other</option></select></label><label>Show me<select id="eSeeking"><option>Everyone</option><option>Women</option><option>Men</option></select></label></div>
+        <label>I am<select id="eGender"><option value="">Select</option><option>Woman</option><option>Man</option><option>Other</option></select></label>
+        <div id="secMate"><label>Show me<select id="eSeeking"><option>Everyone</option><option>Women</option><option>Men</option></select></label></div>
         <div id="secMarriage" hidden><div class="sub-h">Marriage profile</div>
           <label>Religion<input id="eReligion" maxlength="30"></label><label>Mother tongue<input id="eTongue" maxlength="30"></label><label>Community (optional)<input id="eCommunity" maxlength="40"></label>
           <label>Marital status<select id="eMarital"><option>Never married</option><option>Divorced</option><option>Widowed</option></select></label><label>Height (cm)<input id="eHeight" type="number" min="120" max="230" inputmode="numeric"></label>
@@ -722,8 +723,8 @@
           <label>Sheher<input id="aCity" maxlength="40" autocomplete="address-level2"></label>
           <div class="mode-grid" id="modeGrid"><div class="mode-lbl">I am here for</div>
             <button type="button" data-m="friends" class="on"><i>🤝</i>Friendship</button><button type="button" data-m="dating"><i>💜</i>Dating</button><button type="button" data-m="marriage"><i>💍</i>Marriage</button><button type="button" data-m="jobseeker"><i>💼</i>Find a job</button><button type="button" data-m="recruiter"><i>🏢</i>Hire talent</button></div>
-          <div id="aMateBox" hidden><label>I am<select id="aGender"><option value="">Select</option><option>Woman</option><option>Man</option><option>Other</option></select></label>
-          <label>Show me<select id="aSeeking"><option>Everyone</option><option>Women</option><option>Men</option></select></label></div>
+          <label>I am<select id="aGender"><option value="">Select</option><option>Woman</option><option>Man</option><option>Other</option></select></label>
+          <div id="aMateBox" hidden><label>Show me<select id="aSeeking"><option>Everyone</option><option>Women</option><option>Men</option></select></label></div>
           <label class="chk"><input type="checkbox" id="aAdult"><span>I am 18+. I accept the <a href="#" class="plink">Privacy Policy &amp; Terms</a> and understand this is a <b>beta (testing) version</b></span></label>
         </div>
         <div id="pwRow"><label>Password<span class="pw-wrap"><input id="aPass" type="password" required minlength="6" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go" placeholder="kam se kam 6 akshar"><button type="button" class="pw-eye" id="pwEye" aria-label="Show password">👁</button></span></label></div>
@@ -736,5 +737,5 @@
   <div class="toast" id="toast"></div>
 </div>
 
-<script src="app.js?v=b15a22a18f" defer></script>
+<script src="app.js?v=4d27d3cbd7" defer></script>
 <script>if("serviceWorker" in navigator && location.protocol.indexOf("http")===0){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});}</script></body></html>

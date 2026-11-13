@@ -132,12 +132,12 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     if (!auth) { $("authErr").textContent = "App abhi set nahi hui (firebase-config.json khaali hai)."; return; }
     if (googleUser) {
       var gu = googleUser, gAge = parseInt($("aAge").value, 10), gName = clean($("aName").value, 40);
-      if (!gName) { $("authErr").textContent = "Naam likho"; return; }
-      if (!(gAge >= 18 && gAge <= 99)) { $("authErr").textContent = "Ye app sirf 18+ ke liye hai"; return; }
+      if (!gName) { $("authErr").textContent = "Please enter your name"; return; }
+      if (!(gAge >= 18 && gAge <= 99)) { $("authErr").textContent = "This app is for ages 18 and up only"; return; }
       if (!$("aAdult").checked) { $("authErr").textContent = "Please confirm you are 18+ and accept the policy"; return; }
-      if (isMateMode(signMode) && !$("aGender").value) { $("authErr").textContent = "Apna gender chuno (\"I am\"), taaki sahi logon se match ho"; return; }
+      if (!$("aGender").value) { $("authErr").textContent = "Please select your gender (\"I am\")"; return; }
       $("authBtn").disabled = true;
-      var gProf = { name: gName, age: gAge, city: clean($("aCity").value, 40), work: "", about: "", looking: ({ friends: "Dosti", dating: "Dating", marriage: "Shaadi" })[signMode] || "Dosti", mode: signMode, gender: isMateMode(signMode) ? $("aGender").value : "", seeking: isMateMode(signMode) ? $("aSeeking").value : "", hidden: false, consentV: "2026-11", consentAt: serverTimestamp(), createdAt: serverTimestamp() };
+      var gProf = { name: gName, age: gAge, city: clean($("aCity").value, 40), work: "", about: "", looking: ({ friends: "Friendship", dating: "Dating", marriage: "Marriage" })[signMode] || "Friendship", mode: signMode, gender: $("aGender").value, seeking: isMateMode(signMode) ? $("aSeeking").value : "", hidden: false, consentV: "2026-11", consentAt: serverTimestamp(), createdAt: serverTimestamp() };
       setDoc(doc(db, "users", gu.uid), gProf).then(function () { googleUser = null; UID = gu.uid; ME = Object.assign({}, gProf, { uid: UID }); return afterAuth(gu); })
         .catch(function (err) { $("authErr").textContent = errMsg(err); }).then(function () { $("authBtn").disabled = false; });
       return;
@@ -149,13 +149,13 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
       p = signInWithEmailAndPassword(auth, email, pw);
     } else {
       var age = parseInt($("aAge").value, 10), name = clean($("aName").value, 40);
-      if (!name) { $("authErr").textContent = "Naam likho"; $("authBtn").disabled = false; return; }
-      if (!(age >= 18 && age <= 99)) { $("authErr").textContent = "Ye app sirf 18+ ke liye hai"; $("authBtn").disabled = false; return; }
+      if (!name) { $("authErr").textContent = "Please enter your name"; $("authBtn").disabled = false; return; }
+      if (!(age >= 18 && age <= 99)) { $("authErr").textContent = "This app is for ages 18 and up only"; $("authBtn").disabled = false; return; }
       if (!$("aAdult").checked) { $("authErr").textContent = "Please confirm you are 18+ and accept the policy"; $("authBtn").disabled = false; return; }
-      if (isMateMode(signMode) && !$("aGender").value) { $("authErr").textContent = "Apna gender chuno (\"I am\"), taaki sahi logon se match ho"; $("authBtn").disabled = false; return; }
+      if (!$("aGender").value) { $("authErr").textContent = "Please select your gender (\"I am\")"; $("authBtn").disabled = false; return; }
       signingUp = true;
       p = createUserWithEmailAndPassword(auth, email, pw).then(function (cred) {
-        var prof = { name: name, age: age, city: clean($("aCity").value, 40), work: "", about: "", looking: ({ friends: "Dosti", dating: "Dating", marriage: "Shaadi" })[signMode] || "Dosti", mode: signMode, gender: isMateMode(signMode) ? $("aGender").value : "", seeking: isMateMode(signMode) ? $("aSeeking").value : "", hidden: false, consentV: "2026-11", consentAt: serverTimestamp(), createdAt: serverTimestamp() };
+        var prof = { name: name, age: age, city: clean($("aCity").value, 40), work: "", about: "", looking: ({ friends: "Friendship", dating: "Dating", marriage: "Marriage" })[signMode] || "Friendship", mode: signMode, gender: $("aGender").value, seeking: isMateMode(signMode) ? $("aSeeking").value : "", hidden: false, consentV: "2026-11", consentAt: serverTimestamp(), createdAt: serverTimestamp() };
         return setDoc(doc(db, "users", cred.user.uid), prof).then(function () { UID = cred.user.uid; ME = Object.assign({}, prof, { uid: UID }); signingUp = false; lastSent = Date.now(); return sendEmailVerification(cred.user).catch(function () { lastSent = 0; }).then(function () { return afterAuth(cred.user); }); })
           .catch(function (err) { return deleteUser(cred.user).catch(function () {}).then(function () { throw err; }); });
       });
@@ -478,12 +478,12 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
 
   // ---- profile edit ----
   $("saveProfile").addEventListener("click", function () {
-    var m = $("eMode").value, upd = { name: clean($("eName").value, 40) || ME.name, city: clean($("eCity").value, 40), work: clean($("eWork").value, 60), about: clean($("eAbout").value, 300), mode: m, looking: ({ friends: "Dosti", dating: "Dating", marriage: "Shaadi" })[m] || "Dosti" };
+    var m = $("eMode").value, upd = { name: clean($("eName").value, 40) || ME.name, city: clean($("eCity").value, 40), work: clean($("eWork").value, 60), about: clean($("eAbout").value, 300), mode: m, looking: ({ friends: "Friendship", dating: "Dating", marriage: "Marriage" })[m] || "Friendship" };
     Object.keys(PROF_FIELDS).forEach(function (id) { var k = PROF_FIELDS[id], v = $(id).value; upd[k] = NUMF[k] ? (v === "" ? null : +v) : clean(v, k === "cabout" ? 300 : 200); });
-    if (!isMateMode(m)) { upd.gender = ME.gender || ""; upd.seeking = ME.seeking || ""; }
-    if (isMateMode(m) && !upd.gender) { toast("Apna gender chuno (\"I am\"), taaki sahi logon se match ho"); return; }
+    if (!isMateMode(m)) { upd.seeking = ME.seeking || ""; }
+    if (!upd.gender) { toast("Please select your gender (\"I am\")"); return; }
     if (upd.ageMin && upd.ageMax && upd.ageMin > upd.ageMax) { toast("Partner age range is wrong"); return; }
-    updateDoc(doc(db, "users", UID), upd).then(function () { Object.assign(ME, upd); applyMode(); listenApps(); $("pName").innerHTML = esc(ME.name) + creatorBadge(ME); $("pHandle").textContent = ME.city || ""; toast("Profile save ho gayi ✅"); }).catch(function (e) { toast(errMsg(e)); });
+    updateDoc(doc(db, "users", UID), upd).then(function () { Object.assign(ME, upd); applyMode(); listenApps(); $("pName").innerHTML = esc(ME.name) + creatorBadge(ME); $("pHandle").textContent = ME.city || ""; toast("Profile saved ✅"); }).catch(function (e) { toast(errMsg(e)); });
   });
 
   // ---- chats ----
