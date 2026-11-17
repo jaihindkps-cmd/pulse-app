@@ -912,6 +912,58 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     }).catch(function (e) { $("tlText").innerHTML = '<h3>🕰️ Hamari Yaadein</h3><p class="st-note">Abhi load nahi ho payi: ' + esc(errMsg(e)) + '</p>'; });
   });
 
+  // ---- Support Circles: anonymous, topic-based small group chats. No real name shown -- a stable
+  // per-room alias instead -- and messages get a light safety check before they post. ----
+  var ALIAS_ADJ = ["Shaant", "Ujala", "Nirbhay", "Komal", "Dheer", "Roshan", "Saral", "Amol"], ALIAS_N = ["Panchi", "Sitara", "Lahar", "Kiran", "Saathi", "Rahi", "Deep"];
+  function aliasFor(roomId, uid) { var h = Math.abs(hash(roomId + ":" + uid)); return ALIAS_ADJ[h % ALIAS_ADJ.length] + " " + ALIAS_N[Math.floor(h / 7) % ALIAS_N.length] + " #" + (h % 97); }
+  var SUPPORT_TOPICS = [
+    { id: "breakup", name: "💔 Breakup / Rishta khatam hona" },
+    { id: "jobloss", name: "💼 Job loss / Career stress" },
+    { id: "loneliness", name: "🌙 Loneliness" },
+    { id: "family", name: "🏠 Family pressure" },
+    { id: "general", name: "🤝 General support" }
+  ];
+  var curSupport = null, supportUnsubs = [];
+  function closeSupportRooms() { supportUnsubs.forEach(function (u) { u(); }); supportUnsubs = []; }
+  $("supportOpenBtn").addEventListener("click", function () {
+    $("supportPickUI").hidden = false;
+    var box = $("supportTopics"); box.innerHTML = "";
+    SUPPORT_TOPICS.forEach(function (t) {
+      var r = el('<div class="circle-row" style="cursor:pointer"><span>' + esc(t.name) + '</span><span class="st unknown">Join →</span></div>');
+      r.addEventListener("click", function () { $("supportPickUI").hidden = true; openSupportRoom(t); });
+      box.appendChild(r);
+    });
+  });
+  $("supportPickClose").addEventListener("click", function () { $("supportPickUI").hidden = true; });
+  function supportRef(id) { return doc(db, "supportRooms", id); }
+  function openSupportRoom(t) {
+    curSupport = t.id; $("supportName").textContent = t.name; $("supportStatus").textContent = "Anonymous group · be kind 💜";
+    $("support").classList.add("open"); $("supportBody").innerHTML = '<div class="ai-note">💜 Yahan sab anonymous hain — tumhari pehchaan kisi ko nahi dikhegi. Yeh ek AI/community moderated space hai; agar koi khud ko nuksan pahunchane ki baat kare to kripya turant ek helpline ya apne kisi apne se madad lein.</div>';
+    closeSupportRooms();
+    var ref = supportRef(t.id);
+    updateDoc(ref, { members: arrayUnion(UID) }).catch(function () { return setDoc(ref, { topic: t.id, members: [UID], createdAt: serverTimestamp() }); });
+    supportUnsubs.push(onSnapshot(query(collection(db, "supportRooms", t.id, "msgs"), orderBy("createdAt", "asc"), limit(100)), function (s) {
+      var body = $("supportBody"); if (curSupport !== t.id) return;
+      body.querySelectorAll(".sc-msg").forEach(function (n) { n.remove(); });
+      s.forEach(function (d) {
+        var m = snapData(d), mine = m.from === UID;
+        body.appendChild(el('<div class="bubble sc-msg ' + (mine ? "me" : "them") + '" style="max-width:85%"><b style="display:block;font-size:11px;opacity:.7">' + esc(mine ? "Tum" : m.alias || "Koi") + '</b>' + esc(m.text) + '</div>'));
+      });
+      body.scrollTop = 1e9;
+    }, function (e) { toast(errMsg(e)); }));
+  }
+  $("supportBack").addEventListener("click", function () { $("support").classList.remove("open"); closeSupportRooms(); curSupport = null; });
+  function sendSupportMsg() {
+    var inp = $("supportInput"), t = clean(inp.value, 300); if (!t || !curSupport) return;
+    if (CRISIS.test(t)) { inp.value = ""; $("supportBody").appendChild(el('<div class="ai-note">' + esc(CRISIS_REPLY) + '</div>')); $("supportBody").scrollTop = 1e9; return; }
+    if (ABUSE.test(t)) { toast("Yeh group sab ke liye safe rehna chahiye — kripya respectfully likho."); return; }
+    if (!rate("scmsg", 8, 10000)) return;
+    inp.value = "";
+    addDoc(collection(db, "supportRooms", curSupport, "msgs"), { from: UID, alias: aliasFor(curSupport, UID), text: t, createdAt: serverTimestamp() }).catch(function (e) { toast(errMsg(e)); });
+  }
+  $("supportSend").addEventListener("click", sendSupportMsg);
+  $("supportInput").addEventListener("keydown", function (e) { if (e.key === "Enter") sendSupportMsg(); });
+
   // ---- Voice/video call + walkie-talkie (WebRTC; signaling Firestore messages se) ----
   // Media seedhi dono phone ke beech jaati hai (peer-to-peer) -- WebRTC spec ke mutabik har call
   // DTLS-SRTP se compulsory encrypt hoti hai, isliye ye already end-to-end encrypted hai. Firestore

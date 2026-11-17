@@ -218,6 +218,24 @@ service cloud.firestore {
       }
     }
 
+    // Support Circles: anonymous topic rooms, fixed small set of ids. Alias hides identity from
+    // other members; from (uid) is kept only for rate-limiting/moderation, never shown in the UI.
+    match /supportRooms/{tid} {
+      allow get: if signedIn();
+      allow list: if false;
+      allow create: if signedIn() && notBanned() && request.resource.data.topic is string
+        && request.resource.data.members == [me()];
+      allow update: if signedIn() && notBanned()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members'])
+        && me() in request.resource.data.members;
+      match /msgs/{mid} {
+        allow read: if signedIn();
+        allow create: if signedIn() && notBanned() && request.resource.data.from == me()
+          && request.resource.data.alias is string && request.resource.data.alias.size() <= 30
+          && request.resource.data.text is string && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 300;
+      }
+    }
+
     // Jobs: recruiter apni job likhta/badalta/hatata hai. Sab verified log padh sakte hain.
     match /jobs/{jid} {
       allow read: if signedIn();
