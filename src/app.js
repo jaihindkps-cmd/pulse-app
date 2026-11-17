@@ -594,7 +594,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     if (!c.ai && (!c.name || c.name === "...")) userName(c.id).then(function (n) { c.name = n; if (activeChat === c) { $("convoName").textContent = n; $("convoAv").textContent = ini(n); } });
     var av = $("convoAv"); av.textContent = c.ai ? "✦" : ini(c.name); av.style.background = g(c.id);
     $("convoName").innerHTML = esc(c.name) + creatorBadge(c) + (c.ai ? '<span class="ai-pill">AI</span>' : ""); $("convoStatus").textContent = c.ai ? "Always online" : "";
-    $("moreBtn").hidden = !!c.ai; $("medBar").hidden = true; $("callBtn").hidden = $("wtBtn").hidden = $("duetBtn").hidden = !!c.ai;
+    $("moreBtn").hidden = !!c.ai; $("medBar").hidden = true; $("callBtn").hidden = $("wtBtn").hidden = $("duetBtn").hidden = $("tlBtn").hidden = !!c.ai;
     $("micBtn").hidden = !c.ai || !SR_OK; $("saathiVoiceBtn").hidden = !c.ai; if (c.ai) refreshVoiceBtn();
     var body = $("convoBody"); body.innerHTML = "";
     if (c.ai) {
@@ -873,6 +873,39 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
         .catch(function (e) { toast(errMsg(e)); btn.disabled = false; btn.textContent = "Bhej do (private)"; });
     });
   }
+
+  // ---- Shared Memory Timeline: auto-curated from data that already exists -- no extra writes. ----
+  $("tlClose").addEventListener("click", function () { $("tlUI").hidden = true; });
+  $("tlBtn").addEventListener("click", function () {
+    var c = activeChat; if (!c || c.ai) return;
+    $("tlUI").hidden = false; $("tlText").innerHTML = '<h3>🕰️ Hamari Yaadein</h3><p class="st-note">Load ho rahi hai...</p>';
+    var mid = c.mid, other = c.id;
+    Promise.all([
+      getDoc(doc(db, "matches", mid)).catch(function () { return null; }),
+      getDocs(query(collection(db, "matches", mid, "messages"), orderBy("createdAt", "asc"), limit(300))).catch(function () { return { forEach: function () {} }; }),
+      getDoc(duetRef(mid)).catch(function () { return null; }),
+      getDoc(fbRef(mid)).catch(function () { return null; })
+    ]).then(function (r) {
+      var mdoc = r[0], msgs = r[1], duetDoc = r[2], fbDoc = r[3];
+      var items = [];
+      if (mdoc && mdoc.exists && mdoc.exists()) { var md = mdoc.data(); if (md.createdAt) items.push({ at: ms(md.createdAt), icon: "💞", title: "Match hua", sub: hm(ms(md.createdAt)) }); }
+      var firstMsg = null, firstCall = null, total = 0;
+      msgs.forEach(function (d) {
+        var m = snapData(d); if (m.med) return; total++;
+        if (!firstMsg && m.text && !m.call) firstMsg = m;
+        if (!firstCall && m.call && m.call.k === "offer") firstCall = m;
+      });
+      if (firstMsg) items.push({ at: ms(firstMsg.createdAt), icon: "💬", title: "Pehla message", sub: '"' + String(firstMsg.text).slice(0, 60) + '"' });
+      if (firstCall) items.push({ at: ms(firstCall.createdAt), icon: "📞", title: "Pehli call", sub: hm(ms(firstCall.createdAt)) });
+      if (duetDoc && duetDoc.exists && duetDoc.exists() && duetDoc.data().song) { var dd = duetDoc.data(); items.push({ at: Date.now(), icon: "🎤", title: "Duet Song bana: " + dd.song.title, sub: "Dono ne milkar likha" }); }
+      if (fbDoc && fbDoc.exists && fbDoc.exists()) { var fd = fbDoc.data(); if (fd["done_" + UID] && fd["done_" + other]) items.push({ at: Date.now() + 1, icon: "📝", title: "Date feedback exchange hua", sub: "Dono taraf se" }); }
+      if (total > 1) items.push({ at: Date.now() + 2, icon: "✨", title: total + " messages ab tak", sub: "Aur badhte rahenge" });
+      items.sort(function (a, b) { return a.at - b.at; });
+      var box = $("tlText"); box.innerHTML = '<h3>🕰️ Hamari Yaadein</h3>';
+      if (!items.length) { box.appendChild(el('<p class="st-note">Abhi koi yaad nahi — baat karna, call karna ya duet banana shuru karo 💜</p>')); return; }
+      items.forEach(function (it) { box.appendChild(el('<div class="tl-item"><b>' + it.icon + ' ' + esc(it.title) + '</b><span>' + esc(it.sub) + '</span></div>')); });
+    }).catch(function (e) { $("tlText").innerHTML = '<h3>🕰️ Hamari Yaadein</h3><p class="st-note">Abhi load nahi ho payi: ' + esc(errMsg(e)) + '</p>'; });
+  });
 
   // ---- Voice/video call + walkie-talkie (WebRTC; signaling Firestore messages se) ----
   // Media seedhi dono phone ke beech jaati hai (peer-to-peer) -- WebRTC spec ke mutabik har call
