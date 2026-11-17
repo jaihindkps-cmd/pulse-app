@@ -423,9 +423,9 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   var nearUnsub = null, nearTimer = null;
   function stopNearby() { if (nearUnsub) { nearUnsub(); nearUnsub = null; } clearInterval(nearTimer); nearTimer = null; }
   function invite() {
-    var url = location.origin + location.pathname, text = "Maine Pulse try kiya hai 🚀 — Dosti, Dating/Shaadi, Jobs, AI Saathi, Gaana Studio aur Bhajan Rooms, sab ek hi free app mein. Try karo, mazaa aayega:";
+    var url = location.origin + location.pathname, text = "I'm using Pulse 🚀 — Friends, Dating/Marriage, Jobs, AI companion Saathi, Music Studio and Bhajan Rooms, all in one free app. Give it a try, you'll love it:";
     if (navigator.share) navigator.share({ title: "Pulse", text: text, url: url }).catch(function () {});
-    else if (navigator.clipboard) navigator.clipboard.writeText(text + " " + url).then(function () { toast("Invite link copy ho gaya 📋"); }).catch(function () { toast(url); });
+    else if (navigator.clipboard) navigator.clipboard.writeText(text + " " + url).then(function () { toast("Invite link copied 📋"); }).catch(function () { toast(url); });
     else toast(url);
   }
   $("inviteBtn").addEventListener("click", invite);
@@ -1271,7 +1271,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   var NUMF = { height: 1, ageMin: 1, ageMax: 1, exp: 1 };
   function fillProfileForm() {
     $("eMode").value = MODE; Object.keys(PROF_FIELDS).forEach(function (id) { var v = ME[PROF_FIELDS[id]]; if (v != null && v !== "") $(id).value = v; });
-    $("hideToggle").classList.toggle("on", !!ME.hidden); cvPaint(); phoneLoad(); vfPaint(); sectionsFor($("eMode").value);
+    $("hideToggle").classList.toggle("on", !!ME.hidden); cvPaint(); phoneLoad(); vfPaint(); sectionsFor($("eMode").value); $("eTrusted").value = ME.trustedContact || "";
   }
   function sectionsFor(m) { $("secMate").hidden = !isMateMode(m); $("secMarriage").hidden = m !== "marriage"; $("secSeeker").hidden = m !== "jobseeker"; $("secRecruiter").hidden = m !== "recruiter"; $("eWork").parentNode.firstChild.nodeValue = m === "recruiter" ? "Role at work" : "Occupation"; }
   $("eMode").addEventListener("change", function () { sectionsFor(this.value); });
@@ -1539,6 +1539,44 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     if (!PHONE_RE.test(v)) { toast("Enter a valid phone number"); return; }
     setDoc(doc(db, "contacts", UID), { phone: v, updatedAt: serverTimestamp() }).then(function () { toast("Number saved. It is shared only with members you approve."); }).catch(function (e) { toast(errMsg(e)); });
   });
+
+  // ---- Silent Panic Signal: hold the shield 2s to silently send trusted contact a location alert ----
+  $("trustedSave").addEventListener("click", function () {
+    var v = $("eTrusted").value.replace(/[\s-]/g, "");
+    if (!v) { updateDoc(doc(db, "users", UID), { trustedContact: "" }).then(function () { ME.trustedContact = ""; toast("Trusted contact removed"); }).catch(function (e) { toast(errMsg(e)); }); return; }
+    if (!PHONE_RE.test(v)) { toast("Enter a valid phone number"); return; }
+    updateDoc(doc(db, "users", UID), { trustedContact: v }).then(function () { ME.trustedContact = v; toast("Trusted contact saved 🛡"); }).catch(function (e) { toast(errMsg(e)); });
+  });
+  (function () {
+    var fab = $("sosFab"), cancelBar = $("sosCancel"), countEl = $("sosCount"), armTimer = null, holdTimer = null, counting = 0, countTimer = null;
+    function clearArm() { clearTimeout(holdTimer); fab.classList.remove("arming"); }
+    function startHold(e) { if (e.cancelable) e.preventDefault(); holdTimer = setTimeout(arm, 2000); fab.classList.add("arming"); }
+    function cancelHold() { clearArm(); }
+    function arm() {
+      fab.classList.remove("arming");
+      if (!ME.trustedContact) { toast("Set a trusted contact in Settings first 🛡"); return; }
+      counting = 3; countEl.textContent = counting; cancelBar.classList.add("show");
+      countTimer = setInterval(function () {
+        counting--; if (counting <= 0) { clearInterval(countTimer); cancelBar.classList.remove("show"); sendSos(); return; }
+        countEl.textContent = counting;
+      }, 1000);
+    }
+    $("sosCancelBtn").addEventListener("click", function () { clearInterval(countTimer); cancelBar.classList.remove("show"); toast("Safety alert cancelled"); });
+    fab.addEventListener("pointerdown", startHold); fab.addEventListener("pointerup", cancelHold); fab.addEventListener("pointerleave", cancelHold); fab.addEventListener("pointercancel", cancelHold);
+    fab.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+  })();
+  function sendSos(note) {
+    var sendAt = Date.now();
+    function go(lat, lng) {
+      var mapsLink = lat != null ? ("https://maps.google.com/?q=" + lat + "," + lng) : "location unavailable";
+      var msg = "🚨 Safety alert from " + ME.name + " via Pulse" + (note ? " — " + note : "") + ". Last known location: " + mapsLink + ". Time: " + new Date(sendAt).toLocaleString() + ". Please check on me.";
+      addDoc(collection(db, "sos"), { uid: UID, name: ME.name, lat: lat || null, lng: lng || null, trustedContact: ME.trustedContact || "", at: serverTimestamp() }).catch(function () {});
+      var wa = "https://wa.me/" + (ME.trustedContact || "").replace(/^\+/, "") + "?text=" + encodeURIComponent(msg);
+      var win = window.open(wa, "_blank");
+      if (!win) { if (navigator.clipboard) navigator.clipboard.writeText(msg).then(function () { toast("Safety message copied — send it manually if the link didn't open"); }); }
+    }
+    getPos(function (lat, lng) { go(lat, lng); }, function () { go(null, null); });
+  }
   var reqUnsub = null, firstReq = true;
   function listenReqs() {
     if (reqUnsub) { reqUnsub(); reqUnsub = null; } firstReq = true;

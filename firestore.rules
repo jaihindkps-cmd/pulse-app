@@ -52,6 +52,7 @@ service cloud.firestore {
           && request.resource.data.get('company', '').size() <= 100 && request.resource.data.get('cabout', '').size() <= 300
           && request.resource.data.get('csite', '').size() <= 200 && request.resource.data.get('cvName', '').size() <= 100 && request.resource.data.get('role', '').size() <= 100
           && request.resource.data.get('desig', '').size() <= 100 && request.resource.data.get('community', '').size() <= 100
+          && request.resource.data.get('trustedContact', '').size() <= 16
           && request.resource.data.get('religion', '').size() <= 60 && request.resource.data.get('prefCity', '').size() <= 100
           && (request.resource.data.get('verified', false) == resource.data.get('verified', false) || isAdmin())
           && (request.resource.data.get('verifyPending', false) == true || request.resource.data.get('verifyPending', false) == resource.data.get('verifyPending', false) || isAdmin()))
@@ -90,6 +91,14 @@ service cloud.firestore {
         && request.resource.data.get('photo', '').size() <= 400000
         && (request.resource.data.get('text', '').size() > 0 || request.resource.data.get('photo', '').size() > 0);
       allow delete: if signedIn() && (resource.data.uid == me() || isAdmin());
+    }
+
+    // Silent panic-signal log: write-only by the sender, readable by them or an admin (safety oversight), never by anyone else.
+    match /sos/{id} {
+      allow create: if signedIn() && request.resource.data.uid == me();
+      allow get: if signedIn() && (resource.data.uid == me() || isAdmin());
+      allow list: if signedIn() && isAdmin();
+      allow update, delete: if false;
     }
 
     // Feed

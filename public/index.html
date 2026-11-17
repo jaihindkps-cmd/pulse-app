@@ -296,6 +296,13 @@
   .tab svg { width: 23px; height: 23px; transition: transform .15s; }
   .tab.active { color: var(--accent); }
   .tab.active svg { transform: translateY(-2px); }
+  .sos-fab { position: absolute; right: 12px; bottom: 86px; z-index: 46; width: 46px; height: 46px; border-radius: 50%; border: none; background: color-mix(in srgb, var(--surface) 85%, transparent); backdrop-filter: blur(10px); color: var(--faint); font-size: 18px; display: grid; place-items: center; cursor: pointer; box-shadow: var(--shadow); opacity: .55; transition: opacity .15s, transform .15s; }
+  .sos-fab:active { transform: scale(.92); }
+  .sos-fab.arming { opacity: 1; color: #fff; background: #e23d5a; animation: sosPulse .8s infinite; }
+  @keyframes sosPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(226,61,90,.6); } 50% { box-shadow: 0 0 0 10px rgba(226,61,90,0); } }
+  .sos-cancel { position: absolute; left: 50%; bottom: 150px; transform: translateX(-50%); z-index: 71; background: #e23d5a; color: #fff; padding: 12px 20px; border-radius: 14px; font-size: 13px; font-weight: 700; display: none; align-items: center; gap: 10px; box-shadow: var(--shadow); }
+  .sos-cancel.show { display: flex; }
+  .sos-cancel button { background: rgba(255,255,255,.25); border: none; color: #fff; font-weight: 700; padding: 6px 12px; border-radius: 8px; cursor: pointer; }
 
   /* toast */
   .toast { position: absolute; left: 50%; bottom: 100px; transform: translateX(-50%) translateY(20px); background: var(--fg); color: var(--bg); padding: 10px 18px; border-radius: 12px; font-size: 13px; font-weight: 600; z-index: 70; opacity: 0; pointer-events: none; transition: opacity .25s, transform .25s; box-shadow: var(--shadow); max-width: 80%; text-align: center; }
@@ -620,6 +627,9 @@
       <div class="setting-row"><div class="lbl">Identity verification<div class="desc" id="vfDesc">Take a quick selfie so our safety team can confirm you are a real person. Shown to members only as a verified badge — the photo itself is never shown to other members.</div></div><button class="btn-outline" id="vfBtn" style="padding:8px 14px">Verify</button><input type="file" id="vfInput" accept="image/*" capture="user" hidden></div>
       <div class="setting-row"><div class="lbl">Pause my profile<div class="desc">Hide me from Discover, Nearby and candidate search</div></div><button class="toggle" id="hideToggle" aria-label="Pause profile"></button></div>
       <div class="setting-row"><div class="lbl">Blocked people<div class="desc">Unblock someone you blocked</div></div><button class="btn-outline" id="blockedBtn" style="padding:8px 14px">Manage</button></div>
+      <div class="section-title">Safety</div>
+      <div class="st-note">Set a trusted contact once. Then, anywhere in the app, hold the 🛡 shield button for 2 seconds to silently send them your live location — no one else sees it happen.</div>
+      <div class="edit-form" style="padding:0 18px 8px"><label>Trusted contact's phone (with country code)<input id="eTrusted" type="tel" inputmode="tel" maxlength="16" placeholder="+91XXXXXXXXXX"></label><button class="btn-outline" id="trustedSave" type="button" style="margin:6px 0">Save trusted contact</button></div>
       <div id="creatorBox" hidden></div>
       <button class="btn-grad" style="width:100%;margin-top:16px;padding:13px" id="inviteBtn">📨 Invite friends (invite link)</button>
       <button class="btn-outline" style="width:100%;margin-top:12px" id="logoutBtn">Logout</button>
@@ -689,6 +699,8 @@
     <button class="ptt" id="ptt" hidden>🎙 Hold to talk</button>
     <div class="call-actions"><button class="cbtn ok" id="callAccept" hidden>Accept</button><button class="cbtn mute" id="callMute" hidden>Mute</button><button class="cbtn mute" id="callCam" hidden>Camera off</button><button class="cbtn no" id="callEnd">End</button></div>
     <audio id="callAudio" autoplay playsinline controlsList="nodownload" oncontextmenu="return false"></audio></div></div>
+  <button class="sos-fab" id="sosFab" title="Hold 2s to send a silent safety alert" aria-label="Safety alert">🛡</button>
+  <div class="sos-cancel" id="sosCancel">Sending safety alert in <span id="sosCount">3</span>s<button id="sosCancelBtn" type="button">Cancel</button></div>
   <nav class="tabbar">
     <button class="tab active" data-tab="feed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10l9-7 9 7v9a2 2 0 0 1-2 2h-4v-6H9v6H5a2 2 0 0 1-2-2v-9Z" stroke-linejoin="round"/></svg>Home</button>
     <button class="tab" data-tab="discover"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-4.3-9.3-8.5C.9 9.4 2.4 6 5.6 6c1.9 0 3.2 1.1 4.4 2.5C11.2 7.1 12.5 6 14.4 6c3.2 0 4.7 3.4 2.9 6.5C19 16.7 12 21 12 21Z" stroke-linejoin="round"/></svg>Discover</button>
@@ -737,5 +749,5 @@
   <div class="toast" id="toast"></div>
 </div>
 
-<script src="app.js?v=0e1408d4de" defer></script>
+<script src="app.js?v=84b026de63" defer></script>
 <script>if("serviceWorker" in navigator && location.protocol.indexOf("http")===0){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});}</script></body></html>
