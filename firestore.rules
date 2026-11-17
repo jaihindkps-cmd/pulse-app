@@ -152,6 +152,14 @@ service cloud.firestore {
           && exists(/databases/$(database)/documents/matches/$(mid))
           && !isBlocked(me(), otherOf(mid)) && !isBlocked(otherOf(mid), me());
       }
+
+      // Duet Song: dono matched users mil kar ek gaana banate hain, apni-apni line se.
+      match /duet/{id} {
+        allow read: if signedIn() && inPair(mid);
+        allow create: if signedIn() && inPair(mid) && exists(/databases/$(database)/documents/matches/$(mid))
+          && request.resource.data.uids.size() == 2 && me() in request.resource.data.uids;
+        allow update: if signedIn() && inPair(mid) && request.resource.data.uids == resource.data.uids;
+      }
     }
 
     // Block: apna block banao/hatao/dekho.

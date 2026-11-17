@@ -594,7 +594,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     if (!c.ai && (!c.name || c.name === "...")) userName(c.id).then(function (n) { c.name = n; if (activeChat === c) { $("convoName").textContent = n; $("convoAv").textContent = ini(n); } });
     var av = $("convoAv"); av.textContent = c.ai ? "✦" : ini(c.name); av.style.background = g(c.id);
     $("convoName").innerHTML = esc(c.name) + creatorBadge(c) + (c.ai ? '<span class="ai-pill">AI</span>' : ""); $("convoStatus").textContent = c.ai ? "Always online" : "";
-    $("moreBtn").hidden = !!c.ai; $("medBar").hidden = true; $("callBtn").hidden = $("wtBtn").hidden = !!c.ai;
+    $("moreBtn").hidden = !!c.ai; $("medBar").hidden = true; $("callBtn").hidden = $("wtBtn").hidden = $("duetBtn").hidden = !!c.ai;
     $("micBtn").hidden = !c.ai || !SR_OK; $("saathiVoiceBtn").hidden = !c.ai; if (c.ai) refreshVoiceBtn();
     var body = $("convoBody"); body.innerHTML = "";
     if (c.ai) {
@@ -786,6 +786,57 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     var txt = clean("🎵 " + curMeta.title + " (" + GENRES[curMeta.genre].name + ", Pulse Gaana Studio AI)\n" + curMeta.lines.slice(0, 4).map(function (l) { return l.text; }).join(" / "), 500);
     addDoc(collection(db, "posts"), { uid: UID, name: ME.name, text: txt, likedBy: [], createdAt: serverTimestamp() }).then(function () { toast("Posted to feed 🎉"); bump("cPosts"); }).catch(function (e) { toast(errMsg(e)); }).then(function () { btn.disabled = false; });
   });
+
+  // ---- Duet Song: two matched users each write a line, AI blends both into one shared track ----
+  var duetUnsub = null, duetPlayer = new Player(), duetSong = null, duetGenerating = false;
+  var DUET_SYS = "Tum ek geetkaar ho. Do logon ne ek duet gaane ke liye apni-apni ek-ek line/idea di hai. In dono ideas ko jodo aur ek pyara, sanjha ORIGINAL Hinglish (Roman Hindi) duet gaana likho — dono ke bhav ko barabar jagah do. Kisi maujooda gaane ki nakal nahi. Sirf JSON do: {\"title\":string,\"minor\":boolean,\"bpm\":number(70-130),\"lines\":[{\"section\":\"Verse 1\"|\"Chorus\"|\"Verse 2\"|\"Bridge\",\"text\":string}]}. Theek 8 se 12 lines. Gaali, hinsa, nafrat, vayask baatein aur asli logon ke naam nahi.";
+  function duetRef(mid) { return doc(db, "matches", mid, "duet", "main"); }
+  function closeDuet() { $("duetUI").hidden = true; if (duetUnsub) { duetUnsub(); duetUnsub = null; } duetPlayer.stop(); }
+  $("duetClose").addEventListener("click", closeDuet);
+  $("duetBtn").addEventListener("click", function () {
+    var c = activeChat; if (!c || c.ai) return;
+    var mid = c.mid, other = c.id;
+    $("duetUI").hidden = false;
+    if (duetUnsub) duetUnsub();
+    duetUnsub = onSnapshot(duetRef(mid), function (s) { renderDuet(s.exists() ? s.data() : null, mid, other); }, function (e) { toast(errMsg(e)); });
+  });
+  function renderDuet(d, mid, other) {
+    var box = $("duetText"); if (!box) return;
+    var myKey = "idea_" + UID, otherKey = "idea_" + other;
+    if (d && d.song) {
+      box.innerHTML = '<h3>🎤 ' + esc(d.song.title) + '</h3><p class="st-note">Ek duet — dono ki lines, AI ne jod ke gaana bana diya 🎶</p><div id="duetLyrics"></div><button class="btn-grad" id="duetPlay" style="width:100%;margin-top:10px">▶ Play</button>';
+      duetSong = buildSong({ genre: "pop", bpm: d.song.bpm, minor: d.song.minor, title: d.song.title, lines: d.song.lines });
+      var lb = $("duetLyrics"), last = "";
+      d.song.lines.forEach(function (l, i) { if (l.section !== last) { lb.appendChild(el('<div class="sec">' + esc(l.section) + '</div>')); last = l.section; } lb.appendChild(el('<div class="ln" data-i="' + i + '">' + esc(l.text) + '</div>')); });
+      $("duetPlay").addEventListener("click", function () {
+        var btn = this;
+        if (duetPlayer.playing) { duetPlayer.stop(); btn.textContent = "▶ Play"; return; }
+        btn.textContent = "⏹ Stop";
+        duetPlayer.play(duetSong, { onLine: function (i) { lb.querySelectorAll(".ln").forEach(function (n) { n.classList.toggle("on", +n.getAttribute("data-i") === i); }); }, onTick: function () {}, onEnd: function () { btn.textContent = "▶ Play"; } }).catch(function (e) { toast(errMsg(e)); });
+      });
+      return;
+    }
+    if (d && d.status === "generating") { box.innerHTML = '<h3>🎤 Duet Song</h3><p class="st-note">Dono ki lines aa gayi — AI inhe jod kar gaana bana raha hai... 🎶</p>'; return; }
+    if (d && d[myKey]) {
+      box.innerHTML = '<h3>🎤 Duet Song</h3><p class="st-note">Tumhari line bhej di gayi hai ✅ Doosre ke likhne ka intezaar hai...</p><p style="font-style:italic">"' + esc(d[myKey]) + '"</p>';
+      if (d[otherKey] && !duetGenerating) {
+        duetGenerating = true;
+        updateDoc(duetRef(mid), { status: "generating" }).then(function () {
+          return aiJson(DUET_SYS, "Line 1: " + d[myKey] + "\nLine 2: " + d[otherKey]);
+        }).then(normSong).then(function (sp) { if (!sp) throw new Error("bad"); return updateDoc(duetRef(mid), { song: sp, status: "ready" }); })
+          .catch(function () { return updateDoc(duetRef(mid), { song: fallbackSong(d[myKey] + " " + d[otherKey], "pop", ""), status: "ready" }).catch(function () {}); })
+          .then(function () { duetGenerating = false; }).catch(function () { duetGenerating = false; });
+      }
+      return;
+    }
+    box.innerHTML = '<h3>🎤 Duet Song</h3><p class="st-note">Apni ek line/idea likho — jab dono likh denge, AI dono ko jod kar ek sanjha gaana bana dega 🎶</p><div class="edit-form" style="padding:0"><label>Tumhari line/idea<textarea id="duetMine" maxlength="150" rows="2" placeholder="e.g. Pehli baar jab tumse baat hui thi..."></textarea></label><button class="btn-grad" id="duetSend" style="width:100%;margin-top:6px">Bhej do</button></div>';
+    $("duetMine") && $("duetMine").focus();
+    $("duetSend").addEventListener("click", function () {
+      var t = clean($("duetMine").value, 150); if (!t) { toast("Pehle kuch likho"); return; }
+      var uids = [UID, other].sort(), ref = duetRef(mid);
+      updateDoc(ref, obj(myKey, t)).catch(function () { return setDoc(ref, Object.assign({ uids: uids, status: "collecting" }, obj(myKey, t))); }).then(function () { toast("Bhej diya 🎤"); }).catch(function (e) { toast(errMsg(e)); });
+    });
+  }
 
   // ---- Voice/video call + walkie-talkie (WebRTC; signaling Firestore messages se) ----
   // Media seedhi dono phone ke beech jaati hai (peer-to-peer) -- WebRTC spec ke mutabik har call
