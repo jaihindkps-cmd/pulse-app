@@ -260,7 +260,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     screens.forEach(function (s) { $("screen-" + s).hidden = s !== name; });
     document.querySelectorAll(".tab").forEach(function (t) { t.classList.toggle("active", t.getAttribute("data-tab") === key); });
     $("screenTitle").textContent = titles[name];
-    try { if (name === "discover") loadDeck(); if (name === "jobs") loadJobs(); } catch (e) { toast("Could not load this screen. Please try again."); } if (name === "nearby") loadNearby(); else stopNearby(); if (name === "studio") renderLib(); if (name === "chats") { $("chatDot").hidden = true; renderChats(); } if (name === "profile") renderCircle();
+    try { if (name === "discover") loadDeck(); if (name === "jobs") loadJobs(); } catch (e) { toast("Could not load this screen. Please try again."); } if (name === "nearby") loadNearby(); else stopNearby(); if (name === "studio") renderLib(); if (name === "chats") { $("chatDot").hidden = true; renderChats(); } if (name === "profile") { renderCircle(); renderJourney(); }
   }
   document.querySelectorAll(".tab").forEach(function (t) { t.addEventListener("click", function () { if (UID) showTab(t.getAttribute("data-tab")); }); });
 
@@ -681,7 +681,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     if (saathiBusy) return; saathiBusy = true;
     var typing = el('<div class="typing"><i></i><i></i><i></i></div>'); $("convoBody").appendChild(typing); $("convoBody").scrollTop = 1e9;
     var bub = null;
-    var sys = SAATHI_SYS + " User's name: " + ME.name + "." + (ME.saathiMemory ? " What you remember about this user from before: " + ME.saathiMemory : "");
+    var sys = SAATHI_SYS + " User's name: " + ME.name + "." + (ME.saathiMemory ? " What you remember about this user from before: " + ME.saathiMemory : "") + journeyFacts();
     aiChat(sys, saathiHist.slice(-12), function (part) {
       if (activeChat !== c) return; typing.remove();
       if (!bub) bub = addBubble({ mine: false, text: part, at: Date.now() });
@@ -831,7 +831,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
           return aiJson(DUET_SYS, "Line 1: " + d[myKey] + "\nLine 2: " + d[otherKey]);
         }).then(normSong).then(function (sp) { if (!sp) throw new Error("bad"); return updateDoc(duetRef(mid), { song: sp, status: "ready" }); })
           .catch(function () { return updateDoc(duetRef(mid), { song: fallbackSong(d[myKey] + " " + d[otherKey], "pop", ""), status: "ready" }).catch(function () {}); })
-          .then(function () { duetGenerating = false; }).catch(function () { duetGenerating = false; });
+          .then(function () { duetGenerating = false; bump("cDuets"); }).catch(function () { duetGenerating = false; });
       }
       return;
     }
@@ -874,7 +874,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
         .then(function (polished) {
           var ref = fbRef(mid), upd = obj(doneKey, true); upd["sum_for_" + other] = polished;
           return updateDoc(ref, upd).catch(function () { return setDoc(ref, Object.assign({ uids: [UID, other].sort() }, upd)); });
-        }).then(function () { toast("Shukriya 🙏 Private rehta hai jab tak dono na de dein."); })
+        }).then(function () { toast("Shukriya 🙏 Private rehta hai jab tak dono na de dein."); bump("cFeedback"); })
         .catch(function (e) { toast(errMsg(e)); btn.disabled = false; btn.textContent = "Bhej do (private)"; });
     });
   }
@@ -959,7 +959,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     if (ABUSE.test(t)) { toast("Yeh group sab ke liye safe rehna chahiye — kripya respectfully likho."); return; }
     if (!rate("scmsg", 8, 10000)) return;
     inp.value = "";
-    addDoc(collection(db, "supportRooms", curSupport, "msgs"), { from: UID, alias: aliasFor(curSupport, UID), text: t, createdAt: serverTimestamp() }).catch(function (e) { toast(errMsg(e)); });
+    addDoc(collection(db, "supportRooms", curSupport, "msgs"), { from: UID, alias: aliasFor(curSupport, UID), text: t, createdAt: serverTimestamp() }).then(function () { bump("cSupport"); }).catch(function (e) { toast(errMsg(e)); });
   }
   $("supportSend").addEventListener("click", sendSupportMsg);
   $("supportInput").addEventListener("keydown", function (e) { if (e.key === "Enter") sendSupportMsg(); });
@@ -1138,14 +1138,44 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   function bump(field, n) {
     if (!UID) return;
     var upd = {}; upd[field] = increment(n || 1);
+    if (ME) ME[field] = (ME[field] || 0) + (n || 1); // local echo so same-session reads (Journey Score) stay live
     updateDoc(doc(db, "users", UID), upd).catch(function () {});
   }
   var ACTIVITY_FIELDS = [
     { k: "cPosts", lbl: "Posts" }, { k: "cMsgs", lbl: "Msgs" }, { k: "cSwipes", lbl: "Swipes" },
     { k: "cMatches", lbl: "Matches" }, { k: "cApps", lbl: "Applications" }, { k: "cJobs", lbl: "Jobs posted" },
     { k: "cCalls", lbl: "Calls" }, { k: "cSongs", lbl: "Songs played" }, { k: "cRooms", lbl: "Aarti rooms" },
-    { k: "cAi", lbl: "AI chats" }, { k: "cStatus", lbl: "Status posts" }
+    { k: "cAi", lbl: "AI chats" }, { k: "cStatus", lbl: "Status posts" },
+    { k: "cDuets", lbl: "Duet Songs" }, { k: "cFeedback", lbl: "Date feedback given" }, { k: "cSupport", lbl: "Support Circle msgs" }
   ];
+  // ---- Trust & Journey Score: a compounding badge from how a person actually uses Pulse across
+  // every feature -- the thing a copycat app can't fake without copying their whole history too. ----
+  function journeyScore(u) {
+    return (u.cMsgs || 0) * 1 + (u.cMatches || 0) * 5 + (u.cSongs || 0) * 2 + (u.cCalls || 0) * 4 + (u.cAi || 0) * 1
+      + (u.cDuets || 0) * 10 + (u.cFeedback || 0) * 12 + (u.cSupport || 0) * 3 + (u.cRooms || 0) * 2
+      + ((u.circleMembers || []).length) * 8;
+  }
+  function journeyTier(score) {
+    if (score >= 400) return { name: "Soulful ✨", next: null };
+    if (score >= 150) return { name: "Trusted 💎", next: 400 };
+    if (score >= 50) return { name: "Connector 🌱", next: 150 };
+    return { name: "Naya Safar 🌼", next: 50 };
+  }
+  function journeyFacts() {
+    if (!ME) return "";
+    var bits = [];
+    if (ME.cDuets) bits.push(ME.cDuets + " Duet Song(s) made with matches");
+    if (ME.cCalls) bits.push(ME.cCalls + " voice/video call(s)");
+    if ((ME.circleMembers || []).length) bits.push("part of a Safety Circle with " + ME.circleMembers.length + " trusted friend(s)");
+    if (ME.cSupport) bits.push("active in Pulse's anonymous Support Circles");
+    if (!bits.length) return "";
+    return " Lightly, only if it fits naturally, you may recall this about the user's journey on Pulse: " + bits.join(", ") + ".";
+  }
+  function renderJourney() {
+    var box = $("journeyBox"); if (!box || !ME) return;
+    var score = journeyScore(ME), tier = journeyTier(score);
+    box.innerHTML = '<div class="section-title">Trust &amp; Journey</div><div class="ai-note" style="display:flex;align-items:center;gap:12px"><div style="font-size:26px">' + tier.name.split(" ").pop() + '</div><div><b>' + esc(tier.name.split(" ").slice(0, -1).join(" ")) + '</b><div class="st-note" style="margin:2px 0 0">Score ' + score + (tier.next ? " · " + (tier.next - score) + " aur se agla level" : " · top level 🎉") + '</div></div></div>';
+  }
 
   // ---- throttle (spam rokne ke liye) ----
   var rateLog = {};
@@ -1480,7 +1510,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   var NUMF = { height: 1, ageMin: 1, ageMax: 1, exp: 1 };
   function fillProfileForm() {
     $("eMode").value = MODE; Object.keys(PROF_FIELDS).forEach(function (id) { var v = ME[PROF_FIELDS[id]]; if (v != null && v !== "") $(id).value = v; });
-    $("hideToggle").classList.toggle("on", !!ME.hidden); cvPaint(); phoneLoad(); vfPaint(); sectionsFor($("eMode").value); $("eTrusted").value = ME.trustedContact || ""; renderCircle();
+    $("hideToggle").classList.toggle("on", !!ME.hidden); cvPaint(); phoneLoad(); vfPaint(); sectionsFor($("eMode").value); $("eTrusted").value = ME.trustedContact || ""; renderCircle(); renderJourney();
   }
   function sectionsFor(m) { $("secMate").hidden = !isMateMode(m); $("secMarriage").hidden = m !== "marriage"; $("secSeeker").hidden = m !== "jobseeker"; $("secRecruiter").hidden = m !== "recruiter"; $("eWork").parentNode.firstChild.nodeValue = m === "recruiter" ? "Role at work" : "Occupation"; }
   $("eMode").addEventListener("change", function () { sectionsFor(this.value); });
