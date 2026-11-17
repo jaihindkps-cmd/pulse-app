@@ -1,11 +1,19 @@
 name: Pulse APK banao
 on:
   workflow_dispatch: {}          # GitHub par "Run workflow" button se chalta hai
+  workflow_run:                  # website deploy hone ke baad khud-ba-khud APK bhi taaza bana do
+    workflows: ["Firebase par deploy karo"]
+    types: [completed]
+permissions:
+  contents: write                # GitHub Release banane/upload karne ke liye zaroori
 jobs:
   apk:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
       - uses: actions/setup-java@v4
@@ -30,3 +38,15 @@ jobs:
         with:
           name: pulse-apk
           path: mobile/android/app/build/outputs/apk/debug/app-debug.apk
+      - name: GitHub Releases me daalo (purani "latest" release update ho jaati hai)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          SHA="$(git rev-parse --short HEAD)"
+          cp mobile/android/app/build/outputs/apk/debug/app-debug.apk "pulse-${SHA}.apk"
+          gh release delete latest --yes --cleanup-tag --repo "${{ github.repository }}" 2>/dev/null || true
+          gh release create latest "pulse-${SHA}.apk" \
+            --repo "${{ github.repository }}" \
+            --title "Pulse — latest build ($(date -u +%Y-%m-%d))" \
+            --notes "Khud-ba-khud bana APK, commit ${SHA} se. Ye ek debug build hai (testing ke liye, Play Store signed nahi)." \
+            --prerelease
