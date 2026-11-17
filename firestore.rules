@@ -54,6 +54,8 @@ service cloud.firestore {
           && request.resource.data.get('desig', '').size() <= 100 && request.resource.data.get('community', '').size() <= 100
           && request.resource.data.get('trustedContact', '').size() <= 16
           && request.resource.data.get('saathiMemory', '').size() <= 600
+          && request.resource.data.get('circleMembers', []).size() <= 30
+          && request.resource.data.get('safetyStatus', '') in ['', 'safe', 'checkin']
           && request.resource.data.get('religion', '').size() <= 60 && request.resource.data.get('prefCity', '').size() <= 100
           && (request.resource.data.get('verified', false) == resource.data.get('verified', false) || isAdmin())
           && (request.resource.data.get('verifyPending', false) == true || request.resource.data.get('verifyPending', false) == resource.data.get('verifyPending', false) || isAdmin()))

@@ -260,7 +260,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     screens.forEach(function (s) { $("screen-" + s).hidden = s !== name; });
     document.querySelectorAll(".tab").forEach(function (t) { t.classList.toggle("active", t.getAttribute("data-tab") === key); });
     $("screenTitle").textContent = titles[name];
-    try { if (name === "discover") loadDeck(); if (name === "jobs") loadJobs(); } catch (e) { toast("Could not load this screen. Please try again."); } if (name === "nearby") loadNearby(); else stopNearby(); if (name === "studio") renderLib(); if (name === "chats") { $("chatDot").hidden = true; renderChats(); }
+    try { if (name === "discover") loadDeck(); if (name === "jobs") loadJobs(); } catch (e) { toast("Could not load this screen. Please try again."); } if (name === "nearby") loadNearby(); else stopNearby(); if (name === "studio") renderLib(); if (name === "chats") { $("chatDot").hidden = true; renderChats(); } if (name === "profile") renderCircle();
   }
   document.querySelectorAll(".tab").forEach(function (t) { t.addEventListener("click", function () { if (UID) showTab(t.getAttribute("data-tab")); }); });
 
@@ -713,7 +713,8 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     if (!activeChat || activeChat.ai) return;
     var body = $("convoBody"); if (body.querySelector(".safety")) return;
     var u = activeChat;
-    var box = el('<div class="ai-note safety">' + esc(u.name) + ' ke saath: <button class="btn-outline" id="doBlock" style="margin:8px 4px 0;padding:8px 14px">Block karo</button><button class="btn-outline" id="doReport" style="margin:8px 4px 0;padding:8px 14px">Report karo</button><button class="btn-outline" id="doMeet" style="margin:8px 4px 0;padding:8px 14px">📍 Safe meet</button><button class="btn-outline" id="doFeedback" style="margin:8px 4px 0;padding:8px 14px">📝 Date feedback</button><div style="font-size:12px;margin-top:8px;color:var(--muted)">Pehli mulaqat: din me, public jagah, kisi apne ko batakar.</div></div>');
+    var inCircle = (ME.circleMembers || []).indexOf(u.id) >= 0;
+    var box = el('<div class="ai-note safety">' + esc(u.name) + ' ke saath: <button class="btn-outline" id="doBlock" style="margin:8px 4px 0;padding:8px 14px">Block karo</button><button class="btn-outline" id="doReport" style="margin:8px 4px 0;padding:8px 14px">Report karo</button><button class="btn-outline" id="doMeet" style="margin:8px 4px 0;padding:8px 14px">📍 Safe meet</button><button class="btn-outline" id="doFeedback" style="margin:8px 4px 0;padding:8px 14px">📝 Date feedback</button><button class="btn-outline" id="doCircle" style="margin:8px 4px 0;padding:8px 14px">' + (inCircle ? "✅ Safety Circle me hai" : "🛡 Safety Circle me jodo") + '</button><div style="font-size:12px;margin-top:8px;color:var(--muted)">Pehli mulaqat: din me, public jagah, kisi apne ko batakar.</div></div>');
     body.appendChild(box); body.scrollTop = 1e9;
     $("doBlock").addEventListener("click", function () {
       setDoc(doc(db, "blocks", UID + "_" + u.id), { blocker: UID, blocked: u.id, createdAt: serverTimestamp() }).then(function () { blocked.add(u.id); toast("Blocked"); $("convo").classList.remove("open"); closeMsgListener(); activeChat = null; renderChats(); }).catch(function (e) { toast(errMsg(e)); });
@@ -723,6 +724,10 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
       addDoc(collection(db, "reports"), { from: UID, to: u.id, reason: "Chat se report", createdAt: serverTimestamp() }).then(function () { toast("Report bhej di. Shukriya."); box.remove(); }).catch(function (e) { toast(errMsg(e)); });
     });
     $("doFeedback").addEventListener("click", function () { openFeedback(u); });
+    $("doCircle").addEventListener("click", function () {
+      if (inCircle) return;
+      updateDoc(doc(db, "users", UID), { circleMembers: arrayUnion(u.id) }).then(function () { ME.circleMembers = (ME.circleMembers || []).concat([u.id]); toast("Safety Circle me jod diya 🛡"); this.textContent = "✅ Safety Circle me hai"; }.bind(this)).catch(function (e) { toast(errMsg(e)); });
+    });
   });
 
   // ---- Gaana Studio ----
@@ -1423,7 +1428,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   var NUMF = { height: 1, ageMin: 1, ageMax: 1, exp: 1 };
   function fillProfileForm() {
     $("eMode").value = MODE; Object.keys(PROF_FIELDS).forEach(function (id) { var v = ME[PROF_FIELDS[id]]; if (v != null && v !== "") $(id).value = v; });
-    $("hideToggle").classList.toggle("on", !!ME.hidden); cvPaint(); phoneLoad(); vfPaint(); sectionsFor($("eMode").value); $("eTrusted").value = ME.trustedContact || "";
+    $("hideToggle").classList.toggle("on", !!ME.hidden); cvPaint(); phoneLoad(); vfPaint(); sectionsFor($("eMode").value); $("eTrusted").value = ME.trustedContact || ""; renderCircle();
   }
   function sectionsFor(m) { $("secMate").hidden = !isMateMode(m); $("secMarriage").hidden = m !== "marriage"; $("secSeeker").hidden = m !== "jobseeker"; $("secRecruiter").hidden = m !== "recruiter"; $("eWork").parentNode.firstChild.nodeValue = m === "recruiter" ? "Role at work" : "Occupation"; }
   $("eMode").addEventListener("change", function () { sectionsFor(this.value); });
@@ -1699,6 +1704,29 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     if (!PHONE_RE.test(v)) { toast("Enter a valid phone number"); return; }
     updateDoc(doc(db, "users", UID), { trustedContact: v }).then(function () { ME.trustedContact = v; toast("Trusted contact saved 🛡"); }).catch(function (e) { toast(errMsg(e)); });
   });
+  // ---- Safety Circle: trusted friends see a quick safe/check-in status from each other, never location ----
+  function setCircleStatus(s) {
+    updateDoc(doc(db, "users", UID), { safetyStatus: s, safetyStatusAt: serverTimestamp() }).then(function () { ME.safetyStatus = s; ME.safetyStatusAt = { toMillis: function () { return Date.now(); } }; toast(s === "safe" ? "Status: Safe ✅" : "Status: Check-in chahiye 🔶"); renderCircle(); }).catch(function (e) { toast(errMsg(e)); });
+  }
+  $("circleSafe") && $("circleSafe").addEventListener("click", function () { setCircleStatus("safe"); });
+  $("circleCheckin") && $("circleCheckin").addEventListener("click", function () { setCircleStatus("checkin"); });
+  function renderCircle() {
+    var box = $("circleList"); if (!box || !ME) return;
+    $("circleSafe").classList.toggle("on", ME.safetyStatus === "safe"); $("circleCheckin").classList.toggle("on", ME.safetyStatus === "checkin");
+    var mine = ME.circleMembers || [];
+    if (!mine.length) { box.innerHTML = '<div class="st-note">Abhi koi Safety Circle member nahi. Kisi match ke chat me Block/Report menu se "Safety Circle me jodo" dabao.</div>'; return; }
+    box.innerHTML = '<div class="st-note">Load ho raha hai...</div>';
+    Promise.all(mine.map(function (uid) { return getDoc(doc(db, "users", uid)).catch(function () { return null; }); })).then(function (docs) {
+      var rows = [];
+      docs.forEach(function (d, i) {
+        if (!d || !d.exists || !d.exists()) return; var u = d.data();
+        if (!(u.circleMembers || []).includes(UID)) return; // mutual tabhi dikhega
+        var st = u.safetyStatus === "safe" ? "safe" : u.safetyStatus === "checkin" ? "checkin" : "unknown";
+        rows.push('<div class="circle-row"><span>' + esc(u.name || "...") + '</span><span class="st ' + st + '">' + (st === "safe" ? "✅ Safe" : st === "checkin" ? "🔶 Check-in" : "— ") + '</span></div>');
+      });
+      box.innerHTML = rows.length ? rows.join("") : '<div class="st-note">Abhi koi mutual Safety Circle member nahi — unhe bhi tumhe jodna hoga.</div>';
+    }).catch(function () { box.innerHTML = '<div class="st-note">Load nahi ho paya.</div>'; });
+  }
   (function () {
     var fab = $("sosFab"), cancelBar = $("sosCancel"), countEl = $("sosCount"), armTimer = null, holdTimer = null, counting = 0, countTimer = null;
     function clearArm() { clearTimeout(holdTimer); fab.classList.remove("arming"); }

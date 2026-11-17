@@ -87,6 +87,13 @@
   .tl-item:last-child { border-color: transparent; }
   .tl-item::before { content: ""; position: absolute; left: -7px; top: 0; width: 12px; height: 12px; border-radius: 50%; background: var(--grad); }
   .tl-item b { display: block; font-size: 13.5px; } .tl-item span { font-size: 11.5px; color: var(--muted); }
+  .circle-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 13.5px; }
+  .circle-row:last-child { border-bottom: none; } .circle-row .st { margin-left: auto; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; }
+  .circle-row .st.safe { background: color-mix(in srgb, #1fbf7a 18%, transparent); color: #1fbf7a; }
+  .circle-row .st.checkin { background: color-mix(in srgb, #e23d5a 18%, transparent); color: #e23d5a; }
+  .circle-row .st.unknown { background: var(--surface-2); color: var(--muted); }
+  #circleSafe.on { background: color-mix(in srgb, #1fbf7a 20%, transparent); border-color: #1fbf7a; color: #1fbf7a; }
+  #circleCheckin.on { background: color-mix(in srgb, #e23d5a 20%, transparent); border-color: #e23d5a; color: #e23d5a; }
   .icon-btn svg { width: 19px; height: 19px; }
   .icon-btn .badge { position: absolute; transform: translate(11px,-11px); min-width: 16px; height: 16px; padding: 0 4px; border-radius: 9px; background: var(--accent-2); color: #fff; font-size: 10px; font-weight: 700; display: grid; place-items: center; }
 
@@ -636,6 +643,8 @@
       <div class="section-title">Safety</div>
       <div class="st-note">Set a trusted contact once. Then, anywhere in the app, hold the 🛡 shield button for 2 seconds to silently send them your live location — no one else sees it happen.</div>
       <div class="edit-form" style="padding:0 18px 8px"><label>Trusted contact's phone (with country code)<input id="eTrusted" type="tel" inputmode="tel" maxlength="16" placeholder="+91XXXXXXXXXX"></label><button class="btn-outline" id="trustedSave" type="button" style="margin:6px 0">Save trusted contact</button></div>
+      <div class="st-note">Safety Circle: trusted friends who can see a quick ✅ Safe / 🔶 Need check-in from each other — never your live location. Add someone from their chat's Block/Report menu; it only shows once you've added each other.</div>
+      <div class="edit-form" style="padding:0 18px 8px"><label>Tumhara status</label><div style="display:flex;gap:8px;margin:4px 0 8px"><button class="btn-outline" id="circleSafe" type="button" style="flex:1">✅ Main Safe hoon</button><button class="btn-outline" id="circleCheckin" type="button" style="flex:1">🔶 Check-in chahiye</button></div><div id="circleList"></div></div>
       <div id="creatorBox" hidden></div>
       <button class="btn-grad" style="width:100%;margin-top:16px;padding:13px" id="inviteBtn">📨 Invite friends (invite link)</button>
       <button class="btn-outline" style="width:100%;margin-top:12px" id="logoutBtn">Logout</button>
@@ -762,5 +771,5 @@
   <div class="toast" id="toast"></div>
 </div>
 
-<script src="app.js?v=8def89fb42" defer></script>
+<script src="app.js?v=e25e6f5319" defer></script>
 <script>if("serviceWorker" in navigator && location.protocol.indexOf("http")===0){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});}</script></body></html>
