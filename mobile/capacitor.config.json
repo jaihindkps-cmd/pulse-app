@@ -2,6 +2,5 @@
   "appId": "com.pulse.app",
   "appName": "Pulse",
   "webDir": "www",
-  "server": { "url": "https://pulse-704e7.web.app", "cleartext": false },
   "android": { "allowMixedContent": false }
 }

@@ -3,7 +3,8 @@ import { initializeApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup, signInWithRedirect, getRedirectResult, setPersistence, browserLocalPersistence, GoogleAuthProvider, onAuthStateChanged, signOut, deleteUser, sendEmailVerification, sendPasswordResetEmail } from "firebase/auth";
 import {
   initializeFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, collection, addDoc, query, where, orderBy, limit,
-  getDocs, onSnapshot, serverTimestamp, arrayUnion, arrayRemove, Timestamp, writeBatch, increment, getCountFromServer
+  getDocs, onSnapshot, serverTimestamp, arrayUnion, arrayRemove, Timestamp, writeBatch, increment, getCountFromServer,
+  persistentLocalCache, persistentSingleTabManager
 } from "firebase/firestore";
 import { initAI, chat as aiChat, json as aiJson, aiWorking } from "./ai.js";
 import { buildSong, Player, renderWav, GENRES } from "./music.js";
@@ -192,7 +193,11 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   function init(cfg) {
     var app = initializeApp(cfg);
     auth = getAuth(app);
-    db = initializeFirestore(app, { experimentalAutoDetectLongPolling: true });
+    // Offline cache taaki app me thoda sa bhi network hichkichahat ho (mobile data switch waqt)
+    // to login/profile baar-baar poochne ke bajaye aakhri-jaana-hua data se turant kaam chale.
+    try {
+      db = initializeFirestore(app, { experimentalAutoDetectLongPolling: true, localCache: persistentLocalCache({ tabManager: persistentSingleTabManager({}) }) });
+    } catch (e) { db = initializeFirestore(app, { experimentalAutoDetectLongPolling: true }); }
     initAI(app);
     // Agar Google sign-in redirect-flow se hua tha (popup kaam nahi kiya), uska result/error yahan aata hai.
     // Session to onAuthStateChanged se hi ban jata hai — ye sirf kisi redirect-error ko silently lost hone se bachata hai.
@@ -590,11 +595,11 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   }
   function closeMsgListener() { if (msgUnsub) { msgUnsub(); msgUnsub = null; } }
   function openChat(c) {
-    closeMsgListener(); if (!c.ai && nameCache[c.id]) c.name = nameCache[c.id]; activeChat = c;
+    closeMsgListener(); if ($("chatMenu")) $("chatMenu").hidden = true; if (!c.ai && nameCache[c.id]) c.name = nameCache[c.id]; activeChat = c;
     if (!c.ai && (!c.name || c.name === "...")) userName(c.id).then(function (n) { c.name = n; if (activeChat === c) { $("convoName").textContent = n; $("convoAv").textContent = ini(n); } });
     var av = $("convoAv"); av.textContent = c.ai ? "✦" : ini(c.name); av.style.background = g(c.id);
     $("convoName").innerHTML = esc(c.name) + creatorBadge(c) + (c.ai ? '<span class="ai-pill">AI</span>' : ""); $("convoStatus").textContent = c.ai ? "Always online" : "";
-    $("moreBtn").hidden = !!c.ai; $("medBar").hidden = true; $("callBtn").hidden = $("wtBtn").hidden = $("duetBtn").hidden = $("tlBtn").hidden = !!c.ai;
+    $("moreBtn").hidden = !!c.ai; $("medBar").hidden = true; $("callBtn").hidden = $("videoCallBtn").hidden = $("wtBtn").hidden = $("duetBtn").hidden = $("tlBtn").hidden = !!c.ai;
     $("micBtn").hidden = !c.ai || !SR_OK; $("saathiVoiceBtn").hidden = !c.ai; if (c.ai) refreshVoiceBtn();
     var body = $("convoBody"); body.innerHTML = "";
     if (c.ai) {
@@ -631,13 +636,18 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
 
   var saathiHist = [], fbIdx = 0, saathiBusy = false, saathiVoiceOn = false, recog = null, SR_OK = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
   var SAATHI_SYS = "You are 'Saathi', the Pulse app's AI companion. You are an AI, not a person: never claim to be human, to be a real girlfriend/boyfriend, or to 'feel' emotions; if asked, say plainly that you are an AI. You have two jobs, and you tell which one fits each message: (1) when the user is sharing feelings, venting or chatting, listen and understand first, then ask a gentle question or offer a small suggestion, in short warm natural language, 2-4 sentences, occasionally one emoji; (2) when the user asks a factual, general-knowledge, how-to, or 'Google-type' question, answer it directly, accurately and clearly like a genuinely knowledgeable assistant — don't deflect a plain question back with only emotional listening. If you are not confident of a fact, say so plainly instead of guessing. Use different words each time, don't repeat your previous reply. You are not a doctor/therapist/lawyer; don't give medication, diagnosis or legal advice, and say so if asked. No abuse, violence, hate or adult/sexual content. Never ask for or share phone numbers, addresses or other people's private information. If the user talks about harming themselves, gently tell them to talk to someone close to them or a helpline right away.";
-  function refreshVoiceBtn() { var b = $("saathiVoiceBtn"); if (!b) return; saathiVoiceOn = !!(ME && ME.saathiVoice); b.textContent = saathiVoiceOn ? "🔊" : "🔈"; b.classList.toggle("voice-on", saathiVoiceOn); }
+  function paintVoiceBtn() { var b = $("saathiVoiceBtn"); if (!b) return; var ico = b.querySelector(".cmi-ico"), lbl = b.querySelector("span:last-child"); if (ico) ico.textContent = saathiVoiceOn ? "🔊" : "🔈"; if (lbl) lbl.textContent = saathiVoiceOn ? "Saathi ki awaaz: ON" : "Saathi ki awaaz: OFF"; b.classList.toggle("voice-on", saathiVoiceOn); }
+  function refreshVoiceBtn() { saathiVoiceOn = !!(ME && ME.saathiVoice); paintVoiceBtn(); }
   $("saathiVoiceBtn") && $("saathiVoiceBtn").addEventListener("click", function () {
     saathiVoiceOn = !saathiVoiceOn; if (ME) ME.saathiVoice = saathiVoiceOn;
-    $("saathiVoiceBtn").textContent = saathiVoiceOn ? "🔊" : "🔈"; $("saathiVoiceBtn").classList.toggle("voice-on", saathiVoiceOn);
+    paintVoiceBtn();
     if (!saathiVoiceOn && window.speechSynthesis) speechSynthesis.cancel();
     updateDoc(doc(db, "users", UID), { saathiVoice: saathiVoiceOn }).catch(function () {});
   });
+  // ---- chat header: dropdown menu (walkie/duet/timeline/voice/safety) so the header row stays clean ----
+  $("chatMoreBtn").addEventListener("click", function (e) { e.stopPropagation(); $("chatMenu").hidden = !$("chatMenu").hidden; });
+  $("chatMenu").addEventListener("click", function (e) { if (e.target.closest(".chat-menu-item")) $("chatMenu").hidden = true; });
+  document.addEventListener("click", function (e) { if (!$("chatMenu").hidden && !e.target.closest(".chat-menu") && !e.target.closest("#chatMoreBtn")) $("chatMenu").hidden = true; });
   function speak(text) {
     if (!saathiVoiceOn || !window.speechSynthesis) return;
     try { speechSynthesis.cancel(); var u = new SpeechSynthesisUtterance(text.replace(/[\u{1F300}-\u{1FAFF}☀-➿]/gu, "")); u.rate = 1; speechSynthesis.speak(u); } catch (e) {}
