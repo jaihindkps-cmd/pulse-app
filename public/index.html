@@ -81,6 +81,8 @@
   .topbar .actions { display: flex; align-items: center; gap: 6px; }
   .icon-btn { width: 38px; height: 38px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); display: grid; place-items: center; cursor: pointer; transition: transform .15s, background .15s; position: relative; }
   .icon-btn:hover { background: var(--surface-2); transform: translateY(-1px); }
+  .icon-btn.listening { background: #e23d5a; color: #fff; animation: sosPulse .8s infinite; }
+  .icon-btn.voice-on { background: var(--accent); color: #fff; }
   .icon-btn svg { width: 19px; height: 19px; }
   .icon-btn .badge { position: absolute; transform: translate(11px,-11px); min-width: 16px; height: 16px; padding: 0 4px; border-radius: 9px; background: var(--accent-2); color: #fff; font-size: 10px; font-weight: 700; display: grid; place-items: center; }
 
@@ -645,6 +647,7 @@
       <button class="icon-btn" id="callBtn" aria-label="Voice call" title="Voice call"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2Z" stroke-linejoin="round"/></svg></button>
       <button class="icon-btn" id="videoCallBtn" aria-label="Video call" title="Video call"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="14" height="12" rx="2.5"/><path d="M16 10.5l5-3v9l-5-3" stroke-linejoin="round"/></svg></button>
       <button class="icon-btn" id="wtBtn" aria-label="Walkie-talkie" title="Walkie-talkie">📻</button>
+      <button class="icon-btn" id="saathiVoiceBtn" aria-label="Voice replies" title="Saathi ko bolte sunein" hidden>🔈</button>
       <button class="icon-btn" id="moreBtn" aria-label="Block or report" title="Block / Report"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button>
     </div>
     <div class="med-bar" id="medBar" hidden></div>
@@ -652,6 +655,7 @@
     <div class="convo-body" id="convoBody"></div>
     <div class="convo-input">
       <button class="icon-btn" id="emojiBtn" aria-label="Emoji" title="Emoji">😊</button><button class="icon-btn" id="photoBtn" aria-label="Send photo" title="Send photo">📷</button><input type="file" id="photoInput" accept="image/*" hidden>
+      <button class="icon-btn" id="micBtn" aria-label="Voice input" title="Bol kar bhejein" hidden>🎙️</button>
       <input id="msgInput" maxlength="1000" placeholder="Type a message..." autocomplete="off">
       <button class="send-btn" id="sendBtn" aria-label="Send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7Z" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
     </div>
@@ -749,5 +753,5 @@
   <div class="toast" id="toast"></div>
 </div>
 
-<script src="app.js?v=84b026de63" defer></script>
+<script src="app.js?v=65d00c40a9" defer></script>
 <script>if("serviceWorker" in navigator && location.protocol.indexOf("http")===0){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});}</script></body></html>

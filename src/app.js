@@ -595,13 +595,14 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     var av = $("convoAv"); av.textContent = c.ai ? "✦" : ini(c.name); av.style.background = g(c.id);
     $("convoName").innerHTML = esc(c.name) + creatorBadge(c) + (c.ai ? '<span class="ai-pill">AI</span>' : ""); $("convoStatus").textContent = c.ai ? "Always online" : "";
     $("moreBtn").hidden = !!c.ai; $("medBar").hidden = true; $("callBtn").hidden = $("wtBtn").hidden = !!c.ai;
+    $("micBtn").hidden = !c.ai || !SR_OK; $("saathiVoiceBtn").hidden = !c.ai; if (c.ai) refreshVoiceBtn();
     var body = $("convoBody"); body.innerHTML = "";
     if (c.ai) {
-      body.appendChild(el('<div class="ai-note">✦ Saathi is an AI companion, not a real person. It\'s here to talk and listen — not a substitute for a doctor or counsellor. If you\'re struggling, please talk to someone close to you or a helpline.</div>'));
+      body.appendChild(el('<div class="ai-note">✦ Saathi is an AI companion, not a real person. It\'s here to talk and listen — not a substitute for a doctor or counsellor. If you\'re struggling, please talk to someone close to you or a helpline. You can also ask it general questions, or tap 🎙️ to speak.</div>'));
       getDocs(query(collection(db, "users", UID, "saathi"), orderBy("createdAt", "asc"), limit(60))).then(function (s) {
         if (activeChat !== c) return;
         saathiHist = [];
-        if (s.empty) addBubble({ mine: false, text: "Hello " + ME.name + " 🙏 I'm Saathi, an AI. How was your day?", at: Date.now() });
+        if (s.empty) addBubble({ mine: false, text: "Hello " + ME.name + " 🙏 I'm Saathi, an AI. How was your day? You can also ask me anything, or use the mic 🎙️ to talk.", at: Date.now() });
         s.forEach(function (d) { var m = snapData(d); addBubble({ mine: m.role === "user", text: m.text, at: ms(m.createdAt) }); saathiHist.push({ role: m.role === "user" ? "user" : "model", text: m.text }); });
       }).catch(function () {});
     } else {
@@ -628,8 +629,38 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   }
   $("convoBack").addEventListener("click", function () { setTyping(false); $("convo").classList.remove("open"); closeMsgListener(); activeChat = null; renderChats(); });
 
-  var saathiHist = [], fbIdx = 0, saathiBusy = false;
-  var SAATHI_SYS = "You are 'Saathi', the Pulse app's AI companion. You are an AI, not a person: never claim to be human, to be a real girlfriend/boyfriend, or to 'feel' emotions; if asked, say plainly that you are an AI. Reply in short, warm, natural English: 2-4 sentences, occasionally one emoji. Listen and understand first, then ask a gentle question or offer a small suggestion. Use different words each time, don't repeat your previous reply. You are not a doctor/therapist; don't give medication, diagnosis or legal advice. No abuse, violence, hate or adult/sexual content. Never ask for or share phone numbers, addresses or other people's private information. If the user talks about harming themselves, gently tell them to talk to someone close to them or a helpline right away.";
+  var saathiHist = [], fbIdx = 0, saathiBusy = false, saathiVoiceOn = false, recog = null, SR_OK = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+  var SAATHI_SYS = "You are 'Saathi', the Pulse app's AI companion. You are an AI, not a person: never claim to be human, to be a real girlfriend/boyfriend, or to 'feel' emotions; if asked, say plainly that you are an AI. You have two jobs, and you tell which one fits each message: (1) when the user is sharing feelings, venting or chatting, listen and understand first, then ask a gentle question or offer a small suggestion, in short warm natural language, 2-4 sentences, occasionally one emoji; (2) when the user asks a factual, general-knowledge, how-to, or 'Google-type' question, answer it directly, accurately and clearly like a genuinely knowledgeable assistant — don't deflect a plain question back with only emotional listening. If you are not confident of a fact, say so plainly instead of guessing. Use different words each time, don't repeat your previous reply. You are not a doctor/therapist/lawyer; don't give medication, diagnosis or legal advice, and say so if asked. No abuse, violence, hate or adult/sexual content. Never ask for or share phone numbers, addresses or other people's private information. If the user talks about harming themselves, gently tell them to talk to someone close to them or a helpline right away.";
+  function refreshVoiceBtn() { var b = $("saathiVoiceBtn"); if (!b) return; saathiVoiceOn = !!(ME && ME.saathiVoice); b.textContent = saathiVoiceOn ? "🔊" : "🔈"; b.classList.toggle("voice-on", saathiVoiceOn); }
+  $("saathiVoiceBtn") && $("saathiVoiceBtn").addEventListener("click", function () {
+    saathiVoiceOn = !saathiVoiceOn; if (ME) ME.saathiVoice = saathiVoiceOn;
+    $("saathiVoiceBtn").textContent = saathiVoiceOn ? "🔊" : "🔈"; $("saathiVoiceBtn").classList.toggle("voice-on", saathiVoiceOn);
+    if (!saathiVoiceOn && window.speechSynthesis) speechSynthesis.cancel();
+    updateDoc(doc(db, "users", UID), { saathiVoice: saathiVoiceOn }).catch(function () {});
+  });
+  function speak(text) {
+    if (!saathiVoiceOn || !window.speechSynthesis) return;
+    try { speechSynthesis.cancel(); var u = new SpeechSynthesisUtterance(text.replace(/[\u{1F300}-\u{1FAFF}☀-➿]/gu, "")); u.rate = 1; speechSynthesis.speak(u); } catch (e) {}
+  }
+  if (SR_OK) {
+    var SRClass = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recog = new SRClass(); recog.continuous = false; recog.interimResults = false;
+    recog.onresult = function (e) { var t = e.results[0][0].transcript; if (t) { $("msgInput").value = t; sendMsg(); } };
+    recog.onerror = function () { $("micBtn").classList.remove("listening"); };
+    recog.onend = function () { $("micBtn").classList.remove("listening"); };
+  }
+  $("micBtn") && $("micBtn").addEventListener("click", function () {
+    if (!recog) return;
+    if ($("micBtn").classList.contains("listening")) { recog.stop(); return; }
+    try { recog.lang = (navigator.language || "en-IN"); recog.start(); $("micBtn").classList.add("listening"); } catch (e) {}
+  });
+  var saathiMemTurns = 0;
+  function updateSaathiMemory() {
+    if (saathiHist.length < 10) return;
+    aiJson("Summarize durable facts worth remembering long-term about this user from the conversation below, for a companion AI to recall in future sessions (their name, situation, ongoing concerns, preferences). 2-4 short bullet lines max, no feelings-of-the-moment, just durable facts. Reply as JSON: {\"memory\": \"...\"}",
+      saathiHist.slice(-20).map(function (m) { return (m.role === "user" ? "User: " : "Saathi: ") + m.text; }).join("\n")
+    ).then(function (r) { if (r && r.memory) updateDoc(doc(db, "users", UID), { saathiMemory: String(r.memory).slice(0, 600) }).catch(function () {}); }).catch(function () {});
+  }
   var CRISIS = /(suicide|sucide|khudkushi|khud\s*kushi|mar\s*jana|marna\s*chahta|marna\s*chahti|jaan\s*de|jeena\s*nahi|jeene\s*ka\s*mann\s*nahi|zindagi\s*khatam|khud\s*ko\s*(khatam|nuksan|hurt|maar)|end\s*my\s*life|kill\s*myself|self[\s-]*harm)/i;
   var CRISIS_REPLY = "I'm concerned about you, and it matters that you were able to share this. 💜 I'm an AI, and right now you need the support of a real person. Please call someone close to you or go to them right now, and reach out to a helpline in your city. Are you in a safe place right now?";
   var OFFLINE = [
@@ -645,12 +676,13 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     addBubble({ mine: true, text: t, at: Date.now() });
     addDoc(col, { role: "user", text: t, createdAt: serverTimestamp() }).catch(function () {});
     saathiHist.push({ role: "user", text: t }); bump("cAi");
-    function finish(txt) { saathiHist.push({ role: "model", text: txt }); saathiHist = saathiHist.slice(-14); addDoc(col, { role: "assistant", text: txt, createdAt: serverTimestamp() }).catch(function () {}); saathiBusy = false; }
+    function finish(txt) { saathiHist.push({ role: "model", text: txt }); saathiHist = saathiHist.slice(-14); addDoc(col, { role: "assistant", text: txt, createdAt: serverTimestamp() }).catch(function () {}); saathiBusy = false; speak(txt); if (++saathiMemTurns % 6 === 0) updateSaathiMemory(); }
     if (CRISIS.test(t)) { setTimeout(function () { if (activeChat === c) addBubble({ mine: false, text: CRISIS_REPLY, at: Date.now() }); finish(CRISIS_REPLY); }, 500); return; }
     if (saathiBusy) return; saathiBusy = true;
     var typing = el('<div class="typing"><i></i><i></i><i></i></div>'); $("convoBody").appendChild(typing); $("convoBody").scrollTop = 1e9;
     var bub = null;
-    aiChat(SAATHI_SYS + " User's name: " + ME.name + ".", saathiHist.slice(-12), function (part) {
+    var sys = SAATHI_SYS + " User's name: " + ME.name + "." + (ME.saathiMemory ? " What you remember about this user from before: " + ME.saathiMemory : "");
+    aiChat(sys, saathiHist.slice(-12), function (part) {
       if (activeChat !== c) return; typing.remove();
       if (!bub) bub = addBubble({ mine: false, text: part, at: Date.now() });
       else { bub.firstChild.nodeValue = part; $("convoBody").scrollTop = 1e9; }
