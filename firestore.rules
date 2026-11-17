@@ -160,6 +160,15 @@ service cloud.firestore {
           && request.resource.data.uids.size() == 2 && me() in request.resource.data.uids;
         allow update: if signedIn() && inPair(mid) && request.resource.data.uids == resource.data.uids;
       }
+
+      // Anonymous Feedback Loop: raw text never stored -- client polishes it with AI before writing,
+      // so only the de-identified summary meant for the other person ever reaches Firestore.
+      match /feedback/{id} {
+        allow read: if signedIn() && inPair(mid);
+        allow create: if signedIn() && inPair(mid) && exists(/databases/$(database)/documents/matches/$(mid))
+          && request.resource.data.uids.size() == 2 && me() in request.resource.data.uids;
+        allow update: if signedIn() && inPair(mid) && request.resource.data.uids == resource.data.uids;
+      }
     }
 
     // Block: apna block banao/hatao/dekho.

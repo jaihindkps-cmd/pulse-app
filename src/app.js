@@ -713,7 +713,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     if (!activeChat || activeChat.ai) return;
     var body = $("convoBody"); if (body.querySelector(".safety")) return;
     var u = activeChat;
-    var box = el('<div class="ai-note safety">' + esc(u.name) + ' ke saath: <button class="btn-outline" id="doBlock" style="margin:8px 4px 0;padding:8px 14px">Block karo</button><button class="btn-outline" id="doReport" style="margin:8px 4px 0;padding:8px 14px">Report karo</button><button class="btn-outline" id="doMeet" style="margin:8px 4px 0;padding:8px 14px">📍 Safe meet</button><div style="font-size:12px;margin-top:8px;color:var(--muted)">Pehli mulaqat: din me, public jagah, kisi apne ko batakar.</div></div>');
+    var box = el('<div class="ai-note safety">' + esc(u.name) + ' ke saath: <button class="btn-outline" id="doBlock" style="margin:8px 4px 0;padding:8px 14px">Block karo</button><button class="btn-outline" id="doReport" style="margin:8px 4px 0;padding:8px 14px">Report karo</button><button class="btn-outline" id="doMeet" style="margin:8px 4px 0;padding:8px 14px">📍 Safe meet</button><button class="btn-outline" id="doFeedback" style="margin:8px 4px 0;padding:8px 14px">📝 Date feedback</button><div style="font-size:12px;margin-top:8px;color:var(--muted)">Pehli mulaqat: din me, public jagah, kisi apne ko batakar.</div></div>');
     body.appendChild(box); body.scrollTop = 1e9;
     $("doBlock").addEventListener("click", function () {
       setDoc(doc(db, "blocks", UID + "_" + u.id), { blocker: UID, blocked: u.id, createdAt: serverTimestamp() }).then(function () { blocked.add(u.id); toast("Blocked"); $("convo").classList.remove("open"); closeMsgListener(); activeChat = null; renderChats(); }).catch(function (e) { toast(errMsg(e)); });
@@ -722,6 +722,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     $("doReport").addEventListener("click", function () {
       addDoc(collection(db, "reports"), { from: UID, to: u.id, reason: "Chat se report", createdAt: serverTimestamp() }).then(function () { toast("Report bhej di. Shukriya."); box.remove(); }).catch(function (e) { toast(errMsg(e)); });
     });
+    $("doFeedback").addEventListener("click", function () { openFeedback(u); });
   });
 
   // ---- Gaana Studio ----
@@ -835,6 +836,41 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
       var t = clean($("duetMine").value, 150); if (!t) { toast("Pehle kuch likho"); return; }
       var uids = [UID, other].sort(), ref = duetRef(mid);
       updateDoc(ref, obj(myKey, t)).catch(function () { return setDoc(ref, Object.assign({ uids: uids, status: "collecting" }, obj(myKey, t))); }).then(function () { toast("Bhej diya 🎤"); }).catch(function (e) { toast(errMsg(e)); });
+    });
+  }
+
+  // ---- Anonymous Feedback Loop: both sides privately rate the date, each gets only an AI-polished,
+  // non-attributable summary of what the other said -- and only once BOTH have submitted. ----
+  var fbUnsub = null;
+  var FB_SYS = "Tum ek rishta/date-feedback coach ho. Niche kisi ne apne recent date/mulaqaat ke baare me doosre insaan ke liye PRIVATE, raw feedback likha hai. Ise ek chhota (2-4 lines), vinamr aur nirmaanaatmak (constructive) paigaam me phir se likho, jo doosre insaan ko bheja jaayega. Lehja/shabd badal do taaki asli likhne wale ki pehchaan na ho — sirf madadgaar insight rakho. Agar feedback accha/positive hai to use garmjoshi se rakho. Agar kuch negative hai, to use politely aur bina ilzaam lagaye 'is baar kya behtar ho sakta tha' ki tarah likho. Gaali, dhamki, personal attack ya kisi teesre insaan/jagah ka naam kabhi mat likho — agar raw feedback me ho to use chhod do. Sirf JSON do: {\"summary\": string}.";
+  function fbRef(mid) { return doc(db, "matches", mid, "feedback", "main"); }
+  $("fbClose").addEventListener("click", function () { $("fbUI").hidden = true; if (fbUnsub) { fbUnsub(); fbUnsub = null; } });
+  function openFeedback(u) {
+    var mid = u.mid, other = u.id;
+    $("fbUI").hidden = false;
+    if (fbUnsub) fbUnsub();
+    fbUnsub = onSnapshot(fbRef(mid), function (s) { renderFeedback(s.exists() ? s.data() : null, mid, other); }, function (e) { toast(errMsg(e)); });
+  }
+  function renderFeedback(d, mid, other) {
+    var box = $("fbText"); if (!box) return;
+    var doneKey = "done_" + UID, otherDoneKey = "done_" + other, sumKey = "sum_for_" + UID;
+    var mine = d && d[doneKey];
+    if (mine && d[otherDoneKey]) {
+      box.innerHTML = '<h3>📝 Date Feedback</h3><p class="st-note">Dono ne feedback de diya — ye tumhare liye, anonymous aur nirmaanaatmak roop me:</p><div class="ai-note">' + esc(d[sumKey] || "Feedback acha raha, koi khaas baat nahi.") + '</div>';
+      return;
+    }
+    if (mine) { box.innerHTML = '<h3>📝 Date Feedback</h3><p class="st-note">Tumhara feedback mil gaya ✅ Jab doosra insaan bhi apna de dega, dono ko ek-doosre ka anonymous, nirmaanaatmak summary milega.</p>'; return; }
+    box.innerHTML = '<h3>📝 Date Feedback</h3><p class="st-note">Is mulaqaat/date ke baare me doosre insaan ke liye private feedback likho. Isse AI ek vinamr, anonymous paigaam me badal dega — asli shabd kabhi nahi dikhaye jaate. Dono ke dene ke baad hi jawab dikhega.</p><div class="edit-form" style="padding:0"><label>Tumhara private feedback<textarea id="fbMine" maxlength="400" rows="4" placeholder="e.g. Baat karne me maza aaya, lekin time pe nahi aaye..."></textarea></label><button class="btn-grad" id="fbSend" style="width:100%;margin-top:6px">Bhej do (private)</button></div>';
+    $("fbSend").addEventListener("click", function () {
+      var t = clean($("fbMine").value, 400); if (!t) { toast("Pehle kuch likho"); return; }
+      var btn = this; btn.disabled = true; btn.textContent = "Bhej rahe hain...";
+      aiJson(FB_SYS, t).then(function (r) { return (r && r.summary) ? String(r.summary).slice(0, 400) : "Feedback mila, lekin saaf tarah nahi likha gaya tha."; })
+        .catch(function () { return "Feedback mila. (AI abhi polish nahi kar paaya, lekin feedback record ho gaya hai.)"; })
+        .then(function (polished) {
+          var ref = fbRef(mid), upd = obj(doneKey, true); upd["sum_for_" + other] = polished;
+          return updateDoc(ref, upd).catch(function () { return setDoc(ref, Object.assign({ uids: [UID, other].sort() }, upd)); });
+        }).then(function () { toast("Shukriya 🙏 Private rehta hai jab tak dono na de dein."); })
+        .catch(function (e) { toast(errMsg(e)); btn.disabled = false; btn.textContent = "Bhej do (private)"; });
     });
   }
 
