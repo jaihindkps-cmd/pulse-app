@@ -14,6 +14,7 @@ import { serviceStart, serviceStop, routeAvailable, routeStart, routeList, route
 import { FILTERS, STICKERS, effectsSupported, createEffects } from "./effects.js";
 import { DHAMS, art as dhamArt, photoOrArt, loadPhotos, daily as dailyDham, kindName, kindSym, loadDeityPhotos } from "./dham.js";
 import { tr, getLang, setLang, initI18n } from "./i18n.js";
+import { initSocial, stopSocial } from "./social.js";
 
 (function () {
   "use strict";
@@ -179,7 +180,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   });
   $("logoutBtn").addEventListener("click", function () { signOut(auth).then(function () { toast("Logged out"); }); });
 
-  function stopAll() { leaveRoom(true); stopNearby(); endCall(false); player.stop(); unsubs.forEach(function (u) { try { u(); } catch (e) {} }); unsubs = []; }
+  function stopAll() { stopSocial(); leaveRoom(true); stopNearby(); endCall(false); player.stop(); unsubs.forEach(function (u) { try { u(); } catch (e) {} }); unsubs = []; }
 
   // ---- start / stop ----
   function start() {
@@ -188,7 +189,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     $("pName").innerHTML = esc(ME.name) + creatorBadge(ME); $("pHandle").textContent = ME.city || "";
     $("eName").value = ME.name || ""; $("eCity").value = ME.city || ""; $("eWork").value = ME.work || ""; $("eAbout").value = ME.about || "";
     getDocs(query(collection(db, "blocks"), where("blocker", "==", UID))).then(function (s) { blocked = new Set(); s.forEach(function (d) { blocked.add(d.data().blocked); }); }).catch(function () {}).then(function () {
-      applyMode(); listenApps(); listenReqs(); onboard(); paintInterests(); paintStreakMeter(); listenCalls(); listenSongs(); listenFeed(); listenStories(); listenMatches(); refreshLocToggle(); showTab("feed"); setLive(); paintAv(); creatorPanel(); pendingRoom(); heartbeat(); ensureCreatorFlag();
+      applyMode(); listenApps(); listenReqs(); onboard(); paintInterests(); paintStreakMeter(); listenCalls(); listenSongs(); initSocial({ db: db, uid: function () { return UID; }, me: function () { return ME; }, toast: toast, errMsg: errMsg, showTab: showTab, rate: rate, blocked: function () { return blocked; } }); listenFeed(); listenStories(); listenMatches(); refreshLocToggle(); showTab("feed"); setLive(); paintAv(); creatorPanel(); pendingRoom(); heartbeat(); ensureCreatorFlag();
     });
   }
   // One-time self-write so OTHER members' screens can show the 👑 Creator badge (creatorBadge() below).
@@ -1613,7 +1614,8 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     if (!l.length) { box.appendChild(el('<div class="empty">' + (songTab === "mine" ? "You have not published a song yet. Tap Create to make your first one." : "No songs yet. Be the first to publish one.") + '</div>')); return; }
     l.forEach(function (sd) {
       var liked = (sd.likedBy || []).indexOf(UID) >= 0, genre = GENRES[sd.genre] ? GENRES[sd.genre].name : "";
-      var card = el('<div class="sg-card"><div class="sg-head"><button class="sg-play" type="button">▶</button><div style="flex:1;min-width:0"><div class="sg-t"></div><div class="sg-by"></div></div>' + (sd.aud ? '<span class="sg-voice">Voice</span>' : "") + '</div><div class="sg-ly"></div><div class="sg-bar"><i></i></div><div class="sg-act"><button class="sg-like' + (liked ? " liked" : "") + '" type="button">' + (liked ? "♥" : "♡") + ' ' + (sd.likedBy || []).length + '</button>' + (sd.uid === UID ? '<button class="sg-del" type="button">Delete</button>' : "") + '</div></div>');
+      var card = el('<div class="sg-card"><div class="sg-head"><button class="sg-play" type="button">▶</button><div style="flex:1;min-width:0"><div class="sg-t"></div><div class="sg-by"></div></div>' + (sd.aud ? '<span class="sg-voice">Voice</span>' : "") + '</div><div class="sg-ly"></div><div class="sg-bar"><i></i></div><div class="sg-act"><button class="sg-like' + (liked ? " liked" : "") + '" type="button">' + (liked ? "♥" : "♡") + ' ' + (sd.likedBy || []).length + '</button>' + '<button class="sg-share" type="button">Share</button>' + (sd.uid === UID ? '<button class="sg-del" type="button">Delete</button>' : "") + '</div></div>'); card.setAttribute("data-id", sd.id);
+      card.querySelector(".sg-share").addEventListener("click", function () { if (window.__pulseSocial) window.__pulseSocial.shareSong(sd); });
       card.querySelector(".sg-t").textContent = sd.title; card.querySelector(".sg-by").textContent = "by " + sd.name + " · " + genre + " · " + ago(sd.t);
       card.querySelector(".sg-ly").textContent = sd.lines.slice(0, 2).map(function (x) { return x.text; }).join("\n");
       card.querySelector(".sg-play").addEventListener("click", function () { bump("cSongs"); playPublished(sd, card); });
@@ -1647,7 +1649,8 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     if (!curMeta || !rate("song", 4, 60000)) return; var btn = this; btn.disabled = true;
     var d = { uid: UID, name: ME.name, title: clean(curMeta.title, 60), genre: curMeta.genre, bpm: curSong ? curSong.bpm : 0, minor: !!curMeta.minor, singer: $("stSinger").value, lang: $("stLang").value === "en" ? "en" : "hi", lines: curMeta.lines.slice(0, 16).map(function (x) { return { section: clean(x.section, 20), text: clean(x.text, 90) }; }), likedBy: [], createdAt: serverTimestamp() };
     if (stTake && stTake.length <= 500000) d.aud = stTake;
-    addDoc(collection(db, "songs"), d).then(function () { toast("Song published 🎉"); bump("cSongs"); $("stCreate").hidden = true; $("stToggle").textContent = "+ Create"; songTab = "new"; document.querySelectorAll("#songTabs button").forEach(function (x) { x.classList.toggle("on", x.getAttribute("data-k") === "new"); }); })
+    if (window.__pulseChallenge) d.challenge = window.__pulseChallenge;
+    addDoc(collection(db, "songs"), d).then(function () { window.__pulseChallenge = null; if (window.__pulseSocial) window.__pulseSocial.refreshChallenge(); toast("Song published 🎉"); bump("cSongs"); $("stCreate").hidden = true; $("stToggle").textContent = "+ Create"; songTab = "new"; document.querySelectorAll("#songTabs button").forEach(function (x) { x.classList.toggle("on", x.getAttribute("data-k") === "new"); }); })
       .catch(function (e) { toast(errMsg(e)); }).then(function () { btn.disabled = false; });
   });
 

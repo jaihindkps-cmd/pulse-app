@@ -143,6 +143,45 @@ service cloud.firestore {
       allow delete: if signedIn() && resource.data.uid == me();
     }
 
+    // Groups: text chat + a live voice room. Public groups can be listed; private ones only via their link (the doc id).
+    // Members can only add/remove THEMSELVES; the host can edit the group. Voice signalling docs are private to the two phones.
+    function isMember(gid) { return me() in get(/databases/$(database)/documents/groups/$(gid)).data.members; }
+    match /groups/{gid} {
+      allow get: if signedIn();
+      allow list: if signedIn() && (resource.data.public == true || me() in resource.data.members);
+      allow create: if signedIn() && notBanned() && request.resource.data.host == me()
+        && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 40
+        && request.resource.data.get('desc', '').size() <= 120 && request.resource.data.get('emoji', '').size() <= 8
+        && request.resource.data.public is bool && request.resource.data.members == [me()];
+      allow update: if signedIn() && notBanned() && (
+        (resource.data.host == me() && request.resource.data.host == me() && request.resource.data.members.size() <= 60
+          && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 40)
+        || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members']) && request.resource.data.members.size() <= 60
+          && request.resource.data.members.toSet().difference(resource.data.members.toSet())
+               .union(resource.data.members.toSet().difference(request.resource.data.members.toSet())).hasOnly([me()]))
+        || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastText', 'lastAt', 'lastFrom'])
+            && me() in resource.data.members && request.resource.data.lastFrom == me()
+            && request.resource.data.get('lastText', '').size() <= 60));
+      allow delete: if signedIn() && resource.data.host == me();
+      match /msgs/{id} {
+        allow read: if signedIn() && isMember(gid);
+        allow create: if signedIn() && notBanned() && isMember(gid) && request.resource.data.from == me()
+          && request.resource.data.name is string && request.resource.data.name.size() <= 40
+          && request.resource.data.text is string && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 500;
+      }
+      // Who is in the voice room right now (heartbeat doc per person).
+      match /live/{u} {
+        allow read: if signedIn() && isMember(gid);
+        allow write: if signedIn() && notBanned() && isMember(gid) && u == me();
+      }
+      match /sig/{id} {
+        allow read, delete: if signedIn() && isMember(gid) && (resource.data.to == me() || resource.data.from == me());
+        allow create: if signedIn() && notBanned() && isMember(gid) && request.resource.data.from == me()
+          && request.resource.data.to is string && request.resource.data.kind in ['offer', 'answer']
+          && request.resource.data.sdp is string && request.resource.data.sdp.size() <= 30000;
+      }
+    }
+
     // Swipe: id = "<from>_<to>". Sirf apna swipe likh sakte ho; apna ya mujh par kiya hua padh sakte ho.
     match /swipes/{id} {
       allow get: if signedIn() && inPair(id);
