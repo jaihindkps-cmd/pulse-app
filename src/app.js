@@ -137,7 +137,14 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
 
   $("authForm").addEventListener("submit", function (e) {
     e.preventDefault(); $("authErr").textContent = "";
-    if (!auth) { $("authErr").textContent = "The app isn't set up yet (firebase-config.json is empty)."; return; }
+    if (!auth) {
+      // Started too early (config still loading): wait for start-up, then submit again instead of showing a setup error.
+      $("authErr").textContent = "Starting up...";
+      (window.__pulseBoot || Promise.resolve()).then(function () {
+        if (auth) { $("authErr").textContent = ""; $("authForm").requestSubmit(); } else $("authErr").textContent = "Could not start the app. Check your internet and reload.";
+      });
+      return;
+    }
     if (googleUser) {
       var gu = googleUser, gAge = parseInt($("aAge").value, 10), gName = clean($("aName").value, 40);
       if (!gName) { $("authErr").textContent = "Please enter your name"; return; }
@@ -2248,8 +2255,11 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
 
   // ---- boot ----
   initI18n(); setMode("login");
-  fetch("firebase-config.json", { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (cfg) {
-    if (!cfg.apiKey || /PASTE|YOUR/i.test(cfg.apiKey)) { $("authErr").textContent = "Setup incomplete: fill in Firebase details in public/firebase-config.json."; return; }
-    init(cfg);
-  }).catch(function () { $("authErr").textContent = "Config not found (firebase-config.json)."; });
+  // The Firebase web config is public by design (it only names the project; Firestore rules protect the data), so a copy
+  // is built in. It is used if the file cannot be fetched (slow/blocked network, stale cache) so login never breaks.
+  var BUILTIN_CFG = { apiKey: "AIzaSyB2mlyUACsp38Gal7TsUFbet42y3EEh0EE", authDomain: "pulse-704e7.firebaseapp.com", projectId: "pulse-704e7", storageBucket: "pulse-704e7.firebasestorage.app", messagingSenderId: "985338252699", appId: "1:985338252699:web:b001a501828594d81a653e" };
+  window.__pulseBoot = Promise.race([fetch("firebase-config.json", { cache: "no-store" }).then(function (r) { return r.json(); }), new Promise(function (res) { setTimeout(function () { res(null); }, 3000); })]).catch(function () { return null; }).then(function (cfg) {
+    if (!cfg || !cfg.apiKey || /PASTE|YOUR/i.test(cfg.apiKey)) cfg = BUILTIN_CFG;
+    try { init(cfg); } catch (e) { $("authErr").textContent = "Could not start the app: " + (e && e.message ? e.message : e); }
+  });
 })();
