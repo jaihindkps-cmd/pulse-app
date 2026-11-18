@@ -180,7 +180,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     $("pName").innerHTML = esc(ME.name) + creatorBadge(ME); $("pHandle").textContent = ME.city || "";
     $("eName").value = ME.name || ""; $("eCity").value = ME.city || ""; $("eWork").value = ME.work || ""; $("eAbout").value = ME.about || "";
     getDocs(query(collection(db, "blocks"), where("blocker", "==", UID))).then(function (s) { blocked = new Set(); s.forEach(function (d) { blocked.add(d.data().blocked); }); }).catch(function () {}).then(function () {
-      applyMode(); listenApps(); listenReqs(); onboard(); paintInterests(); paintStreakMeter(); listenSongs(); listenFeed(); listenStories(); listenMatches(); refreshLocToggle(); showTab("feed"); setLive(); paintAv(); creatorPanel(); pendingRoom(); heartbeat(); ensureCreatorFlag();
+      applyMode(); listenApps(); listenReqs(); onboard(); paintInterests(); paintStreakMeter(); listenCalls(); listenSongs(); listenFeed(); listenStories(); listenMatches(); refreshLocToggle(); showTab("feed"); setLive(); paintAv(); creatorPanel(); pendingRoom(); heartbeat(); ensureCreatorFlag();
     });
   }
   // One-time self-write so OTHER members' screens can show the 👑 Creator badge (creatorBadge() below).
@@ -1201,7 +1201,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
         if (!CALL || CALL.id !== id) { o.pc.close(); return; }
         CALL.pc = o.pc; watchCall();
         CALL.timeout = setTimeout(function () { if (CALL && CALL.id === id && !CALL.connected) endCall(true, "No answer"); }, 45000);
-        return callMsg(c.mid, CALL_LABEL[mode] || CALL_LABEL.call, { k: "offer", id: id, mode: mode, sdp: o.sdp }, true).then(function (r) { bump("cCalls"); return r; });
+        return callMsg(c.mid, CALL_LABEL[mode] || CALL_LABEL.call, { k: "offer", id: id, mode: mode, sdp: o.sdp }, true).then(function (r) { bump("cCalls"); markCall(c.mid, id, mode, c.id, "ringing"); return r; });
       });
     }).catch(function (e) { endCall(false); toast(e && e.name === "NotAllowedError" ? permMsg(isVideo) : errMsg(e)); });
   }
@@ -1212,14 +1212,34 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     if (c.stream) c.stream.getTracks().forEach(function (t) { t.stop(); }); if (c.pc) try { c.pc.close(); } catch (e) {}
     $("callUI").classList.remove("remote-live"); $("callAudio").srcObject = null; $("callRemoteVideo").srcObject = null; $("callLocalVideo").srcObject = null;
     $("callUI").classList.remove("video-on"); callShow(false);
-    if (notify && c.mid) callMsg(c.mid, "📞 Call ended", { k: "end", id: c.id }, true).catch(function () {});
+    if (notify && c.mid) { callMsg(c.mid, "📞 Call ended", { k: "end", id: c.id }, true).catch(function () {}); markCall(c.mid, c.id, c.mode, c.peer, "ended"); }
     if (msg) toast(msg);
   }
-  function maybeIncoming(mid, m, other) {
-    if (CALL || !/^(📞 Voice|📻|🎥)/.test(m.lastText || "") || Date.now() - ms(m.lastAt) > 40000) return;
-    getDocs(query(collection(db, "matches", mid, "messages"), orderBy("createdAt", "desc"), limit(6))).then(function (s) {
+  // Ring marker: calls/<matchId> is written when a call starts and again when it ends, so the other phone rings even if
+  // the match list did not change in a way we noticed (previously calls were only detected through lastText).
+  function markCall(mid, id, mode, other, state) {
+    return setDoc(doc(db, "calls", mid), { from: UID, to: other, id: id, mode: mode, state: state, createdAt: serverTimestamp() }).catch(function () {});
+  }
+  function listenCalls() {
+    unsubs.push(onSnapshot(query(collection(db, "calls"), where("to", "==", UID)), function (snap) {
+      snap.docChanges().forEach(function (ch) {
+        if (ch.type === "removed") return;
+        var d = snapData(ch.doc);
+        if (d.state === "ringing" && !CALL) {
+          var age = d.createdAt ? Date.now() - ms(d.createdAt) : 0;
+          if (age < 60000) maybeIncoming(ch.doc.id, null, d.from, d.id);
+        } else if (d.state === "ended" && CALL && CALL.id === d.id && !CALL.ending) {
+          endCall(false, CALL.connected ? "Call ended" : CALL.role === "in" ? "Missed call" : "Call declined");
+        }
+      });
+    }, function () {}));
+  }
+  function maybeIncoming(mid, m, other, wantId) {
+    if (CALL) return;
+    if (!wantId && (!/^(📞 Voice|📻|🎥)/.test(m.lastText || "") || Date.now() - ms(m.lastAt) > 40000)) return;
+    getDocs(query(collection(db, "matches", mid, "messages"), orderBy("createdAt", "desc"), limit(10))).then(function (s) {
       if (CALL) return; var offer = null, ended = {};
-      s.forEach(function (d) { var x = d.data(); if (!x.call) return; if (x.call.k === "end") ended[x.call.id] = 1; else if (x.call.k === "offer" && x.from !== UID && !offer) offer = x.call; });
+      s.forEach(function (d) { var x = d.data(); if (!x.call) return; if (x.call.k === "end") ended[x.call.id] = 1; else if (x.call.k === "offer" && x.from !== UID && !offer && (!wantId || x.call.id === wantId)) offer = x.call; });
       if (!offer || ended[offer.id]) return;
       userName(other).then(function (n) {
         if (CALL) return; CALL = { mid: mid, id: offer.id, role: "in", mode: offer.mode, offer: offer.sdp, name: n, peer: other };

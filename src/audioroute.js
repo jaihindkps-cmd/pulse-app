@@ -49,3 +49,5 @@ export function startTone(kind) {
   }
 }
 export function chime(up) { beep(up ? 660 : 440, 0, 0.12, 0.2); beep(up ? 880 : 330, 0.14, 0.16, 0.2); }
+
+try { document.addEventListener("pointerdown", function () { ac(); }, { once: true, passive: true }); } catch (e) {}

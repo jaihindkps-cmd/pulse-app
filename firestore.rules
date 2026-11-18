@@ -118,6 +118,16 @@ service cloud.firestore {
       allow delete: if signedIn() && resource.data.uid == me();
     }
 
+    // Calls: one ringing/ended marker per match so the other phone rings reliably (the offer itself travels in the match's messages)
+    match /calls/{mid} {
+      allow read: if signedIn() && (resource.data.to == me() || resource.data.from == me());
+      allow create, update: if signedIn() && notBanned() && inPair(mid)
+        && request.resource.data.from in mid.split('_') && request.resource.data.to in mid.split('_')
+        && request.resource.data.from != request.resource.data.to
+        && !isBlocked(request.resource.data.to, request.resource.data.from) && !isBlocked(request.resource.data.from, request.resource.data.to);
+      allow delete: if false;
+    }
+
     // Songs: community feed of published songs (lyrics + optional recorded voice), likeable by everyone
     match /songs/{id} {
       allow read: if signedIn();
