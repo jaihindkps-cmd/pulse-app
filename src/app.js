@@ -1180,7 +1180,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
       if (!CALL.connected) { CALL.connected = true; clearTimeout(CALL.timeout); CALL.t0 = Date.now(); stopTone(); chime(true); refreshRouteLabel();
         if (CALL.mode === "walkie" && !CALL.muteInit) { CALL.muteInit = true; setMic(false); $("ptt").hidden = false; $("callAccept").hidden = true; }
         Call.requestWakeLock(); Call.setMediaSession(CALL.mode === "video" ? "Pulse Video Call" : CALL.mode === "walkie" ? "Pulse Walkie-talkie" : "Pulse Call");
-        if (CALL.mode === "video") startWatermark();
+        if (CALL.mode === "video") { startWatermark(); if (CALL.pc) CALL.stopAdapt = Call.adapt(CALL.pc); }
         callTick = setInterval(function () { if (!CALL) return; var s = Math.floor((Date.now() - CALL.t0) / 1000); $("callSub").textContent = (CALL.mode === "walkie" ? "Walkie-talkie · " : CALL.mode === "video" ? "Video call · " : "Call · ") + Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); }, 500);
       } else { $("callSub").textContent = (CALL.mode === "walkie" ? "Walkie-talkie" : CALL.mode === "video" ? "Video call" : "Call"); }
     } else if (st === "disconnected") {
@@ -1231,6 +1231,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   }
   function endCall(notify, msg) {
     var c = CALL; if (!c) return; c.ending = true; CALL = null; clearInterval(callTick); clearTimeout(c.timeout); clearTimeout(discoTimer); discoTimer = null; stopWatermark();
+    if (c.stopAdapt) { try { c.stopAdapt(); } catch (e) {} }
     if (c.fx) { try { c.fx.stop(); } catch (e) {} } $("fxTray").hidden = true; clearTimeout(idleT); $("callUI").classList.remove("idle"); $("callFxLayer").innerHTML = "";
     secureScreen(false);
     Call.releaseWakeLock(); Call.clearMediaSession(); stopTone(); routeStop(); serviceStop(); $("routeSheet").hidden = true; if (c.connected) chime(false);

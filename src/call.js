@@ -21,9 +21,9 @@ export function getMedia(withVideo, facing) {
   // 4:3 uses the camera's whole sensor, so the picture is WIDER than a 16:9 crop at the same sharpness.
   var portrait = !(window.matchMedia && window.matchMedia("(orientation: landscape)").matches), fm = { ideal: facing || "user" };
   function size(w, h) { return portrait ? { width: { ideal: h }, height: { ideal: w } } : { width: { ideal: w }, height: { ideal: h } }; }
-  var tiers = [[2880, 2160], [2560, 1920], [1920, 1440], [1440, 1080], [1024, 768], [640, 480]];
+  var tiers = [[1440, 1080], [1024, 768], [640, 480]];
   function attempt(i) {
-    var v = Object.assign({ facingMode: fm, frameRate: { ideal: 30, max: 60 } }, size(tiers[i][0], tiers[i][1]));
+    var v = Object.assign({ facingMode: fm, frameRate: { ideal: 30, max: 30 } }, size(tiers[i][0], tiers[i][1]));
     return navigator.mediaDevices.getUserMedia({ audio: audio, video: v }).catch(function (e) {
       if (i + 1 < tiers.length && e && (e.name === "OverconstrainedError" || e.name === "NotReadableError" || e.name === "AbortError")) return attempt(i + 1);
       throw e;
@@ -43,7 +43,7 @@ export function tune(pc) {
     pc.getSenders().forEach(function (sn) {
       if (!sn.track || !sn.getParameters) return;
       var pr = sn.getParameters(); if (!pr.encodings || !pr.encodings.length) pr.encodings = [{}];
-      if (sn.track.kind === "video") { pr.encodings[0].maxBitrate = 12000000; pr.encodings[0].maxFramerate = 30; pr.degradationPreference = "maintain-resolution"; try { sn.track.contentHint = "detail"; } catch (e) {} }
+      if (sn.track.kind === "video") { pr.encodings[0].maxBitrate = 4000000; pr.encodings[0].maxFramerate = 30; pr.degradationPreference = "balanced"; }
       else { pr.encodings[0].maxBitrate = 96000; }
       sn.setParameters(pr).catch(function () {});
     });
@@ -81,7 +81,7 @@ export function clearMediaSession() {
 // Opus tuned for clear speech: 48 kHz, ~96 kbps, forward error correction on (survives packet loss), no DTX gaps.
 function vbr(sdp) {
   // Ask Chrome to start high and never fall below an HD-capable floor; the congestion controller still adapts to the network.
-  var add = "x-google-min-bitrate=800;x-google-start-bitrate=4000;x-google-max-bitrate=12000", i = sdp.indexOf("m=video"); if (i < 0) return sdp;
+  var add = "x-google-min-bitrate=250;x-google-start-bitrate=1500;x-google-max-bitrate=4000", i = sdp.indexOf("m=video"); if (i < 0) return sdp;
   var head = sdp.slice(0, i), vid = sdp.slice(i), re = /a=rtpmap:(\d+) (VP8|VP9|H264|AV1)\/90000/g, m, pts = [];
   while ((m = re.exec(vid))) pts.push(m[1]);
   pts.forEach(function (pt) {
@@ -115,7 +115,7 @@ function mk(stream, onTrack, onState, onData) {
   stream.getTracks().forEach(function (t) { pc.addTrack(t, stream); });
   try {
     var caps = window.RTCRtpSender && RTCRtpSender.getCapabilities && RTCRtpSender.getCapabilities("video");
-    if (caps) { var rank = { "video/VP9": 0, "video/H264": 1, "video/VP8": 2 }, cs = caps.codecs.slice().sort(function (a, b) { return (rank[a.mimeType] === undefined ? 9 : rank[a.mimeType]) - (rank[b.mimeType] === undefined ? 9 : rank[b.mimeType]); });
+    if (caps) { var rank = { "video/H264": 0, "video/VP8": 1, "video/VP9": 2 }, cs = caps.codecs.slice().sort(function (a, b) { return (rank[a.mimeType] === undefined ? 9 : rank[a.mimeType]) - (rank[b.mimeType] === undefined ? 9 : rank[b.mimeType]); });
       pc.getTransceivers().forEach(function (t) { if (t.sender && t.sender.track && t.sender.track.kind === "video" && t.setCodecPreferences) t.setCodecPreferences(cs); }); }
   } catch (e) {}
   pc.ontrack = function (e) { onTrack(e.streams[0] || new MediaStream([e.track])); };
@@ -141,3 +141,31 @@ export async function makeAnswer(stream, offerSdp, onTrack, onState, onData) {
 }
 
 export function applyAnswer(pc, sdp) { return pc.setRemoteDescription({ type: "answer", sdp: sdp }).then(function () { tune(pc); }); }
+
+// Keep the video smooth instead of buffering: watch packet loss + round-trip time and step the video bitrate / size down
+// quickly when the network is weak, and back up slowly when it recovers. Audio is never touched, so voice stays clear.
+var LEVELS = [[4000000, 1], [2500000, 1], [1500000, 1.33], [800000, 2], [400000, 2.67], [220000, 4]];
+export function adapt(pc, onLevel) {
+  var lvl = 0, good = 0, stopped = false, last = {};
+  function apply() {
+    var sn = videoSender(pc); if (!sn || !sn.getParameters) return;
+    var pr = sn.getParameters(); if (!pr.encodings || !pr.encodings.length) pr.encodings = [{}];
+    pr.encodings[0].maxBitrate = LEVELS[lvl][0]; pr.encodings[0].scaleResolutionDownBy = LEVELS[lvl][1];
+    sn.setParameters(pr).catch(function () {}); if (onLevel) onLevel(lvl);
+  }
+  var t = setInterval(function () {
+    if (stopped) return;
+    pc.getStats().then(function (rep) {
+      var loss = 0, rtt = 0, lim = "";
+      rep.forEach(function (r) {
+        if (r.type === "remote-inbound-rtp" && r.kind === "video") { loss = r.fractionLost || 0; rtt = r.roundTripTime || 0; }
+        if (r.type === "outbound-rtp" && r.kind === "video") lim = r.qualityLimitationReason || "";
+      });
+      var bad = loss > 0.06 || rtt > 0.45 || lim === "cpu" || lim === "bandwidth" && loss > 0.02;
+      if (bad && lvl < LEVELS.length - 1) { lvl++; good = 0; apply(); }
+      else if (!bad && loss < 0.015 && rtt < 0.25) { if (++good >= 4 && lvl > 0) { lvl--; good = 0; apply(); } }
+      else good = 0;
+    }).catch(function () {});
+  }, 2000);
+  return function () { stopped = true; clearInterval(t); };
+}
