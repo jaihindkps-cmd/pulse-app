@@ -737,6 +737,13 @@ body{background:var(--bg)}
 #stRec.rec{background:var(--accent);color:#fff;border-color:var(--accent)}
 .vn-btn.rec{background:var(--accent);color:#fff;border-radius:999px;width:auto;padding:0 12px;font-size:13px;font-weight:700}
 .bubble audio{display:block;width:210px;max-width:100%;height:36px}
+/* v3f: interests, streak, meter */
+.int-lbl{font-size:13px;font-weight:600;color:var(--muted);margin:10px 0 6px}.int-grid{display:flex;flex-wrap:wrap;gap:8px}
+.int-chip{border:1px solid var(--line);background:var(--surface);color:var(--fg);padding:7px 14px;border-radius:999px;font:inherit;font-size:13px;cursor:pointer}.int-chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.p-streak{display:inline-block;margin-top:6px;padding:3px 12px;border-radius:99px;font-size:12px;font-weight:700;background:color-mix(in srgb,var(--accent) 12%,var(--surface));color:var(--accent)}
+.p-meter{display:none!important;margin:12px auto 0;max-width:320px;text-align:left}.pm-t{font-size:12.5px;color:var(--muted);margin-bottom:6px}.pm-b{height:6px;background:var(--line);border-radius:6px;overflow:hidden}.pm-b i{display:block;height:100%;background:var(--accent)}
+.liked-banner{margin:6px 0 10px;padding:10px 14px;border-radius:14px;font-size:13px;font-weight:600;color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,var(--surface))}.liked-banner[hidden]{display:none}
+.tags .lk-me{background:var(--accent)!important;color:#fff!important}
 </style></head><body>
 <div class="app">
   <header class="topbar">
@@ -768,6 +775,7 @@ body{background:var(--bg)}
       <div class="st-row"><input class="bh-in" id="fAgeMin" type="number" placeholder="Age from" style="margin:0 0 8px"><input class="bh-in" id="fAgeMax" type="number" placeholder="Age to" style="margin:0 0 8px"></div>
       <input class="bh-in" id="fReligion" placeholder="Religion"><input class="bh-in" id="fCity" placeholder="City"><select class="bh-in" id="fMarital"><option value="">Any marital status</option><option>Never married</option><option>Divorced</option><option>Widowed</option></select>
       <button class="btn-grad" id="fApply" style="width:100%;padding:11px">Apply filters</button></div></div>
+    <div class="liked-banner" id="likedBanner" hidden></div>
     <div class="deck-wrap" id="deck"></div>
     <div class="swipe-controls">
       <button class="sbtn nope" id="btnNope" aria-label="Pass"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6L6 18M6 6l12 12" stroke-linecap="round"/></svg></button>
@@ -835,12 +843,13 @@ body{background:var(--bg)}
     <div class="profile-cover"></div>
     <div class="profile-head">
       <div class="profile-av" id="pAv" style="background:var(--grad)">K</div>
-      <h2 id="pName">-</h2><div class="handle" id="pHandle"></div>
+      <h2 id="pName">-</h2><div class="handle" id="pHandle"></div><div class="p-streak" id="pStreak"></div><div class="p-meter" id="pMeter" hidden></div>
       <div class="form" style="margin-top:14px">
         <label>Name<input id="eName" maxlength="40"></label>
         <label>City<input id="eCity" maxlength="40"></label>
         <label>Work<input id="eWork" maxlength="60"></label>
         <label>About me<textarea id="eAbout" maxlength="300" rows="3"></textarea></label>
+        <div class="int-lbl">Interests (up to 6)</div><div class="int-grid" id="eInterests"></div>
         <label>I am here for<select id="eMode"><option value="friends">Friendship</option><option value="dating">Dating</option><option value="marriage">Marriage</option><option value="jobseeker">Find a job</option><option value="recruiter">Hire talent</option></select></label>
         <label>I am<select id="eGender"><option value="">Select</option><option>Woman</option><option>Man</option><option>Other</option></select></label>
         <div id="secMate"><label>Show me<select id="eSeeking"><option>Everyone</option><option>Women</option><option>Men</option></select></label></div>
@@ -1032,5 +1041,5 @@ body{background:var(--bg)}
   <div class="toast" id="toast"></div>
 </div>
 
-<script src="app.js?v=5a15950fc3" defer></script>
+<script src="app.js?v=ab545fe328" defer></script>
 <script>if("serviceWorker" in navigator && location.protocol.indexOf("http")===0){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});}</script></body></html>

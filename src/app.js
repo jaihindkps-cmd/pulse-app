@@ -178,7 +178,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     $("pName").innerHTML = esc(ME.name) + creatorBadge(ME); $("pHandle").textContent = ME.city || "";
     $("eName").value = ME.name || ""; $("eCity").value = ME.city || ""; $("eWork").value = ME.work || ""; $("eAbout").value = ME.about || "";
     getDocs(query(collection(db, "blocks"), where("blocker", "==", UID))).then(function (s) { blocked = new Set(); s.forEach(function (d) { blocked.add(d.data().blocked); }); }).catch(function () {}).then(function () {
-      applyMode(); listenApps(); listenReqs(); onboard(); listenSongs(); listenFeed(); listenStories(); listenMatches(); refreshLocToggle(); showTab("feed"); setLive(); paintAv(); creatorPanel(); pendingRoom(); heartbeat(); ensureCreatorFlag();
+      applyMode(); listenApps(); listenReqs(); onboard(); paintInterests(); paintStreakMeter(); listenSongs(); listenFeed(); listenStories(); listenMatches(); refreshLocToggle(); showTab("feed"); setLive(); paintAv(); creatorPanel(); pendingRoom(); heartbeat(); ensureCreatorFlag();
     });
   }
   // One-time self-write so OTHER members' screens can show the 👑 Creator badge (creatorBadge() below).
@@ -287,6 +287,23 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
       .catch(function (e) { toast(errMsg(e)); $("postBtn").disabled = false; });
   });
   var DAILY = ["What is one thing you are grateful for today?", "What is a small win you had this week?", "Which skill do you wish you had learned earlier?", "What is your go-to comfort food?", "Who made you smile recently, and how?", "What is a place you want to visit this year?", "What advice would you give your younger self?", "What is a song that always lifts your mood?", "What is something kind you did for someone lately?", "What is the best meal you ever had?"];
+  var INTERESTS = ["Music", "Movies", "Travel", "Cricket", "Food", "Books", "Fitness", "Gaming", "Photography", "Art", "Tech", "Dance", "Cooking", "Yoga", "Nature", "Poetry"], pickedInt = [];
+  function pickedInterests() { return pickedInt.slice(0, 6); }
+  function paintInterests() {
+    var box = $("eInterests"); if (!box) return; pickedInt = String((ME && ME.interests) || "").split(",").filter(Boolean); box.innerHTML = "";
+    INTERESTS.forEach(function (n) {
+      var b = el('<button type="button" class="int-chip"></button>'); b.textContent = n; b.classList.toggle("on", pickedInt.indexOf(n) >= 0);
+      b.addEventListener("click", function () { var i = pickedInt.indexOf(n); if (i >= 0) pickedInt.splice(i, 1); else if (pickedInt.length < 6) pickedInt.push(n); else { toast("Pick up to 6 interests"); return; } b.classList.toggle("on", pickedInt.indexOf(n) >= 0); });
+      box.appendChild(b);
+    });
+  }
+  function paintStreakMeter() {
+    var days = 1; try { var k = "pulse_streak", s = JSON.parse(localStorage.getItem(k) || "{}"), today = Math.floor(Date.now() / 86400000);
+      if (s.d === today) days = s.n || 1; else { days = s.d === today - 1 ? (s.n || 0) + 1 : 1; localStorage.setItem(k, JSON.stringify({ d: today, n: days })); } } catch (e) {}
+    var st = $("pStreak"); if (st) st.textContent = days > 1 ? days + "-day streak" : "Day 1";
+    var got = [ME.photo, ME.about, ME.city, ME.work, ME.interests].filter(Boolean).length, pct = 40 + got * 12, m = $("pMeter");
+    if (m) { m.hidden = pct >= 100; m.innerHTML = '<div class="pm-t">Profile ' + pct + '% complete. Add a photo, about, city, work and interests.</div><div class="pm-b"><i style="width:' + pct + '%"></i></div>'; }
+  }
   function dailyQuestion() {
     var q = DAILY[Math.floor(Date.now() / 86400000) % DAILY.length], host = $("dailyQ"); if (!host) return;
     host.innerHTML = '<div class="dq-l">Question of the day</div><div class="dq-q"></div><button type="button" class="btn-grad dq-b">Write your answer</button>';
@@ -392,10 +409,13 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   var queue = [], dragging = false, sx = 0, cx = 0, topCard = null, topUser = null, busy = false;
   function shuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
   function loadDeck() {
-    Promise.all([getDocs(query(collection(db, "users"), where("mode", "==", MODE), limit(60))), getDocs(query(collection(db, "swipes"), where("from", "==", UID)))]).then(function (r) {
+    Promise.all([getDocs(query(collection(db, "users"), where("mode", "==", MODE), limit(60))), getDocs(query(collection(db, "swipes"), where("from", "==", UID))), getDocs(query(collection(db, "swipes"), where("to", "==", UID))).catch(function () { return []; })]).then(function (r) {
       var done = new Set(); r[1].forEach(function (d) { done.add(d.data().to); });
-      var list = []; r[0].forEach(function (d) { var u = Object.assign({ id: d.id }, d.data()); if (d.id !== UID && !done.has(d.id) && !blocked.has(d.id) && deckOk(u)) list.push(u); });
-      queue = shuffle(list).slice(0, 20); renderDeck();
+      var likers = new Set(); r[2].forEach(function (d) { var x = d.data(); if (x.kind === "like") likers.add(x.from); });
+      var list = []; r[0].forEach(function (d) { var u = Object.assign({ id: d.id }, d.data()); if (d.id !== UID && !done.has(d.id) && !blocked.has(d.id) && deckOk(u)) { u.likedMe = likers.has(d.id); list.push(u); } });
+      list = shuffle(list); var first = list.filter(function (u) { return u.likedMe; }), rest = list.filter(function (u) { return !u.likedMe; });
+      queue = first.concat(rest).slice(0, 20); renderDeck();
+      var lb = $("likedBanner"); if (lb) { lb.hidden = !first.length; lb.textContent = first.length + (first.length === 1 ? " person likes you. They are first in your deck." : " people like you. They are first in your deck."); }
     }).catch(function (e) { toast(errMsg(e)); });
   }
   function renderDeck() {
@@ -403,7 +423,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     if (!queue.length) { deck.innerHTML = '<div class="deck-empty"><div><div style="font-size:42px;margin-bottom:8px">💫</div><div style="font-weight:700;font-size:16px;color:var(--fg);margin-bottom:4px">You have seen everyone for now</div><div style="font-size:13px;margin-bottom:14px">New people show up here as they join. Invite a friend to get things moving.</div><button class="btn-grad" id="deckInvite" type="button">Invite friends</button></div></div>'; var di = $("deckInvite"); if (di) di.addEventListener("click", invite); return; }
     queue.slice(0, 3).reverse().forEach(function (u, i, arr) {
       var top = i === arr.length - 1, depth = arr.length - 1 - i;
-      var c = el('<div class="swipe-card" style="background:' + g(u.id) + ';transform:translateY(' + depth * 14 + 'px) scale(' + (1 - depth * 0.05) + ')"><div class="scrim"></div><div class="avatar-big"' + (u.photo && JPEG.test(u.photo) ? ' style="background:center/cover url(' + u.photo + ')"' : "") + '>' + (u.photo && JPEG.test(u.photo) ? "" : ini(u.name)) + '</div><span class="stamp like">Like</span><span class="stamp nope">Nope</span><div class="info"><h3>' + esc(u.name) + (u.age ? ", " + u.age : "") + vBadge(u) + creatorBadge(u) + '</h3><div class="sub">' + esc([u.work, u.city].filter(Boolean).join(" · ") || "Pulse member") + '</div>' + (u.about ? '<p class="about">' + esc(u.about) + '</p>' : '') + '<div class="tags"><span>' + esc(MODE_LABEL[modeOf(u)]) + '</span></div>' + factsFor(u) + '</div></div>');
+      var c = el('<div class="swipe-card" style="background:' + g(u.id) + ';transform:translateY(' + depth * 14 + 'px) scale(' + (1 - depth * 0.05) + ')"><div class="scrim"></div><div class="avatar-big"' + (u.photo && JPEG.test(u.photo) ? ' style="background:center/cover url(' + u.photo + ')"' : "") + '>' + (u.photo && JPEG.test(u.photo) ? "" : ini(u.name)) + '</div><span class="stamp like">Like</span><span class="stamp nope">Nope</span><div class="info"><h3>' + esc(u.name) + (u.age ? ", " + u.age : "") + vBadge(u) + creatorBadge(u) + '</h3><div class="sub">' + esc([u.work, u.city].filter(Boolean).join(" · ") || "Pulse member") + '</div>' + (u.about ? '<p class="about">' + esc(u.about) + '</p>' : '') + '<div class="tags">' + (u.likedMe ? '<span class="lk-me">Likes you</span>' : "") + '<span>' + esc(MODE_LABEL[modeOf(u)]) + '</span>' + String(u.interests || "").split(",").filter(Boolean).slice(0, 4).map(function (x) { return "<span>" + esc(x) + "</span>"; }).join("") + '</div>' + factsFor(u) + '</div></div>');
       deck.appendChild(c);
       if (top) { topCard = c; topUser = u; drag(c); }
     });
@@ -514,7 +534,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
 
   // ---- profile edit ----
   $("saveProfile").addEventListener("click", function () {
-    var m = $("eMode").value, upd = { name: clean($("eName").value, 40) || ME.name, city: clean($("eCity").value, 40), work: clean($("eWork").value, 60), about: clean($("eAbout").value, 300), mode: m, looking: ({ friends: "Friendship", dating: "Dating", marriage: "Marriage" })[m] || "Friendship" };
+    var m = $("eMode").value, upd = { name: clean($("eName").value, 40) || ME.name, city: clean($("eCity").value, 40), work: clean($("eWork").value, 60), about: clean($("eAbout").value, 300), interests: pickedInterests().join(","), mode: m, looking: ({ friends: "Friendship", dating: "Dating", marriage: "Marriage" })[m] || "Friendship" };
     Object.keys(PROF_FIELDS).forEach(function (id) { var k = PROF_FIELDS[id], v = $(id).value; upd[k] = NUMF[k] ? (v === "" ? null : +v) : clean(v, k === "cabout" ? 300 : 200); });
     if (!isMateMode(m)) { upd.seeking = ME.seeking || ""; }
     if (!upd.gender) { toast("Please select your gender (\"I am\")"); return; }

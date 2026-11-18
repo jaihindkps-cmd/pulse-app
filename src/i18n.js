@@ -88,6 +88,8 @@ var EN2HI = [
 ];
 
 var MORE_HI = [
+  ["Interests (up to 6)","रुचियाँ (अधिकतम 6)"],["Pick up to 6 interests","अधिकतम 6 रुचियाँ चुनें"],["Likes you","आपको पसंद करता/करती है"],["Day 1","पहला दिन"],
+  ["Music","संगीत"],["Movies","फ़िल्में"],["Travel","यात्रा"],["Cricket","क्रिकेट"],["Food","खाना"],["Books","किताबें"],["Fitness","फ़िटनेस"],["Gaming","गेमिंग"],["Photography","फ़ोटोग्राफ़ी"],["Art","कला"],["Tech","टेक"],["Dance","डांस"],["Cooking","कुकिंग"],["Yoga","योग"],["Nature","प्रकृति"],["Poetry","कविता"],
   ["Trending","ट्रेंडिंग"],["New","नए"],["Mine","मेरे"],["+ Create","+ बनाएँ"],["Close","बंद करें"],["Create a song","गाना बनाएँ"],["Sing it","खुद गाएँ"],["Stop","रोकें"],["Publish to Songs","गानों में पब्लिश करें"],["Share to feed","फ़ीड पर शेयर करें"],["My drafts","मेरे ड्राफ़्ट"],["Voice","आवाज़"],["Delete","हटाएँ"],
   ["Create song","गाना बनाएँ"],["Song published 🎉","गाना पब्लिश हो गया 🎉"],["No songs yet. Be the first to publish one.","अभी कोई गाना नहीं। पहला गाना आप पब्लिश करें।"],["You have not published a song yet. Tap Create to make your first one.","आपने अभी कोई गाना पब्लिश नहीं किया। पहला गाना बनाने के लिए बनाएँ दबाएँ।"],
   ["Type an idea. AI writes the lyrics and the tune is made on your phone. Then sing it in your own voice.","एक आइडिया लिखें। AI बोल लिखेगा, धुन आपके फ़ोन पर बनेगी। फिर उसे अपनी आवाज़ में गाएँ।"],
