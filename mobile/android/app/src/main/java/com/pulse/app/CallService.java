@@ -9,15 +9,19 @@ import android.content.Intent;
 import android.content.pm.ServiceInfo;
 import android.os.Build;
 import android.os.IBinder;
+import android.os.PowerManager;
 
 /** Foreground service that keeps the microphone (and camera) alive while Pulse is minimized during a call. */
 public class CallService extends Service {
     public static volatile boolean running = false;
+    public static volatile boolean video = false;
     private static final String CHANNEL = "pulse_call";
+    private PowerManager.WakeLock wl;
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         boolean video = intent != null && intent.getBooleanExtra("video", false);
+        CallService.video = video;
         String title = intent != null && intent.getStringExtra("title") != null ? intent.getStringExtra("title") : "Pulse call";
         NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         if (Build.VERSION.SDK_INT >= 26 && nm != null) {
@@ -40,6 +44,10 @@ public class CallService extends Service {
         } else {
             startForeground(4711, n);
         }
+        try {
+            if (wl == null) { PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE); wl = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "pulse:call"); wl.setReferenceCounted(false); }
+            if (!wl.isHeld()) wl.acquire(4 * 60 * 60 * 1000L);
+        } catch (Exception e) { /* ignore */ }
         running = true;
         return START_NOT_STICKY;
     }
@@ -47,6 +55,7 @@ public class CallService extends Service {
     @Override
     public void onDestroy() {
         running = false;
+        try { if (wl != null && wl.isHeld()) wl.release(); } catch (Exception e) { /* ignore */ }
         super.onDestroy();
     }
 
