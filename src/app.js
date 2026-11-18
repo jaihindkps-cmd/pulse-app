@@ -20,7 +20,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   var auth, db, UID = null, ME = null, signingUp = false;
   var unsubs = [], blocked = new Set(), nameCache = {};
 
-  var grads = ["linear-gradient(135deg,#7c4dff,#ff4d8d)","linear-gradient(135deg,#18c2a8,#7c4dff)","linear-gradient(135deg,#ff8a3d,#ff4d8d)","linear-gradient(135deg,#4d8dff,#18c2a8)","linear-gradient(135deg,#ff4d8d,#ff8a3d)","linear-gradient(135deg,#9b4dff,#4d8dff)"];
+  var grads = ["linear-gradient(135deg,#0FA58B,#1E7BE0)","linear-gradient(135deg,#18c2a8,#7c4dff)","linear-gradient(135deg,#ff8a3d,#ff4d8d)","linear-gradient(135deg,#4d8dff,#18c2a8)","linear-gradient(135deg,#ff4d8d,#ff8a3d)","linear-gradient(135deg,#9b4dff,#4d8dff)"];
   function hash(s) { var h = 0; for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return h; }
   function g(key) { return grads[Math.abs(hash(String(key))) % grads.length]; }
   function esc(s) { return String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
