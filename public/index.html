@@ -794,6 +794,15 @@ body{background:var(--bg)}
 .fx-row.stk button{font-size:22px;padding:4px 10px}
 #fxStickers button,#fxReact button{font-size:22px;padding:4px 11px;line-height:1.2}
 @media (prefers-reduced-motion:reduce){.fx-flt{animation-duration:.01s}}
+
+.callui .call-top{pointer-events:none}
+.callui.idle .call-watermark{opacity:0}.call-watermark{transition:opacity .25s}
+.callui.connected-video .call-top{transition:opacity .4s}
+#callVideoWrap{touch-action:none;overflow:hidden}
+#callRemoteVideo{transform-origin:50% 50%;will-change:transform}
+.zoom-chip{position:absolute;z-index:6;left:50%;top:calc(var(--sa-top,0px) + 70px);transform:translateX(-50%);border:none;border-radius:999px;padding:6px 14px;font:700 13px var(--font-body);background:rgba(18,22,30,.78);color:#fff}
+.self-show{position:absolute;z-index:6;right:0;top:calc(var(--sa-top,0px) + 90px);width:26px;height:56px;border:none;border-radius:14px 0 0 14px;background:rgba(18,22,30,.72);color:#fff;font-size:20px}
+.callui.self-off #callLocalVideo{display:none}
 </style></head><body>
 <div class="app">
   <header class="topbar">
@@ -1039,6 +1048,7 @@ body{background:var(--bg)}
       <div class="call-watermark" id="callWatermark"></div>
     </div>
     <div class="call-top"><div class="ct-txt"><h3 id="callName">-</h3><div class="call-sub" id="callSub"></div></div><span class="ct-badge" id="callHd" hidden>HD</span></div>
+    <button class="zoom-chip" id="zoomChip" type="button" hidden>1×</button><button class="self-show" id="selfShow" type="button" aria-label="Show my camera" hidden>‹</button>
     <div class="call-mid"><div class="call-av" id="callAv">A</div>
     <div class="call-enc" id="callEnc">End-to-end encrypted. Screenshots and screen recording are blocked in the app.</div></div>
     <button class="ptt" id="ptt" hidden>🎙 Hold to talk</button>
@@ -1107,5 +1117,5 @@ body{background:var(--bg)}
   <div class="toast" id="toast"></div>
 </div>
 
-<script src="app.js?v=a3e3792322" defer></script>
+<script src="app.js?v=5cac67c70a" defer></script>
 <script>if("serviceWorker" in navigator && location.protocol.indexOf("http")===0){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});}</script></body></html>

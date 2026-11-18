@@ -18,9 +18,10 @@ export function getMic() { return getMedia(false); }
 export function getMedia(withVideo, facing) {
   var audio = { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1, sampleRate: 48000 };
   if (!withVideo) return navigator.mediaDevices.getUserMedia({ audio: audio, video: false });
+  // 4:3 uses the camera's whole sensor, so the picture is WIDER than a 16:9 crop at the same sharpness.
   var portrait = !(window.matchMedia && window.matchMedia("(orientation: landscape)").matches), fm = { ideal: facing || "user" };
   function size(w, h) { return portrait ? { width: { ideal: h }, height: { ideal: w } } : { width: { ideal: w }, height: { ideal: h } }; }
-  var tiers = [[3840, 2160], [1920, 1080], [1280, 720], [640, 480]];
+  var tiers = [[2880, 2160], [2560, 1920], [1920, 1440], [1440, 1080], [1024, 768], [640, 480]];
   function attempt(i) {
     var v = Object.assign({ facingMode: fm, frameRate: { ideal: 30, max: 60 } }, size(tiers[i][0], tiers[i][1]));
     return navigator.mediaDevices.getUserMedia({ audio: audio, video: v }).catch(function (e) {
@@ -29,6 +30,11 @@ export function getMedia(withVideo, facing) {
     });
   }
   return attempt(0);
+}
+
+// Ultra-wide: some phones expose zoom below 1x. Returns true if a wider view was applied.
+export function wide(track, on) {
+  try { var c = track.getCapabilities && track.getCapabilities(); if (!c || !c.zoom) return false; var z = on ? c.zoom.min : Math.max(1, c.zoom.min); track.applyConstraints({ advanced: [{ zoom: z }] }).catch(function () {}); return on ? c.zoom.min < 1 : true; } catch (e) { return false; }
 }
 
 // Raise the video/audio bitrate ceiling (default WebRTC caps are very low) and keep sharpness over frame rate.
@@ -73,7 +79,20 @@ export function clearMediaSession() {
 }
 
 // Opus tuned for clear speech: 48 kHz, ~96 kbps, forward error correction on (survives packet loss), no DTX gaps.
+function vbr(sdp) {
+  // Ask Chrome to start high and never fall below an HD-capable floor; the congestion controller still adapts to the network.
+  var add = "x-google-min-bitrate=800;x-google-start-bitrate=4000;x-google-max-bitrate=12000", i = sdp.indexOf("m=video"); if (i < 0) return sdp;
+  var head = sdp.slice(0, i), vid = sdp.slice(i), re = /a=rtpmap:(\d+) (VP8|VP9|H264|AV1)\/90000/g, m, pts = [];
+  while ((m = re.exec(vid))) pts.push(m[1]);
+  pts.forEach(function (pt) {
+    var f = new RegExp("a=fmtp:" + pt + " ([^\\r\\n]*)");
+    if (f.test(vid)) vid = vid.replace(f, function (_, x) { return "a=fmtp:" + pt + " " + x + ";" + add; });
+    else vid = vid.replace(new RegExp("(a=rtpmap:" + pt + " [^\\r\\n]*)"), "$1\r\na=fmtp:" + pt + " " + add);
+  });
+  return head + vid;
+}
 function hq(sdp) {
+  sdp = vbr(sdp);
   var m = /a=rtpmap:(\d+) opus\/48000/.exec(sdp); if (!m) return sdp;
   var pt = m[1], re = new RegExp("a=fmtp:" + pt + " ([^\\r\\n]*)"), add = "minptime=10;useinbandfec=1;usedtx=0;stereo=0;sprop-stereo=0;maxaveragebitrate=96000;maxplaybackrate=48000";
   if (re.test(sdp)) return sdp.replace(re, function (_, f) { var keep = f.split(";").filter(function (x) { return x && !/^(minptime|useinbandfec|usedtx|stereo|sprop-stereo|maxaveragebitrate|maxplaybackrate)=/.test(x); }); return "a=fmtp:" + pt + " " + keep.concat(add.split(";")).join(";"); });
@@ -94,6 +113,11 @@ function mk(stream, onTrack, onState, onData) {
   var pc = new RTCPeerConnection(ICE);
   try { pc.fx = pc.createDataChannel("fx", { negotiated: true, id: 1 }); pc.fx.onmessage = function (e) { if (onData) onData(e.data); }; } catch (e) {}
   stream.getTracks().forEach(function (t) { pc.addTrack(t, stream); });
+  try {
+    var caps = window.RTCRtpSender && RTCRtpSender.getCapabilities && RTCRtpSender.getCapabilities("video");
+    if (caps) { var rank = { "video/VP9": 0, "video/H264": 1, "video/VP8": 2 }, cs = caps.codecs.slice().sort(function (a, b) { return (rank[a.mimeType] === undefined ? 9 : rank[a.mimeType]) - (rank[b.mimeType] === undefined ? 9 : rank[b.mimeType]); });
+      pc.getTransceivers().forEach(function (t) { if (t.sender && t.sender.track && t.sender.track.kind === "video" && t.setCodecPreferences) t.setCodecPreferences(cs); }); }
+  } catch (e) {}
   pc.ontrack = function (e) { onTrack(e.streams[0] || new MediaStream([e.track])); };
   pc.onconnectionstatechange = function () { onState(pc.connectionState); };
   return pc;

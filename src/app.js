@@ -1141,14 +1141,16 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     $("callUI").classList.toggle("video-on", !!opts.video); $("callUI").classList.remove("idle", "remote-contain");
     $("callLocalVideo").hidden = !opts.video; $("callRemoteVideo").hidden = !opts.video;
     $("callWatermark").textContent = (ME.name || "Pulse") + " · " + UID.slice(0, 6);
-    secureScreen(true); idleKick();
+    secureScreen(true); $("callUI").classList.remove("self-off"); $("selfShow").hidden = true; $("zoomChip").hidden = true; $("callRemoteVideo").style.transform = ""; $("callLocalVideo").style.transform = ""; Z0();
+    idleKick();
     callShow(true);
   }
+  function Z0() { try { Z.s = 1; Z.x = 0; Z.y = 0; pipX = 0; pipY = 0; } catch (e) {} }
   function lbl(id, t) { var b = $(id).querySelector(".lb"); if (b) b.textContent = t; }
   function setRouteBtn(kind, t) { $("callRoute").setAttribute("data-k", kind === "earpiece" ? "earpiece" : "speaker"); lbl("callRoute", t); }
   // Controls fade out after a few quiet seconds in a video call; a tap brings them back.
   var idleT = null;
-  function idleKick() { var u = $("callUI"); u.classList.remove("idle"); clearTimeout(idleT); if (!u.classList.contains("video-on")) return; idleT = setTimeout(function () { if (CALL && CALL.connected && $("fxTray").hidden && $("routeSheet").hidden) u.classList.add("idle"); }, 5000); }
+  function idleKick() { var u = $("callUI"); u.classList.remove("idle"); clearTimeout(idleT); if (!u.classList.contains("video-on")) return; idleT = setTimeout(function () { if (CALL && CALL.connected && $("fxTray").hidden && $("routeSheet").hidden) u.classList.add("idle"); }, 3000); }
   $("callUI").addEventListener("pointerdown", idleKick);
   function callMsg(mid, text, call, touchMatch) {
     var b = writeBatch(db), mref = doc(collection(db, "matches", mid, "messages"));
@@ -1218,7 +1220,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
       callSetup(c.name, "Ringing...", { walkie: mode === "walkie", video: isVideo });
       routeStart(isVideo).then(refreshRouteLabel); startTone("out"); serviceStart(isVideo, "Pulse call with " + c.name);
       if (isVideo) { var lv = $("callLocalVideo"); lv.srcObject = stream; lv.play().catch(function () {}); }
-      CALL.facing = "user";
+      CALL.facing = "user"; if (isVideo) Call.wide(stream.getVideoTracks()[0], true);
       return Call.makeOffer(stream, onRemote, onState, onFxData).then(function (o) {
         if (!CALL || CALL.id !== id) { o.pc.close(); return; }
         CALL.pc = o.pc; watchCall();
@@ -1279,7 +1281,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     Call.getMedia(isVideo).then(function (stream) {
       c.stream = stream;
       if (isVideo) { var lv = $("callLocalVideo"); lv.srcObject = stream; lv.hidden = false; lv.play().catch(function () {}); $("callRemoteVideo").hidden = false; $("callUI").classList.add("video-on"); }
-      c.facing = "user";
+      c.facing = "user"; if (isVideo) Call.wide(stream.getVideoTracks()[0], true);
       return Call.makeAnswer(stream, c.offer, onRemote, onState, onFxData);
     })
       .then(function (a) { c.pc = a.pc; $("callMute").hidden = c.mode === "walkie"; $("ptt").hidden = c.mode !== "walkie"; $("callCam").hidden = !isVideo; $("callFlip").hidden = $("callFx").hidden = !isVideo; return callMsg(c.mid, "📞 Jawab", { k: "answer", id: c.id, sdp: a.sdp }, false); })
@@ -1305,7 +1307,46 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   $("callCam").addEventListener("click", function () { if (!CALL) return; var off = this.classList.toggle("on"); setCam(!off); lbl("callCam", off ? "Camera on" : "Camera"); });
 
   // ---- Effects (filters, face stickers, floating reactions), camera flip ----
-  function previewStream(c) { var lv = $("callLocalVideo"), s = c.fx && c.fx.active() ? new MediaStream([c.fx.track]) : c.stream; lv.srcObject = s; lv.classList.toggle("rear", c.facing === "environment"); lv.play().catch(function () {}); }
+  var pipX = 0, pipY = 0;
+  function pipT() { var lv = $("callLocalVideo"); lv.style.transform = "translate(" + pipX + "px," + pipY + "px)" + (lv.classList.contains("rear") ? "" : " scaleX(-1)"); }
+  function previewStream(c) { var lv = $("callLocalVideo"), s = c.fx && c.fx.active() ? new MediaStream([c.fx.track]) : c.stream; lv.srcObject = s; lv.classList.toggle("rear", c.facing === "environment"); pipT(); lv.play().catch(function () {}); }
+  // My own picture: drag it anywhere, or push it off the right edge to hide it (tap the small tab to bring it back).
+  (function () {
+    var p = $("callLocalVideo"), sx = 0, sy = 0, ox = 0, oy = 0, drag = false;
+    p.addEventListener("pointerdown", function (e) { e.stopPropagation(); drag = true; sx = e.clientX; sy = e.clientY; ox = pipX; oy = pipY; try { p.setPointerCapture(e.pointerId); } catch (x) {} });
+    p.addEventListener("pointermove", function (e) { if (!drag) return; pipX = ox + e.clientX - sx; pipY = oy + e.clientY - sy; pipT(); });
+    function up() {
+      if (!drag) return; drag = false; var r = p.getBoundingClientRect();
+      if (r.left + r.width / 2 > innerWidth * 0.82) { $("callUI").classList.add("self-off"); $("selfShow").hidden = false; }
+      else { pipX = Math.max(-(innerWidth - r.width - 24), Math.min(pipX, 12)); pipT(); }
+    }
+    p.addEventListener("pointerup", up); p.addEventListener("pointercancel", up);
+    $("selfShow").addEventListener("click", function () { $("callUI").classList.remove("self-off"); this.hidden = true; pipX = 0; pipY = 0; pipT(); });
+  })();
+  // Zoom the other person: pinch with two fingers, drag to move around, double-tap for 2x. Tap the chip to reset.
+  var Z = { s: 1, x: 0, y: 0 };
+  function zApply() {
+    var v = $("callRemoteVideo"), w = innerWidth, h = innerHeight;
+    Z.s = Math.max(1, Math.min(5, Z.s)); var mx = (Z.s - 1) * w / 2, my = (Z.s - 1) * h / 2;
+    Z.x = Math.max(-mx, Math.min(mx, Z.x)); Z.y = Math.max(-my, Math.min(my, Z.y));
+    v.style.transform = Z.s === 1 ? "" : "translate(" + Z.x + "px," + Z.y + "px) scale(" + Z.s + ")";
+    var chip = $("zoomChip"); chip.hidden = Z.s === 1; chip.textContent = Z.s.toFixed(1) + "× · reset";
+  }
+  function zReset() { Z.s = 1; Z.x = 0; Z.y = 0; zApply(); }
+  $("zoomChip").addEventListener("click", zReset);
+  (function () {
+    var w = $("callVideoWrap"), ptrs = {}, d0 = 0, s0 = 1, lastTap = 0;
+    function dist() { var k = Object.keys(ptrs); if (k.length < 2) return 0; var a = ptrs[k[0]], b = ptrs[k[1]]; return Math.hypot(a.x - b.x, a.y - b.y); }
+    w.addEventListener("pointerdown", function (e) { ptrs[e.pointerId] = { x: e.clientX, y: e.clientY }; try { w.setPointerCapture(e.pointerId); } catch (x) {} d0 = dist(); s0 = Z.s;
+      if (Object.keys(ptrs).length === 1) { var t = Date.now(); if (t - lastTap < 300) { Z.s > 1 ? zReset() : (Z.s = 2, zApply()); } lastTap = t; } });
+    w.addEventListener("pointermove", function (e) {
+      var p = ptrs[e.pointerId]; if (!p) return; var n = Object.keys(ptrs).length;
+      if (n >= 2) { ptrs[e.pointerId] = { x: e.clientX, y: e.clientY }; var d = dist(); if (d0 > 10) { Z.s = s0 * d / d0; zApply(); } }
+      else if (Z.s > 1) { Z.x += e.clientX - p.x; Z.y += e.clientY - p.y; ptrs[e.pointerId] = { x: e.clientX, y: e.clientY }; zApply(); }
+    });
+    function end(e) { delete ptrs[e.pointerId]; d0 = dist(); s0 = Z.s; }
+    w.addEventListener("pointerup", end); w.addEventListener("pointercancel", end);
+  })();
   function applyFx(o) {
     var c = CALL; if (!c || !c.stream || !effectsSupported()) { toast("Effects are not supported on this device."); return; }
     if (!c.fx) c.fx = createEffects(c.stream); if (!c.fx) return;
@@ -1318,6 +1359,9 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     var c = CALL, st = c && c.fx ? c.fx.state() : { filter: "none", sticker: "none" };
     var f = $("fxFilters"), s = $("fxStickers"), r = $("fxReact");
     if (!f.children.length) {
+      var wb = el('<button type="button" class="on">↔ Wide</button>');
+      wb.addEventListener("click", function () { var cc = CALL; if (!cc || !cc.stream) return; cc.wideOn = cc.wideOn === false; var ok = Call.wide(cc.stream.getVideoTracks()[0], cc.wideOn); if (!ok && cc.wideOn) toast("This camera has no wider view."); wb.classList.toggle("on", cc.wideOn); });
+      f.appendChild(wb);
       FILTERS.forEach(function (x) { var b = el('<button type="button" data-f="' + x.id + '"></button>'); b.textContent = x.name; b.addEventListener("click", function () { applyFx({ filter: x.id }); }); f.appendChild(b); });
       STICKERS.forEach(function (x) { var b = el('<button type="button" data-s="' + x.id + '"></button>'); b.textContent = x.e; b.addEventListener("click", function () { applyFx({ sticker: x.id }); }); s.appendChild(b); });
       ["❤️", "😂", "👍", "🔥", "😮", "👏", "🎉"].forEach(function (e) { var b = el('<button type="button"></button>'); b.textContent = e; b.addEventListener("click", function () { sendReaction(e); }); r.appendChild(b); });
@@ -1341,7 +1385,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
       var fxState = c.fx ? c.fx.state() : null; if (c.fx) { c.fx.stop(); c.fx = null; }
       c.stream.removeTrack(old); c.stream.addTrack(nv); if (old) old.stop(); c.facing = next;
       var sn = c.pc && Call.videoSender(c.pc); if (sn) sn.replaceTrack(nv).catch(function () {});
-      Call.tune(c.pc);
+      Call.wide(nv, true); Call.tune(c.pc);
       if (fxState && (fxState.filter !== "none" || fxState.sticker !== "none")) applyFx(fxState); else previewStream(c);
     }).catch(function () { toast("Could not switch the camera."); }).then(function () { c.flipping = false; });
   });
@@ -2255,6 +2299,12 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
 
   // ---- boot ----
   initI18n(); setMode("login");
+  // Pick up new versions by itself: if a newer build is published, reload (never during a call).
+  (function () {
+    var me = (document.querySelector('script[src*="app.js"]') || {}).src || "", mv = /v=([a-z0-9]+)/.exec(me); if (!mv) return;
+    function chk() { if (CALL) return; fetch("index.html", { cache: "no-store" }).then(function (r) { return r.text(); }).then(function (t) { var m = /app\.js\?v=([a-z0-9]+)/.exec(t); if (m && m[1] !== mv[1] && !CALL) location.reload(); }).catch(function () {}); }
+    setInterval(chk, 90000); document.addEventListener("visibilitychange", function () { if (document.visibilityState === "visible") chk(); });
+  })();
   // The Firebase web config is public by design (it only names the project; Firestore rules protect the data), so a copy
   // is built in. It is used if the file cannot be fetched (slow/blocked network, stale cache) so login never breaks.
   var BUILTIN_CFG = { apiKey: "AIzaSyB2mlyUACsp38Gal7TsUFbet42y3EEh0EE", authDomain: "pulse-704e7.firebaseapp.com", projectId: "pulse-704e7", storageBucket: "pulse-704e7.firebasestorage.app", messagingSenderId: "985338252699", appId: "1:985338252699:web:b001a501828594d81a653e" };
