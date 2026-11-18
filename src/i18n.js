@@ -88,6 +88,8 @@ var EN2HI = [
 ];
 
 var MORE_HI = [
+  ["Female singer","गायिका की आवाज़"],["Male singer","गायक की आवाज़"],["Lyrics: Hindi","बोल: हिंदी"],["Lyrics: English","बोल: अंग्रेज़ी"],["Lyrics: Hinglish","बोल: हिंग्लिश"],["Auto voice","अपने आप चुनें"],["Hear voice","आवाज़ सुनें"],
+  ["Sing with the voice above (turn off if you record your own)","ऊपर चुनी आवाज़ में गवाएँ (अपनी आवाज़ रिकॉर्ड करें तो बंद कर दें)"],
   ["Interests (up to 6)","रुचियाँ (अधिकतम 6)"],["Pick up to 6 interests","अधिकतम 6 रुचियाँ चुनें"],["Likes you","आपको पसंद करता/करती है"],["Day 1","पहला दिन"],
   ["Music","संगीत"],["Movies","फ़िल्में"],["Travel","यात्रा"],["Cricket","क्रिकेट"],["Food","खाना"],["Books","किताबें"],["Fitness","फ़िटनेस"],["Gaming","गेमिंग"],["Photography","फ़ोटोग्राफ़ी"],["Art","कला"],["Tech","टेक"],["Dance","डांस"],["Cooking","कुकिंग"],["Yoga","योग"],["Nature","प्रकृति"],["Poetry","कविता"],
   ["Trending","ट्रेंडिंग"],["New","नए"],["Mine","मेरे"],["+ Create","+ बनाएँ"],["Close","बंद करें"],["Create a song","गाना बनाएँ"],["Sing it","खुद गाएँ"],["Stop","रोकें"],["Publish to Songs","गानों में पब्लिश करें"],["Share to feed","फ़ीड पर शेयर करें"],["My drafts","मेरे ड्राफ़्ट"],["Voice","आवाज़"],["Delete","हटाएँ"],

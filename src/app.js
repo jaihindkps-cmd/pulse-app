@@ -8,6 +8,7 @@ import {
 } from "firebase/firestore";
 import { initAI, chat as aiChat, json as aiJson, aiWorking } from "./ai.js";
 import { buildSong, Player, renderWav, GENRES } from "./music.js";
+import { singLine, voiceList, langOf, singerSupported, stopSinging } from "./singer.js";
 import * as Call from "./call.js";
 import { DHAMS, art as dhamArt, photoOrArt, loadPhotos, daily as dailyDham, kindName, kindSym, loadDeityPhotos } from "./dham.js";
 import { tr, getLang, setLang, initI18n } from "./i18n.js";
@@ -864,7 +865,13 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   // ---- Gaana Studio ----
   var player = new Player(), curSong = null, curMeta = null, LIBKEY = "pulse_songs_v1";
   Object.keys(GENRES).forEach(function (k) { $("stGenre").appendChild(new Option(GENRES[k].name, k)); });
-  var SONG_SYS = "Tum ek geetkaar ho. Sirf ORIGINAL bol likho: kisi maujooda gaane ke bol ya kisi artist ki nakal nahi. Hinglish (Roman Hindi) me likho. Sirf JSON do: {\"title\":string,\"minor\":boolean,\"bpm\":number(70-130),\"lines\":[{\"section\":\"Verse 1\"|\"Chorus\"|\"Verse 2\"|\"Bridge\",\"text\":string}]}. Theek 8 se 12 lines, har line 4-9 shabd, Chorus ki 2 line do baar aa sakti hain. Gaali, hinsa, nafrat, vayask baatein aur asli logon ke naam nahi.";
+  function songSys(lang, singer) {
+    var L = lang === "en" ? "natural, singable English" : lang === "hinglish" ? "Hinglish (Hindi in Roman letters)" : "simple, poetic Hindi written in Devanagari script (no Roman letters)";
+    return "You are an award-winning songwriter who writes radio-hit lyrics. Write ONE completely ORIGINAL song: never copy or imitate any existing song, lyric, or artist, and never name real people. Language: " + L + ". The song is sung by a " + (singer === "m" ? "male" : "female") + " singer, so write in that first-person voice. " +
+      "Craft: a memorable title that appears in the hook; a strong emotional arc; concrete imagery (senses, places, small details) instead of cliches; consistent rhyme (AABB or ABAB) and a steady rhythm of 5 to 8 syllables per line so it can be sung; the chorus must be catchy, repeatable, and emotionally clearest. " +
+      "Structure exactly 16 lines: Verse 1 (4 lines), Chorus (4), Verse 2 (4), Chorus (repeat the same 4 lines), no other sections. " +
+      "Output only JSON: {\"title\":string,\"minor\":boolean (true for sad or tender songs),\"bpm\":number between 70 and 120,\"lines\":[{\"section\":\"Verse 1\"|\"Chorus\"|\"Verse 2\",\"text\":string}]}. No profanity, violence, hate, or adult content.";
+  }
   function fallbackSong(idea, genre, mood) {
     var w = idea.split(/\s+/).filter(function (x) { return x.length > 3; }), k = (w[0] || "zindagi").replace(/[^\p{L}\p{N}]/gu, "") || "zindagi", k2 = w[1] || "khushi";
     var L = [["Verse 1", "Aaj phir " + k + " ki yaad aayi"], ["Verse 1", "Dil ne chupke se awaaz lagayi"], ["Verse 1", "Raaton ke saath chalti hai " + k2], ["Verse 1", "Subah ne naye rang bikhraye"],
@@ -873,7 +880,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     return { title: k.charAt(0).toUpperCase() + k.slice(1) + " ki dhun", minor: mood === "udaas" || mood === "shaanti", bpm: 0, lines: L.map(function (x) { return { section: x[0], text: x[1] }; }) };
   }
   function normSong(j) {
-    var lines = (j && Array.isArray(j.lines) ? j.lines : []).map(function (x) { return { section: clean(x && x.section, 20), text: clean(x && x.text, 90) }; }).filter(function (x) { return x.text; }).slice(0, 12);
+    var lines = (j && Array.isArray(j.lines) ? j.lines : []).map(function (x) { return { section: clean(x && x.section, 20), text: clean(x && x.text, 90) }; }).filter(function (x) { return x.text; }).slice(0, 16);
     if (lines.length < 4) return null;
     return { title: clean(j.title, 60) || "Meri dhun", minor: !!j.minor, bpm: +j.bpm || 0, lines: lines };
   }
@@ -896,19 +903,22 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     var idea = clean($("stPrompt").value, 300), genre = $("stGenre").value, mood = $("stMood").value, btn = this;
     if (!idea) { toast("Type a song idea first"); return; }
     btn.disabled = true; $("stNote").textContent = "AI is writing the lyrics...";
-    aiJson(SONG_SYS, "Idea: " + idea + "\nGenre: " + GENRES[genre].name + (mood ? "\nMood: " + mood : "")).then(normSong).then(function (sp) { if (!sp) throw new Error("bad"); $("stNote").textContent = "AI wrote the lyrics ✦"; return sp; })
+    aiJson(songSys($("stLang").value, $("stSinger").value), "Idea: " + idea + "\nGenre: " + GENRES[genre].name + (mood ? "\nMood: " + mood : "")).then(normSong).then(function (sp) { if (!sp) throw new Error("bad"); $("stNote").textContent = "AI wrote the lyrics ✦"; return sp; })
       .catch(function () { $("stNote").textContent = "AI is off right now, so this was made from a simple template. (Turn on AI Logic in Firebase for real AI-written lyrics.)"; return fallbackSong(idea, genre, mood); })
       .then(function (sp) { var meta = { title: sp.title, genre: genre, bpm: sp.bpm, minor: sp.minor, lines: sp.lines }; showSong(meta); saveLib(meta); })
       .catch(function (e) { toast(errMsg(e)); }).then(function () { btn.disabled = false; });
   });
-  function speak(t) { try { if ($("stVoice").checked && window.speechSynthesis) { speechSynthesis.cancel(); var u = new SpeechSynthesisUtterance(t); u.lang = "hi-IN"; u.rate = 0.9; u.pitch = 1.05; speechSynthesis.speak(u); } } catch (e) {} }
+  function studioSing(i) { if ($("stVoice").checked && curSong) singLine(curSong, i, { kind: $("stSinger").value, voiceName: $("stVoicePick").value, lang: langOf($("stLang").value === "en" ? "en" : "hi") }); }
+  function fillVoicePick() { var sel = $("stVoicePick"), cur = sel.value; sel.innerHTML = '<option value="">Auto voice</option>'; voiceList($("stLang").value === "en" ? "en" : "hi").forEach(function (v) { sel.appendChild(new Option(v.name + " (" + v.lang + ")", v.name)); }); sel.value = cur; }
+  $("stLang").addEventListener("change", fillVoicePick); setTimeout(fillVoicePick, 600); setTimeout(fillVoicePick, 2500);
+  $("stTest").addEventListener("click", function () { var s = buildSong({ genre: "pop", bpm: 90, minor: false, title: "t", lines: [{ section: "Verse 1", text: $("stLang").value === "en" ? "Hello, this is my singing voice" : "नमस्ते, ये मेरी गाने की आवाज़ है" }] }); if (!singerSupported()) { toast("This phone has no voice engine. Install Google Text-to-speech from the Play Store."); return; } singLine(s, 0, { kind: $("stSinger").value, voiceName: $("stVoicePick").value, lang: langOf($("stLang").value === "en" ? "en" : "hi") }); });
   $("stPlay").addEventListener("click", function () {
     if (!curSong) return;
     if (player.playing) { player.stop(); try { speechSynthesis.cancel(); } catch (e) {} this.textContent = "▶ Play"; return; }
     var btn = this; btn.textContent = "⏹ Stop";
     bump("cSongs");
     player.play(curSong, {
-      onLine: function (i) { document.querySelectorAll("#stLyrics .ln").forEach(function (n) { n.classList.toggle("on", +n.getAttribute("data-i") === i); }); if (i >= 0) speak(curMeta.lines[i].text); },
+      onLine: function (i) { document.querySelectorAll("#stLyrics .ln").forEach(function (n) { n.classList.toggle("on", +n.getAttribute("data-i") === i); }); if (i >= 0) studioSing(i); },
       onTick: function (s, t) { $("stBar").style.width = Math.min(100, s / t * 100) + "%"; },
       onEnd: function () { btn.textContent = "▶ Play"; $("stBar").style.width = "0"; }
     }).catch(function (e) { btn.textContent = "▶ Play"; toast(errMsg(e)); });
@@ -1426,7 +1436,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     var hasVoice = sd.aud && AUDIO_OK.test(sd.aud);
     if (hasVoice) { feedAudio = new Audio(sd.aud); feedAudio.play().catch(function () {}); }
     feedPlayer.play(song, {
-      onLine: function (i) { if (!hasVoice && i >= 0 && sd.lines[i]) { try { speechSynthesis.cancel(); var u = new SpeechSynthesisUtterance(sd.lines[i].text); u.lang = "hi-IN"; u.rate = 0.9; speechSynthesis.speak(u); } catch (e) {} } },
+      onLine: function (i) { if (!hasVoice && i >= 0 && sd.lines[i]) singLine(song, i, { kind: sd.singer || "f", lang: sd.lang === "en" ? "en-IN" : "hi-IN" }); },
       onTick: function (s, t) { bar.style.width = Math.min(100, s / t * 100) + "%"; },
       onEnd: function () { if (feedPlaying === sd.id) stopFeedPlay(); }
     }).catch(function (e) { stopFeedPlay(); toast(errMsg(e)); });
@@ -1449,7 +1459,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   }
   function listenSongs() {
     unsubs.push(onSnapshot(query(collection(db, "songs"), orderBy("createdAt", "desc"), limit(60)), function (snap) {
-      songDocs = []; snap.forEach(function (d) { var x = snapData(d); if (!x.lines || !x.title) return; songDocs.push({ id: d.id, uid: x.uid, name: x.name || "Member", title: x.title, genre: x.genre, bpm: x.bpm, minor: !!x.minor, lines: x.lines, aud: x.aud, likedBy: x.likedBy || [], t: ms(x.createdAt) || Date.now() }); });
+      songDocs = []; snap.forEach(function (d) { var x = snapData(d); if (!x.lines || !x.title) return; songDocs.push({ id: d.id, uid: x.uid, name: x.name || "Member", title: x.title, genre: x.genre, bpm: x.bpm, minor: !!x.minor, lines: x.lines, aud: x.aud, singer: x.singer, lang: x.lang, likedBy: x.likedBy || [], t: ms(x.createdAt) || Date.now() }); });
       if (!feedPlaying) renderSongs();
     }, function () {}));
   }
@@ -1470,7 +1480,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   });
   $("stPublish").addEventListener("click", function () {
     if (!curMeta || !rate("song", 4, 60000)) return; var btn = this; btn.disabled = true;
-    var d = { uid: UID, name: ME.name, title: clean(curMeta.title, 60), genre: curMeta.genre, bpm: curSong ? curSong.bpm : 0, minor: !!curMeta.minor, lines: curMeta.lines.slice(0, 12).map(function (x) { return { section: clean(x.section, 20), text: clean(x.text, 90) }; }), likedBy: [], createdAt: serverTimestamp() };
+    var d = { uid: UID, name: ME.name, title: clean(curMeta.title, 60), genre: curMeta.genre, bpm: curSong ? curSong.bpm : 0, minor: !!curMeta.minor, singer: $("stSinger").value, lang: $("stLang").value === "en" ? "en" : "hi", lines: curMeta.lines.slice(0, 16).map(function (x) { return { section: clean(x.section, 20), text: clean(x.text, 90) }; }), likedBy: [], createdAt: serverTimestamp() };
     if (stTake && stTake.length <= 500000) d.aud = stTake;
     addDoc(collection(db, "songs"), d).then(function () { toast("Song published 🎉"); bump("cSongs"); $("stCreate").hidden = true; $("stToggle").textContent = "+ Create"; songTab = "new"; document.querySelectorAll("#songTabs button").forEach(function (x) { x.classList.toggle("on", x.getAttribute("data-k") === "new"); }); })
       .catch(function (e) { toast(errMsg(e)); }).then(function () { btn.disabled = false; });

@@ -815,6 +815,8 @@ body{background:var(--bg)}
       <p class="st-sub">Type an idea. AI writes the lyrics and the tune is made on your phone. Then sing it in your own voice.</p>
       <textarea id="stPrompt" rows="2" maxlength="300" placeholder="e.g. a memory of old friendship in the rain, or a thank-you note for Dad..."></textarea>
       <div class="st-row"><select id="stGenre"></select><select id="stMood"><option value="">Mood: let AI choose</option><option value="khushi">Happy</option><option value="udaas">Sad</option><option value="pyaar">Romantic</option><option value="josh">Energetic</option><option value="shaanti">Peaceful</option></select></div>
+      <div class="st-row"><select id="stSinger"><option value="f">Female singer</option><option value="m">Male singer</option></select><select id="stLang"><option value="hi">Lyrics: Hindi</option><option value="en">Lyrics: English</option><option value="hinglish">Lyrics: Hinglish</option></select></div>
+      <div class="st-row"><select id="stVoicePick"><option value="">Auto voice</option></select><button class="btn-outline" id="stTest" type="button">Hear voice</button></div>
       <button class="btn-grad" id="stMake" style="width:100%;padding:13px">Create song</button>
       <div class="st-note" id="stNote"></div>
     </div>
@@ -824,7 +826,7 @@ body{background:var(--bg)}
       <div class="st-ctrl"><button class="btn-grad" id="stPlay">▶ Play</button><button class="btn-outline" id="stRec">Sing it</button><button class="btn-outline" id="stWav">⬇ WAV</button></div>
       <div class="st-note" id="stRecNote">Tip: use earphones, tap Sing it, and sing along with the lyrics. Your voice is saved with the song.</div>
       <audio id="stRecAudio" controls hidden style="width:100%;margin-top:8px"></audio>
-      <label class="st-voice"><input type="checkbox" id="stVoice"> Read the lyrics aloud (phone voice, only if you did not record your own)</label>
+      <label class="st-voice"><input type="checkbox" id="stVoice" checked> Sing with the voice above (turn off if you record your own)</label>
       <div class="st-ctrl"><button class="btn-grad" id="stPublish" type="button">Publish to Songs</button><button class="btn-outline" id="stPost">Share to feed</button></div>
       <div class="st-lyrics" id="stLyrics"></div>
     </div>
@@ -1041,5 +1043,5 @@ body{background:var(--bg)}
   <div class="toast" id="toast"></div>
 </div>
 
-<script src="app.js?v=ab545fe328" defer></script>
+<script src="app.js?v=49b553d822" defer></script>
 <script>if("serviceWorker" in navigator && location.protocol.indexOf("http")===0){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});}</script></body></html>
