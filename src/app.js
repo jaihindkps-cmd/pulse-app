@@ -107,6 +107,10 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     var note = el('<div class="st-note" style="margin-top:6px">If Google sign-in keeps failing to stay signed in: this page looks like it is open inside another app\'s (WhatsApp/Instagram) built-in browser — tap the "⋮" menu and choose "Open in Chrome/Browser", then sign in with Google there. Sign-in stays saved reliably in Chrome/Safari.</div>');
     var gb = $("googleBtn"); if (gb && gb.parentNode) gb.parentNode.insertBefore(note, gb.nextSibling);
   }
+  // Installed Android app: Google sign-in redirects out to Chrome, which has no saved login state
+  // ("missing initial state" error). Hide it there; email + password login works fully in-app.
+  var isNativeApp = !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === "function" && window.Capacitor.isNativePlatform());
+  if (isNativeApp) document.documentElement.classList.add("native-app"); // CSS hides #googleBtn + .auth-or (setMode resets inline styles, so CSS is the reliable way)
   $("googleBtn").addEventListener("click", function () {
     if (!auth) { $("authErr").textContent = "The app isn't configured yet (firebase-config.json is empty)."; return; }
     var btn = this; btn.disabled = true; $("googleBtnLbl").textContent = "Connecting...";

@@ -680,6 +680,19 @@ body{background:var(--bg)}
 :root[data-theme="dark"] .tabbar,:root[data-theme="dark"] header.top,:root[data-theme="dark"] .top{background:rgba(17,26,42,.94)!important}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .auth-card{background:var(--surface)!important}}
 :root[data-theme="dark"] .auth-card{background:var(--surface)!important;border:0!important}
+/* v3b: fixes found in review */
+.cbtn[hidden]{display:none!important}
+.bubble.me{background:var(--accent);box-shadow:none}
+.bubble.them{box-shadow:none}
+.bubble{box-shadow:none}
+.med-bar{background:var(--surface-2)!important;border-bottom:1px solid var(--line);color:var(--muted)}
+.med-bar button{background:var(--ink)!important;color:#fff!important;border-radius:999px}
+.match-avs .av-sm:last-child{background:linear-gradient(180deg,#14C3A8,#1E7BE0)!important}
+.swipe-controls{margin-top:18px}
+.swipe-card{box-shadow:var(--shadow-lg)}
+.sbtn{box-shadow:var(--shadow)}
+.convo-input input{border-radius:999px}
+.native-app #googleBtn,.native-app .auth-or{display:none!important}
 </style></head><body>
 <div class="app">
   <header class="topbar">
@@ -966,5 +979,5 @@ body{background:var(--bg)}
   <div class="toast" id="toast"></div>
 </div>
 
-<script src="app.js?v=aa19c0bd47" defer></script>
+<script src="app.js?v=9f92f991f2" defer></script>
 <script>if("serviceWorker" in navigator && location.protocol.indexOf("http")===0){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});}</script></body></html>
