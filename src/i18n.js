@@ -88,6 +88,10 @@ var EN2HI = [
 ];
 
 var MORE_HI = [
+  ["Question of the day","आज का सवाल"],["Write your answer","अपना जवाब लिखें"],["Not sure what to say? Tap one","क्या कहें, समझ नहीं आ रहा? एक चुनें"],["Skip","छोड़ें"],["Next","आगे"],["Get started","शुरू करें"],
+  ["Meet real people","असली लोगों से मिलें"],["Friends, dating, marriage and jobs in one place, for 18+ only.","दोस्ती, डेटिंग, शादी और जॉब, सब एक जगह। सिर्फ़ 18+ के लिए।"],
+  ["Talk your way","अपने अंदाज़ में बात करें"],["Chat, voice and video calls, plus Saathi, an AI companion that listens.","चैट, वॉइस और वीडियो कॉल, और साथी, एक AI दोस्त जो आपकी सुनता है।"],
+  ["Stay safe","सुरक्षित रहें"],["Block, report and a hidden Safety Circle shield keep you in control.","ब्लॉक, रिपोर्ट और सेफ्टी सर्कल शील्ड से आप हमेशा नियंत्रण में रहते हैं।"],
   ["Messages","संदेश"],["Live","लाइव"],["Me","मैं"],["Name","नाम"],["Support Circle","सपोर्ट सर्कल"],["Discover","डिस्कवर"],
   ["Missed", "मिस्ड"], ["Calling...", "कॉल हो रही है..."],
   ["Microphone access is off. Open Settings > Apps > Pulse > Permissions and allow it.", "माइक्रोफ़ोन की इजाज़त बंद है। सेटिंग्स > ऐप्स > Pulse > परमिशन्स खोलकर इजाज़त दें।"],

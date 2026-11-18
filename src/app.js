@@ -178,7 +178,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     $("pName").innerHTML = esc(ME.name) + creatorBadge(ME); $("pHandle").textContent = ME.city || "";
     $("eName").value = ME.name || ""; $("eCity").value = ME.city || ""; $("eWork").value = ME.work || ""; $("eAbout").value = ME.about || "";
     getDocs(query(collection(db, "blocks"), where("blocker", "==", UID))).then(function (s) { blocked = new Set(); s.forEach(function (d) { blocked.add(d.data().blocked); }); }).catch(function () {}).then(function () {
-      applyMode(); listenApps(); listenReqs(); listenFeed(); listenStories(); listenMatches(); refreshLocToggle(); showTab("feed"); setLive(); paintAv(); creatorPanel(); pendingRoom(); heartbeat(); ensureCreatorFlag();
+      applyMode(); listenApps(); listenReqs(); onboard(); listenFeed(); listenStories(); listenMatches(); refreshLocToggle(); showTab("feed"); setLive(); paintAv(); creatorPanel(); pendingRoom(); heartbeat(); ensureCreatorFlag();
     });
   }
   // One-time self-write so OTHER members' screens can show the 👑 Creator badge (creatorBadge() below).
@@ -286,7 +286,30 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
       .then(function () { postText.value = ""; postText.style.height = "auto"; $("charCount").textContent = "0/500"; toast("Post ho gaya 🎉"); bump("cPosts"); })
       .catch(function (e) { toast(errMsg(e)); $("postBtn").disabled = false; });
   });
+  var DAILY = ["What is one thing you are grateful for today?", "What is a small win you had this week?", "Which skill do you wish you had learned earlier?", "What is your go-to comfort food?", "Who made you smile recently, and how?", "What is a place you want to visit this year?", "What advice would you give your younger self?", "What is a song that always lifts your mood?", "What is something kind you did for someone lately?", "What is the best meal you ever had?"];
+  function dailyQuestion() {
+    var q = DAILY[Math.floor(Date.now() / 86400000) % DAILY.length], host = $("dailyQ"); if (!host) return;
+    host.innerHTML = '<div class="dq-l">Question of the day</div><div class="dq-q"></div><button type="button" class="btn-grad dq-b">Write your answer</button>';
+    host.querySelector(".dq-q").textContent = q;
+    host.querySelector(".dq-b").onclick = function () { postText.value = q + " "; postText.dispatchEvent(new Event("input")); postText.focus(); };
+  }
+  function onboard() {
+    var done = false; try { done = localStorage.getItem("pulse_onb1") === "1"; } catch (e) {}
+    if (done || $("onb")) return;
+    var steps = [["Meet real people", "Friends, dating, marriage and jobs in one place, for 18+ only."], ["Talk your way", "Chat, voice and video calls, plus Saathi, an AI companion that listens."], ["Stay safe", "Block, report and a hidden Safety Circle shield keep you in control."]], i = 0;
+    var o = el('<div class="onb" id="onb"><div class="onb-card"><div class="onb-dots"></div><h2 class="onb-h"></h2><p class="onb-p"></p><button type="button" class="btn-grad onb-next"></button><button type="button" class="onb-skip">Skip</button></div></div>');
+    function paint() {
+      o.querySelector(".onb-h").textContent = steps[i][0]; o.querySelector(".onb-p").textContent = steps[i][1];
+      o.querySelector(".onb-next").textContent = i === steps.length - 1 ? "Get started" : "Next";
+      o.querySelector(".onb-dots").innerHTML = steps.map(function (_, k) { return '<i class="' + (k === i ? "on" : "") + '"></i>'; }).join("");
+    }
+    function close() { try { localStorage.setItem("pulse_onb1", "1"); } catch (e) {} o.remove(); }
+    o.querySelector(".onb-next").onclick = function () { if (i < steps.length - 1) { i++; paint(); } else close(); };
+    o.querySelector(".onb-skip").onclick = close;
+    document.body.appendChild(o); paint();
+  }
   function listenFeed() {
+    dailyQuestion();
     unsubs.push(onSnapshot(query(collection(db, "posts"), orderBy("createdAt", "desc"), limit(50)), function (snap) {
       var f = $("feed"); f.innerHTML = ""; var n = 0;
       snap.forEach(function (d) {
@@ -654,6 +677,13 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   function cancelReply() { replyDraft = null; $("replyPreview").hidden = true; }
   $("rpClose") && $("rpClose").addEventListener("click", cancelReply);
   function closeMsgListener() { if (msgUnsub) { msgUnsub(); msgUnsub = null; } }
+  var ICE = ["What's the best thing that happened to you this week?", "Chai or coffee? Defend your answer.", "What song is stuck in your head right now?", "Which city would you move to tomorrow, and why?", "What's a small thing that makes your day better?", "Describe your weekend in three words.", "What are you learning at the moment?", "Which old movie can you watch again and again?"];
+  function icebreakers() {
+    var pick = ICE.slice().sort(function () { return Math.random() - 0.5; }).slice(0, 3);
+    var box = el('<div class="ice"><div class="ice-t">Not sure what to say? Tap one</div></div>');
+    pick.forEach(function (q) { var b = el('<button type="button" class="ice-chip"></button>'); b.textContent = q; b.addEventListener("click", function () { var i = $("msgInput"); i.value = q; i.focus(); }); box.appendChild(b); });
+    return box;
+  }
   function openChat(c) {
     closeMsgListener(); if ($("chatMenu")) $("chatMenu").hidden = true; cancelReply(); closeMsgActions(); if (!c.ai && nameCache[c.id]) c.name = nameCache[c.id]; activeChat = c;
     if (!c.ai && (!c.name || c.name === "...")) userName(c.id).then(function (n) { c.name = n; if (activeChat === c) { $("convoName").textContent = n; $("convoAv").textContent = ini(n); } });
@@ -673,7 +703,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     } else {
       msgUnsub = onSnapshot(query(collection(db, "matches", c.mid, "messages"), orderBy("createdAt", "asc"), limit(200)), function (s) {
         body.innerHTML = "";
-        if (s.empty) body.appendChild(el('<div class="sys">You matched! Send the first message 👋</div>'));
+        if (s.empty) { body.appendChild(el('<div class="sys">You matched! Send the first message 👋</div>')); body.appendChild(icebreakers()); }
         var med = { state: "off" }, hist = [], calls = {};
         s.forEach(function (d) {
           var m = snapData(d);
