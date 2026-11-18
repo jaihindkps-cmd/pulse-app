@@ -454,6 +454,26 @@
   .med-note { margin: 10px auto; max-width: 92%; padding: 11px 13px; border-radius: 14px; font-size: 13.5px; line-height: 1.5; background: color-mix(in srgb, var(--accent) 12%, var(--surface)); border: 1px solid var(--line); white-space: pre-wrap; }
   .med-note b { display: block; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); margin-bottom: 3px; }
   .bubble .warn { display: block; margin-top: 6px; font-size: 11.5px; font-weight: 700; color: #d9480f; }
+  .bubble { cursor: pointer; }
+  .reply-quote { display: block; border-left: 3px solid currentColor; opacity: .85; padding: 2px 0 4px 8px; margin-bottom: 5px; font-size: 12.5px; line-height: 1.3; }
+  .reply-quote b { display: block; font-size: 11.5px; }
+  .msg-reactions { display: flex; gap: 4px; margin-top: 5px; flex-wrap: wrap; }
+  .msg-reactions .rchip { background: var(--surface); border: 1px solid var(--line); border-radius: 999px; font-size: 11px; padding: 1px 7px; color: var(--fg); }
+  .bubble.me .msg-reactions .rchip { background: rgba(255,255,255,.22); border-color: rgba(255,255,255,.4); color: #fff; }
+  .msg-reactions .rchip.mine { border-color: var(--accent); border-width: 1.5px; }
+  .react-bar { display: flex; align-items: center; gap: 2px; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 6px 8px; box-shadow: var(--shadow-lg); max-width: 78%; animation: menuIn .12s ease; }
+  .react-bar.me { align-self: flex-end; }
+  .react-bar.them { align-self: flex-start; }
+  .react-bar .re-emo { border: none; background: none; font-size: 19px; padding: 3px 5px; cursor: pointer; border-radius: 8px; line-height: 1; }
+  .react-bar .re-emo:hover, .react-bar .re-emo:active { background: var(--surface-2); }
+  .react-bar .re-reply { border: none; background: none; font-size: 12.5px; font-weight: 700; color: var(--accent); padding: 3px 8px; margin-left: 2px; cursor: pointer; white-space: nowrap; }
+  .reply-preview { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: var(--surface-2); border-top: 1px solid var(--line); }
+  .reply-preview[hidden] { display: none; }
+  .reply-preview .rp-bar { width: 3px; align-self: stretch; background: var(--accent); border-radius: 3px; flex: none; }
+  .reply-preview .rp-body { flex: 1; min-width: 0; font-size: 12.5px; line-height: 1.3; overflow: hidden; }
+  .reply-preview .rp-body b { display: block; font-size: 12px; color: var(--accent); }
+  .reply-preview .rp-body span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
+  .reply-preview #rpClose { width: 30px; height: 30px; flex: none; }
 
   .lang-btn { font-weight: 800; font-size: 13px; }
   .chk { flex-direction: row !important; align-items: center; gap: 8px; font-size: 12.5px; } .chk input { width: auto !important; } .chk a { color: var(--accent); }
@@ -684,6 +704,11 @@
     <div class="med-bar" id="medBar" hidden></div>
     <div class="emoji-panel" id="emojiPanel" hidden><div class="emo-tabs" id="emoTabs"></div><div class="emo-grid" id="emoGrid" data-notr></div></div>
     <div class="convo-body" id="convoBody"></div>
+    <div class="reply-preview" id="replyPreview" hidden>
+      <div class="rp-bar"></div>
+      <div class="rp-body"><b id="rpName"></b><span id="rpText"></span></div>
+      <button class="icon-btn" id="rpClose" aria-label="Cancel reply">✕</button>
+    </div>
     <div class="convo-input">
       <button class="icon-btn" id="emojiBtn" aria-label="Emoji" title="Emoji">😊</button><button class="icon-btn" id="photoBtn" aria-label="Send photo" title="Send photo">📷</button><input type="file" id="photoInput" accept="image/*" hidden>
       <button class="icon-btn" id="micBtn" aria-label="Voice input" title="Bol kar bhejein" hidden>🎙️</button>
@@ -805,5 +830,5 @@
   <div class="toast" id="toast"></div>
 </div>
 
-<script src="app.js?v=107f14d786" defer></script>
+<script src="app.js?v=28605eeda9" defer></script>
 <script>if("serviceWorker" in navigator && location.protocol.indexOf("http")===0){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});}</script></body></html>

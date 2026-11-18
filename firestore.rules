@@ -152,7 +152,19 @@ service cloud.firestore {
           && notBanned() && request.resource.data.from == me()
           && request.resource.data.text is string && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 1000
           && exists(/databases/$(database)/documents/matches/$(mid))
-          && !isBlocked(me(), otherOf(mid)) && !isBlocked(otherOf(mid), me());
+          && !isBlocked(me(), otherOf(mid)) && !isBlocked(otherOf(mid), me())
+          // optional "reply to" quote -- jo bheja ja raha hai usi ka ek chhota snapshot, koi extra field nahi
+          && (!('replyTo' in request.resource.data) ||
+              (request.resource.data.replyTo.keys().hasOnly(['id', 'from', 'fromName', 'text'])
+               && request.resource.data.replyTo.id is string
+               && request.resource.data.replyTo.from is string
+               && request.resource.data.replyTo.text is string && request.resource.data.replyTo.text.size() <= 120));
+        // Reactions: dono me se koi bhi emoji laga/hata sakta hai, lekin SIRF apni hi entry -- kisi aur ki nahi, aur na hi message ka text badal sakta hai.
+        allow update: if signedIn() && inPair(mid) && notBanned()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions'])
+          && request.resource.data.reactions.diff(resource.data.get('reactions', {})).affectedKeys().hasOnly([me()])
+          && (!(me() in request.resource.data.reactions) ||
+              (request.resource.data.reactions[me()] is string && request.resource.data.reactions[me()].size() <= 8));
       }
 
       // Duet Song: dono matched users mil kar ek gaana banate hain, apni-apni line se.

@@ -586,16 +586,56 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     if (!shown.length) l.appendChild(el('<div class="empty">No chats yet. Swipe in Discover — once you match, the chat opens here.</div>'));
   }
 
+  var REACT_EMOJIS = ["❤️", "😂", "😮", "😢", "👍", "🙏"];
+  function reactionCounts(r) { var c = {}; Object.keys(r || {}).forEach(function (uid) { var e = r[uid]; c[e] = (c[e] || 0) + 1; }); return c; }
+  function renderReactions(r) {
+    var counts = reactionCounts(r), keys = Object.keys(counts); if (!keys.length) return "";
+    return '<div class="msg-reactions">' + keys.map(function (e) { return '<span class="rchip' + (r[UID] === e ? " mine" : "") + '">' + e + ' ' + counts[e] + '</span>'; }).join("") + '</div>';
+  }
   function addBubble(m) {
     var sys = $("convoBody").querySelector(".sys"); if (sys) sys.remove();
     var big = !m.img && /^(\p{Extended_Pictographic}|\u200d|\ufe0f|\s){1,3}$/u.test(m.text || "");
-    var b = el('<div class="bubble ' + (m.mine ? "me" : "them") + (big ? " big-emoji" : "") + '">' + (m.img && JPEG.test(m.img) ? '<img class="chat-img" src="' + m.img + '" alt="photo">' : "") + (m.img ? "" : esc(m.text)) + (m.warn ? '<span class="warn">⚠️ Caution: never share money, OTPs or bank details. If something feels off, use Report.</span>' : '') + '<span class="t">' + hm(m.at) + '</span></div>');
-    var im = b.querySelector(".chat-img"); if (im) im.addEventListener("click", function () { viewImg(m.img); });
+    var replyHtml = m.replyTo ? '<div class="reply-quote"><b>' + (m.replyTo.from === UID ? "You" : esc(m.replyTo.fromName || "")) + '</b>' + esc(m.replyTo.text || "") + '</div>' : "";
+    var b = el('<div class="bubble ' + (m.mine ? "me" : "them") + (big ? " big-emoji" : "") + '">' + replyHtml + (m.img && JPEG.test(m.img) ? '<img class="chat-img" src="' + m.img + '" alt="photo">' : "") + (m.img ? "" : esc(m.text)) + (m.warn ? '<span class="warn">⚠️ Caution: never share money, OTPs or bank details. If something feels off, use Report.</span>' : '') + '<span class="t">' + hm(m.at) + '</span>' + renderReactions(m.reactions) + '</div>');
+    var im = b.querySelector(".chat-img"); if (im) im.addEventListener("click", function (e) { e.stopPropagation(); viewImg(m.img); });
+    if (m.id) b.addEventListener("click", function (e) { if (e.target.closest(".chat-img")) return; openMsgActions(b, m); });
     $("convoBody").appendChild(b); $("convoBody").scrollTop = $("convoBody").scrollHeight; return b;
   }
+  // ---- message reactions + reply-to: tap a bubble -> small popover (quick emoji react, or reply) ----
+  var msgActionsEl = null, replyDraft = null;
+  function closeMsgActions() { if (msgActionsEl) { msgActionsEl.remove(); msgActionsEl = null; } }
+  function openMsgActions(bubbleEl, m) {
+    var already = msgActionsEl && msgActionsEl.dataset.forId === String(m.id);
+    closeMsgActions(); if (already || !activeChat || activeChat.ai) return;
+    var bar = el('<div class="react-bar ' + (m.mine ? "me" : "them") + '" data-for-id="' + m.id + '">' +
+      REACT_EMOJIS.map(function (e) { return '<button class="re-emo" type="button">' + e + '</button>'; }).join("") +
+      '<button class="re-reply" type="button">↩ Reply</button></div>');
+    var ems = bar.querySelectorAll(".re-emo");
+    REACT_EMOJIS.forEach(function (e, i) { ems[i].addEventListener("click", function (ev) { ev.stopPropagation(); toggleReaction(m.id, e); closeMsgActions(); }); });
+    bar.querySelector(".re-reply").addEventListener("click", function (ev) { ev.stopPropagation(); startReply(m); closeMsgActions(); });
+    bubbleEl.insertAdjacentElement("afterend", bar); msgActionsEl = bar; $("convoBody").scrollTop = $("convoBody").scrollHeight;
+  }
+  document.addEventListener("click", function (e) { if (msgActionsEl && !e.target.closest(".react-bar") && !e.target.closest(".bubble")) closeMsgActions(); });
+  function toggleReaction(msgId, emoji) {
+    var c = activeChat; if (!c || c.ai) return;
+    var ref = doc(db, "matches", c.mid, "messages", msgId);
+    getDoc(ref).then(function (s) {
+      if (!s.exists()) return;
+      var r = Object.assign({}, s.data().reactions || {});
+      if (r[UID] === emoji) delete r[UID]; else r[UID] = emoji;
+      return updateDoc(ref, { reactions: r });
+    }).catch(function (e) { toast(errMsg(e)); });
+  }
+  function startReply(m) {
+    replyDraft = { id: m.id, from: m.from, fromName: m.mine ? ME.name : (activeChat && activeChat.name), text: clean(m.text, 120) };
+    $("rpName").textContent = m.mine ? "You" : (replyDraft.fromName || ""); $("rpText").textContent = replyDraft.text; $("replyPreview").hidden = false;
+    $("msgInput").focus();
+  }
+  function cancelReply() { replyDraft = null; $("replyPreview").hidden = true; }
+  $("rpClose") && $("rpClose").addEventListener("click", cancelReply);
   function closeMsgListener() { if (msgUnsub) { msgUnsub(); msgUnsub = null; } }
   function openChat(c) {
-    closeMsgListener(); if ($("chatMenu")) $("chatMenu").hidden = true; if (!c.ai && nameCache[c.id]) c.name = nameCache[c.id]; activeChat = c;
+    closeMsgListener(); if ($("chatMenu")) $("chatMenu").hidden = true; cancelReply(); closeMsgActions(); if (!c.ai && nameCache[c.id]) c.name = nameCache[c.id]; activeChat = c;
     if (!c.ai && (!c.name || c.name === "...")) userName(c.id).then(function (n) { c.name = n; if (activeChat === c) { $("convoName").textContent = n; $("convoAv").textContent = ini(n); } });
     var av = $("convoAv"); av.textContent = c.ai ? "✦" : ini(c.name); av.style.background = g(c.id);
     $("convoName").innerHTML = esc(c.name) + creatorBadge(c) + (c.ai ? '<span class="ai-pill">AI</span>' : ""); $("convoStatus").textContent = c.ai ? "Always online" : "";
@@ -624,7 +664,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
             return;
           }
           hist.push({ from: m.from, text: m.text });
-          addBubble({ mine: m.from === UID, text: m.text, img: m.img, at: ms(m.createdAt), warn: m.from !== UID && SCAM_MONEY.test(m.text) });
+          addBubble({ id: d.id, from: m.from, mine: m.from === UID, text: m.text, img: m.img, at: ms(m.createdAt), warn: m.from !== UID && SCAM_MONEY.test(m.text), reactions: m.reactions, replyTo: m.replyTo });
         });
         c.med = med; c.hist = hist; renderMed(); body.scrollTop = body.scrollHeight;
         liveStatus();
@@ -632,7 +672,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     }
     $("convo").classList.add("open");
   }
-  $("convoBack").addEventListener("click", function () { setTyping(false); $("convo").classList.remove("open"); closeMsgListener(); activeChat = null; renderChats(); });
+  $("convoBack").addEventListener("click", function () { setTyping(false); cancelReply(); closeMsgActions(); $("convo").classList.remove("open"); closeMsgListener(); activeChat = null; renderChats(); });
 
   var saathiHist = [], fbIdx = 0, saathiBusy = false, saathiVoiceOn = false, recog = null, SR_OK = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
   var SAATHI_SYS = "You are 'Saathi', the Pulse app's AI companion. You are an AI, not a person: never claim to be human, to be a real girlfriend/boyfriend, or to 'feel' emotions; if asked, say plainly that you are an AI. You have two jobs, and you tell which one fits each message: (1) when the user is sharing feelings, venting or chatting, listen and understand first, then ask a gentle question or offer a small suggestion, in short warm natural language, 2-4 sentences, occasionally one emoji; (2) when the user asks a factual, general-knowledge, how-to, or 'Google-type' question, answer it directly, accurately and clearly like a genuinely knowledgeable assistant — don't deflect a plain question back with only emotional listening. If you are not confident of a fact, say so plainly instead of guessing. Use different words each time, don't repeat your previous reply. You are not a doctor/therapist/lawyer; don't give medication, diagnosis or legal advice, and say so if asked. No abuse, violence, hate or adult/sexual content. Never ask for or share phone numbers, addresses or other people's private information. If the user talks about harming themselves, gently tell them to talk to someone close to them or a helpline right away.";
@@ -709,7 +749,10 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     autoFlag(t, "chat");
     if (SCAM_MONEY.test(t) || PII.test(t)) { if (!window.confirm("⚠️ Safety: paisa, OTP, bank details, phone number ya link bhejna risky ho sakta hai. Pehle bharosa banao. Phir bhi bhejna hai?")) { inp.value = t; return; } }
     var b = writeBatch(db), mref = doc(collection(db, "matches", c.mid, "messages"));
-    b.set(mref, { from: UID, text: t, createdAt: serverTimestamp() });
+    var msgData = { from: UID, text: t, createdAt: serverTimestamp() };
+    if (replyDraft) { msgData.replyTo = { id: replyDraft.id, from: replyDraft.from, fromName: replyDraft.fromName || "", text: replyDraft.text }; }
+    cancelReply();
+    b.set(mref, msgData);
     var upd = { lastText: t, lastAt: serverTimestamp(), lastFrom: UID }; upd["typing_" + UID] = null; typingOn = false; lastTypingSent = 0;
     b.update(doc(db, "matches", c.mid), upd);
     b.commit().then(function () { bump("cMsgs"); }).catch(function (e) { toast(e && e.code === "permission-denied" ? "This user is not available" : errMsg(e)); });
