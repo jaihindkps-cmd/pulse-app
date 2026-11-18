@@ -178,7 +178,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     $("pName").innerHTML = esc(ME.name) + creatorBadge(ME); $("pHandle").textContent = ME.city || "";
     $("eName").value = ME.name || ""; $("eCity").value = ME.city || ""; $("eWork").value = ME.work || ""; $("eAbout").value = ME.about || "";
     getDocs(query(collection(db, "blocks"), where("blocker", "==", UID))).then(function (s) { blocked = new Set(); s.forEach(function (d) { blocked.add(d.data().blocked); }); }).catch(function () {}).then(function () {
-      applyMode(); listenApps(); listenReqs(); onboard(); listenFeed(); listenStories(); listenMatches(); refreshLocToggle(); showTab("feed"); setLive(); paintAv(); creatorPanel(); pendingRoom(); heartbeat(); ensureCreatorFlag();
+      applyMode(); listenApps(); listenReqs(); onboard(); listenSongs(); listenFeed(); listenStories(); listenMatches(); refreshLocToggle(); showTab("feed"); setLive(); paintAv(); creatorPanel(); pendingRoom(); heartbeat(); ensureCreatorFlag();
     });
   }
   // One-time self-write so OTHER members' screens can show the 👑 Creator badge (creatorBadge() below).
@@ -627,7 +627,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     var sys = $("convoBody").querySelector(".sys"); if (sys) sys.remove();
     var big = !m.img && /^(\p{Extended_Pictographic}|\u200d|\ufe0f|\s){1,3}$/u.test(m.text || "");
     var replyHtml = m.replyTo ? '<div class="reply-quote"><b>' + (m.replyTo.from === UID ? "You" : esc(m.replyTo.fromName || "")) + '</b>' + esc(m.replyTo.text || "") + '</div>' : "";
-    var b = el('<div class="bubble ' + (m.mine ? "me" : "them") + (big ? " big-emoji" : "") + '">' + replyHtml + (m.img && JPEG.test(m.img) ? '<img class="chat-img" src="' + m.img + '" alt="photo">' : "") + (m.img ? "" : esc(m.text)) + (m.warn ? '<span class="warn">⚠️ Caution: never share money, OTPs or bank details. If something feels off, use Report.</span>' : '') + '<span class="t">' + hm(m.at) + '</span>' + renderReactions(m.reactions) + '</div>');
+    var b = el('<div class="bubble ' + (m.mine ? "me" : "them") + (big ? " big-emoji" : "") + '">' + replyHtml + (m.img && JPEG.test(m.img) ? '<img class="chat-img" src="' + m.img + '" alt="photo">' : "") + (m.aud && AUDIO_OK.test(m.aud) ? '<audio controls preload="none" src="' + m.aud + '"></audio>' : (m.img ? "" : esc(m.text))) + (m.warn ? '<span class="warn">⚠️ Caution: never share money, OTPs or bank details. If something feels off, use Report.</span>' : '') + '<span class="t">' + hm(m.at) + '</span>' + renderReactions(m.reactions) + '</div>');
     var im = b.querySelector(".chat-img"); if (im) im.addEventListener("click", function (e) { e.stopPropagation(); viewImg(m.img); });
     if (m.id) b.addEventListener("click", function (e) { if (e.target.closest(".chat-img")) return; openMsgActions(b, m); });
     $("convoBody").appendChild(b); $("convoBody").scrollTop = $("convoBody").scrollHeight; return b;
@@ -690,7 +690,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     var av = $("convoAv"); av.textContent = c.ai ? "✦" : ini(c.name); av.style.background = g(c.id);
     $("convoName").innerHTML = esc(c.name) + creatorBadge(c) + (c.ai ? '<span class="ai-pill">AI</span>' : ""); $("convoStatus").textContent = c.ai ? "Always online" : "";
     $("moreBtn").hidden = !!c.ai; $("medBar").hidden = true; $("callBtn").hidden = $("videoCallBtn").hidden = $("wtBtn").hidden = $("duetBtn").hidden = $("tlBtn").hidden = !!c.ai;
-    $("micBtn").hidden = !c.ai || !SR_OK; $("saathiVoiceBtn").hidden = !c.ai; if (c.ai) refreshVoiceBtn();
+    $("vnBtn").hidden = !!c.ai; $("micBtn").hidden = !c.ai || !SR_OK; $("saathiVoiceBtn").hidden = !c.ai; if (c.ai) refreshVoiceBtn();
     var body = $("convoBody"); body.innerHTML = "";
     if (c.ai) {
       body.appendChild(el('<div class="ai-note">✦ Saathi is an AI companion, not a real person. It\'s here to talk and listen — not a substitute for a doctor or counsellor. If you\'re struggling, please talk to someone close to you or a helpline. You can also ask it general questions, or tap 🎙️ to speak.</div>'));
@@ -721,7 +721,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
             return;
           }
           hist.push({ from: m.from, text: m.text });
-          addBubble({ id: d.id, from: m.from, mine: m.from === UID, text: m.text, img: m.img, at: ms(m.createdAt), warn: m.from !== UID && SCAM_MONEY.test(m.text), reactions: m.reactions, replyTo: m.replyTo });
+          addBubble({ id: d.id, from: m.from, mine: m.from === UID, text: m.text, img: m.img, aud: m.aud, at: ms(m.createdAt), warn: m.from !== UID && SCAM_MONEY.test(m.text), reactions: m.reactions, replyTo: m.replyTo });
         });
         Object.keys(calls).forEach(function (k) { paintCallLog(calls[k]); });
         c.med = med; c.hist = hist; renderMed(); body.scrollTop = body.scrollHeight;
@@ -858,7 +858,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     return { title: clean(j.title, 60) || "Meri dhun", minor: !!j.minor, bpm: +j.bpm || 0, lines: lines };
   }
   function showSong(meta) {
-    player.stop(); $("stPlay").textContent = "▶ Play"; $("stBar").style.width = "0";
+    player.stop(); $("stPlay").textContent = "▶ Play"; $("stBar").style.width = "0"; stRecReset();
     curMeta = meta; curSong = buildSong({ genre: meta.genre, bpm: meta.bpm, minor: meta.minor, title: meta.title, lines: meta.lines });
     $("stTitle").textContent = meta.title; $("stMeta").textContent = GENRES[meta.genre].name + " · " + curSong.bpm + " BPM · " + Math.round(curSong.duration) + " sec · AI lyrics + tune made in your browser";
     var box = $("stLyrics"); box.innerHTML = ""; var last = "";
@@ -1098,7 +1098,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   }
   function onRemote(stream) {
     var hasVideo = stream.getVideoTracks().length > 0;
-    if (hasVideo) { var v = $("callRemoteVideo"); v.srcObject = stream; v.play().catch(function () {}); }
+    if (hasVideo) { var v = $("callRemoteVideo"); v.onplaying = function () { $("callUI").classList.add("remote-live"); }; v.srcObject = stream; v.play().catch(function () {}); }
     var a = $("callAudio"); a.srcObject = hasVideo ? null : stream; if (!hasVideo) a.play().catch(function () {});
   }
   function startWatermark() {
@@ -1167,7 +1167,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     Call.releaseWakeLock(); Call.clearMediaSession();
     if (c.unsub) try { c.unsub(); } catch (e) {}
     if (c.stream) c.stream.getTracks().forEach(function (t) { t.stop(); }); if (c.pc) try { c.pc.close(); } catch (e) {}
-    $("callAudio").srcObject = null; $("callRemoteVideo").srcObject = null; $("callLocalVideo").srcObject = null;
+    $("callUI").classList.remove("remote-live"); $("callAudio").srcObject = null; $("callRemoteVideo").srcObject = null; $("callLocalVideo").srcObject = null;
     $("callUI").classList.remove("video-on"); callShow(false);
     if (notify && c.mid) callMsg(c.mid, "📞 Call ended", { k: "end", id: c.id }, true).catch(function () {});
     if (msg) toast(msg);
@@ -1351,6 +1351,109 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
       b.update(doc(db, "matches", c.mid), { lastText: "📷 Photo", lastAt: serverTimestamp(), lastFrom: UID });
       return b.commit();
     }).catch(function (e) { toast(errMsg(e)); });
+  });
+
+  // ---- voice recorder (used by chat voice notes and by "Sing it" in the song studio) ----
+  function recStart() {
+    if (!navigator.mediaDevices || !window.MediaRecorder) return Promise.reject(new Error("Recording is not supported on this device"));
+    return navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: true } }).then(function (st) {
+      var mt = ["audio/webm;codecs=opus", "audio/mp4", "audio/webm"].filter(function (t) { return MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t); })[0] || "";
+      var ch = [], r = new MediaRecorder(st, mt ? { mimeType: mt, audioBitsPerSecond: 24000 } : { audioBitsPerSecond: 24000 }), t0 = Date.now();
+      r.ondataavailable = function (e) { if (e.data && e.data.size) ch.push(e.data); };
+      r.start(500);
+      function free() { st.getTracks().forEach(function (t) { t.stop(); }); }
+      return {
+        stop: function () { return new Promise(function (res, rej) { r.onstop = function () { free(); var fr = new FileReader(); fr.onload = function () { res({ data: String(fr.result), ms: Date.now() - t0 }); }; fr.onerror = rej; fr.readAsDataURL(new Blob(ch, { type: r.mimeType || mt || "audio/webm" })); }; try { r.stop(); } catch (e) { free(); rej(e); } }); },
+        cancel: function () { try { r.onstop = null; r.stop(); } catch (e) {} free(); }
+      };
+    });
+  }
+  var AUDIO_OK = /^data:audio\/[a-z0-9.+-]+(;codecs=[a-z0-9.,]+)?;base64,/i;
+  var vn = null, vnTimer = null;
+  function vnReset() { clearInterval(vnTimer); vnTimer = null; vn = null; $("vnBtn").classList.remove("rec"); $("vnBtn").textContent = "🎤"; }
+  $("vnBtn").addEventListener("click", function () {
+    var c = activeChat; if (!c || c.ai) { toast("Voice notes work in chats with people"); return; }
+    if (vn) {
+      var h = vn; vnReset();
+      h.stop().then(function (r) {
+        if (r.ms < 700) return;
+        if (r.data.length > 260000) throw new Error("Voice note is too long");
+        if (!rate("vn", 6, 60000)) return;
+        var b = writeBatch(db), mref = doc(collection(db, "matches", c.mid, "messages"));
+        b.set(mref, { from: UID, text: "🎤 Voice note", aud: r.data, dur: Math.round(r.ms / 1000), createdAt: serverTimestamp() });
+        b.update(doc(db, "matches", c.mid), { lastText: "🎤 Voice note", lastAt: serverTimestamp(), lastFrom: UID });
+        return b.commit();
+      }).catch(function (e) { toast(errMsg(e)); });
+      return;
+    }
+    recStart().then(function (h) {
+      vn = h; var t0 = Date.now(), btn = $("vnBtn"); btn.classList.add("rec");
+      var tick = function () { var s = Math.floor((Date.now() - t0) / 1000); btn.textContent = "⏹ " + fmtDur(s); if (s >= 40 && vn === h) btn.click(); };
+      tick(); vnTimer = setInterval(tick, 500);
+    }).catch(function (e) { toast(/denied|NotAllowed|Permission/i.test(String(e && (e.name || e.message))) ? "Microphone access is off. Open Settings > Apps > Pulse > Permissions and allow it." : errMsg(e)); });
+  });
+
+  // ---- Songs: community feed with likes, plus "Sing it" (record your own voice over the backing track) ----
+  var songDocs = [], songTab = "hot", feedPlayer = new Player(), feedPlaying = null, feedAudio = null, stVoiceRec = null, stTake = null;
+  $("stToggle").addEventListener("click", function () { var s = $("stCreate"); s.hidden = !s.hidden; this.textContent = s.hidden ? "+ Create" : "Close"; });
+  document.querySelectorAll("#songTabs button").forEach(function (b) { b.addEventListener("click", function () { songTab = b.getAttribute("data-k"); document.querySelectorAll("#songTabs button").forEach(function (x) { x.classList.toggle("on", x === b); }); renderSongs(); }); });
+  function stopFeedPlay() { try { feedPlayer.stop(); } catch (e) {} try { speechSynthesis.cancel(); } catch (e) {} if (feedAudio) { try { feedAudio.pause(); } catch (e) {} feedAudio = null; } feedPlaying = null; document.querySelectorAll(".sg-play").forEach(function (x) { x.textContent = "▶"; }); document.querySelectorAll(".sg-bar i").forEach(function (x) { x.style.width = "0"; }); }
+  function playPublished(sd, card) {
+    if (feedPlaying === sd.id) { stopFeedPlay(); return; }
+    stopFeedPlay(); feedPlaying = sd.id;
+    var btn = card.querySelector(".sg-play"), bar = card.querySelector(".sg-bar i"); btn.textContent = "⏹";
+    var song = buildSong({ genre: sd.genre, bpm: sd.bpm, minor: sd.minor, title: sd.title, lines: sd.lines });
+    var hasVoice = sd.aud && AUDIO_OK.test(sd.aud);
+    if (hasVoice) { feedAudio = new Audio(sd.aud); feedAudio.play().catch(function () {}); }
+    feedPlayer.play(song, {
+      onLine: function (i) { if (!hasVoice && i >= 0 && sd.lines[i]) { try { speechSynthesis.cancel(); var u = new SpeechSynthesisUtterance(sd.lines[i].text); u.lang = "hi-IN"; u.rate = 0.9; speechSynthesis.speak(u); } catch (e) {} } },
+      onTick: function (s, t) { bar.style.width = Math.min(100, s / t * 100) + "%"; },
+      onEnd: function () { if (feedPlaying === sd.id) stopFeedPlay(); }
+    }).catch(function (e) { stopFeedPlay(); toast(errMsg(e)); });
+  }
+  function renderSongs() {
+    var box = $("songFeed"); if (!box) return; stopFeedPlay(); box.innerHTML = "";
+    var l = songDocs.filter(function (s) { return !blocked.has(s.uid) && (songTab !== "mine" || s.uid === UID); });
+    if (songTab === "hot") l = l.slice().sort(function (a, b) { return (b.likedBy || []).length - (a.likedBy || []).length || b.t - a.t; });
+    if (!l.length) { box.appendChild(el('<div class="empty">' + (songTab === "mine" ? "You have not published a song yet. Tap Create to make your first one." : "No songs yet. Be the first to publish one.") + '</div>')); return; }
+    l.forEach(function (sd) {
+      var liked = (sd.likedBy || []).indexOf(UID) >= 0, genre = GENRES[sd.genre] ? GENRES[sd.genre].name : "";
+      var card = el('<div class="sg-card"><div class="sg-head"><button class="sg-play" type="button">▶</button><div style="flex:1;min-width:0"><div class="sg-t"></div><div class="sg-by"></div></div>' + (sd.aud ? '<span class="sg-voice">Voice</span>' : "") + '</div><div class="sg-ly"></div><div class="sg-bar"><i></i></div><div class="sg-act"><button class="sg-like' + (liked ? " liked" : "") + '" type="button">' + (liked ? "♥" : "♡") + ' ' + (sd.likedBy || []).length + '</button>' + (sd.uid === UID ? '<button class="sg-del" type="button">Delete</button>' : "") + '</div></div>');
+      card.querySelector(".sg-t").textContent = sd.title; card.querySelector(".sg-by").textContent = "by " + sd.name + " · " + genre + " · " + ago(sd.t);
+      card.querySelector(".sg-ly").textContent = sd.lines.slice(0, 2).map(function (x) { return x.text; }).join("\n");
+      card.querySelector(".sg-play").addEventListener("click", function () { bump("cSongs"); playPublished(sd, card); });
+      card.querySelector(".sg-like").addEventListener("click", function () { updateDoc(doc(db, "songs", sd.id), { likedBy: liked ? arrayRemove(UID) : arrayUnion(UID) }).catch(function (e) { toast(errMsg(e)); }); });
+      var dl = card.querySelector(".sg-del"); if (dl) dl.addEventListener("click", function () { if (confirm("Delete this song?")) deleteDoc(doc(db, "songs", sd.id)).catch(function (e) { toast(errMsg(e)); }); });
+      box.appendChild(card);
+    });
+  }
+  function listenSongs() {
+    unsubs.push(onSnapshot(query(collection(db, "songs"), orderBy("createdAt", "desc"), limit(60)), function (snap) {
+      songDocs = []; snap.forEach(function (d) { var x = snapData(d); if (!x.lines || !x.title) return; songDocs.push({ id: d.id, uid: x.uid, name: x.name || "Member", title: x.title, genre: x.genre, bpm: x.bpm, minor: !!x.minor, lines: x.lines, aud: x.aud, likedBy: x.likedBy || [], t: ms(x.createdAt) || Date.now() }); });
+      if (!feedPlaying) renderSongs();
+    }, function () {}));
+  }
+  function stRecReset() { if (stVoiceRec) { stVoiceRec.cancel(); stVoiceRec = null; } stTake = null; $("stRec").classList.remove("rec"); $("stRec").textContent = "Sing it"; $("stRecAudio").hidden = true; $("stRecAudio").removeAttribute("src"); }
+  $("stRec").addEventListener("click", function () {
+    if (!curSong) return; var btn = this;
+    if (stVoiceRec) { var h = stVoiceRec; stVoiceRec = null; player.stop(); try { speechSynthesis.cancel(); } catch (e) {} $("stPlay").textContent = "▶ Play"; btn.classList.remove("rec"); btn.textContent = "Sing it";
+      h.stop().then(function (r) { if (r.data.length > 500000) { toast("Recording is too long. Try a shorter song."); return; } stTake = r.data; var a = $("stRecAudio"); a.src = r.data; a.hidden = false; $("stRecNote").textContent = "Your voice is attached. Listen, or tap Sing it to record again."; }).catch(function (e) { toast(errMsg(e)); }); return; }
+    stRecReset(); player.stop();
+    recStart().then(function (h) {
+      stVoiceRec = h; btn.classList.add("rec"); btn.textContent = "Stop"; $("stPlay").textContent = "⏹ Stop";
+      player.play(curSong, {
+        onLine: function (i) { document.querySelectorAll("#stLyrics .ln").forEach(function (n) { n.classList.toggle("on", +n.getAttribute("data-i") === i); }); },
+        onTick: function (s, t) { $("stBar").style.width = Math.min(100, s / t * 100) + "%"; },
+        onEnd: function () { if (stVoiceRec === h) btn.click(); $("stBar").style.width = "0"; }
+      }).catch(function (e) { toast(errMsg(e)); });
+    }).catch(function (e) { toast(/denied|NotAllowed|Permission/i.test(String(e && (e.name || e.message))) ? "Microphone access is off. Open Settings > Apps > Pulse > Permissions and allow it." : errMsg(e)); });
+  });
+  $("stPublish").addEventListener("click", function () {
+    if (!curMeta || !rate("song", 4, 60000)) return; var btn = this; btn.disabled = true;
+    var d = { uid: UID, name: ME.name, title: clean(curMeta.title, 60), genre: curMeta.genre, bpm: curSong ? curSong.bpm : 0, minor: !!curMeta.minor, lines: curMeta.lines.slice(0, 12).map(function (x) { return { section: clean(x.section, 20), text: clean(x.text, 90) }; }), likedBy: [], createdAt: serverTimestamp() };
+    if (stTake && stTake.length <= 500000) d.aud = stTake;
+    addDoc(collection(db, "songs"), d).then(function () { toast("Song published 🎉"); bump("cSongs"); $("stCreate").hidden = true; $("stToggle").textContent = "+ Create"; songTab = "new"; document.querySelectorAll("#songTabs button").forEach(function (x) { x.classList.toggle("on", x.getAttribute("data-k") === "new"); }); })
+      .catch(function (e) { toast(errMsg(e)); }).then(function () { btn.disabled = false; });
   });
 
   // ---- profile photo ----

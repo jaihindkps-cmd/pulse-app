@@ -118,6 +118,21 @@ service cloud.firestore {
       allow delete: if signedIn() && resource.data.uid == me();
     }
 
+    // Songs: community feed of published songs (lyrics + optional recorded voice), likeable by everyone
+    match /songs/{id} {
+      allow read: if signedIn();
+      allow create: if signedIn() && notBanned() && request.resource.data.uid == me()
+        && request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 60
+        && request.resource.data.lines is list && request.resource.data.lines.size() >= 1 && request.resource.data.lines.size() <= 14
+        && request.resource.data.likedBy.size() == 0
+        && (!('aud' in request.resource.data) || (request.resource.data.aud is string && request.resource.data.aud.size() <= 520000));
+      allow update: if signedIn()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likedBy'])
+        && request.resource.data.likedBy.toSet().difference(resource.data.likedBy.toSet())
+             .union(resource.data.likedBy.toSet().difference(request.resource.data.likedBy.toSet())).hasOnly([me()]);
+      allow delete: if signedIn() && resource.data.uid == me();
+    }
+
     // Swipe: id = "<from>_<to>". Sirf apna swipe likh sakte ho; apna ya mujh par kiya hua padh sakte ho.
     match /swipes/{id} {
       allow get: if signedIn() && inPair(id);

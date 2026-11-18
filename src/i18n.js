@@ -88,6 +88,11 @@ var EN2HI = [
 ];
 
 var MORE_HI = [
+  ["Trending","ट्रेंडिंग"],["New","नए"],["Mine","मेरे"],["+ Create","+ बनाएँ"],["Close","बंद करें"],["Create a song","गाना बनाएँ"],["Sing it","खुद गाएँ"],["Stop","रोकें"],["Publish to Songs","गानों में पब्लिश करें"],["Share to feed","फ़ीड पर शेयर करें"],["My drafts","मेरे ड्राफ़्ट"],["Voice","आवाज़"],["Delete","हटाएँ"],
+  ["Create song","गाना बनाएँ"],["Song published 🎉","गाना पब्लिश हो गया 🎉"],["No songs yet. Be the first to publish one.","अभी कोई गाना नहीं। पहला गाना आप पब्लिश करें।"],["You have not published a song yet. Tap Create to make your first one.","आपने अभी कोई गाना पब्लिश नहीं किया। पहला गाना बनाने के लिए बनाएँ दबाएँ।"],
+  ["Type an idea. AI writes the lyrics and the tune is made on your phone. Then sing it in your own voice.","एक आइडिया लिखें। AI बोल लिखेगा, धुन आपके फ़ोन पर बनेगी। फिर उसे अपनी आवाज़ में गाएँ।"],
+  ["Tip: use earphones, tap Sing it, and sing along with the lyrics. Your voice is saved with the song.","सुझाव: ईयरफ़ोन लगाएँ, \"खुद गाएँ\" दबाएँ और बोलों के साथ गाएँ। आपकी आवाज़ गाने के साथ सेव होगी।"],
+  ["Voice notes work in chats with people","वॉइस नोट सिर्फ़ लोगों की चैट में चलते हैं"],["Voice note is too long","वॉइस नोट बहुत लंबा है"],["🎤 Voice note","🎤 वॉइस नोट"],
   ["Question of the day","आज का सवाल"],["Write your answer","अपना जवाब लिखें"],["Not sure what to say? Tap one","क्या कहें, समझ नहीं आ रहा? एक चुनें"],["Skip","छोड़ें"],["Next","आगे"],["Get started","शुरू करें"],
   ["Meet real people","असली लोगों से मिलें"],["Friends, dating, marriage and jobs in one place, for 18+ only.","दोस्ती, डेटिंग, शादी और जॉब, सब एक जगह। सिर्फ़ 18+ के लिए।"],
   ["Talk your way","अपने अंदाज़ में बात करें"],["Chat, voice and video calls, plus Saathi, an AI companion that listens.","चैट, वॉइस और वीडियो कॉल, और साथी, एक AI दोस्त जो आपकी सुनता है।"],

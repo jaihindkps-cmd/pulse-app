@@ -442,10 +442,14 @@
   .ptt { display: block; width: 100%; margin: 0 0 20px; padding: 26px 10px; border-radius: 22px; border: 2px solid rgba(255,255,255,.35); background: rgba(255,255,255,.1); color: #fff; font-size: 18px; font-weight: 800; touch-action: none; user-select: none; font-family: var(--font-body); } .ptt[hidden] { display: none; } .ptt.live { background: #18c27a; border-color: #18c27a; }
   .call-video-wrap { display: none; position: absolute; inset: 0; background: #000; }
   .callui.video-on .call-video-wrap { display: block; }
-  .callui.video-on .call-av, .callui.video-on .ringring { display: none; }
+  .callui.video-on.remote-live .call-av, .callui.video-on.remote-live .ringring { display: none; }
+  #callRemoteVideo{visibility:hidden}.callui.remote-live #callRemoteVideo{visibility:visible}
+  video::-webkit-media-controls,video::-webkit-media-controls-start-playback-button,video::-webkit-media-controls-overlay-play-button{display:none!important;-webkit-appearance:none}
+  .callui.video-on:not(.remote-live) .call-video-wrap{background:transparent}
+  .callui.video-on:not(.remote-live) #callLocalVideo{width:96px;height:136px}
   #callRemoteVideo { width: 100%; height: 100%; object-fit: cover; background: #111; }
   #callLocalVideo { position: absolute; width: 104px; height: 150px; right: 14px; top: 14px; border-radius: 14px; object-fit: cover; background: #222; border: 1.5px solid rgba(255,255,255,.4); z-index: 2; transform: scaleX(-1); }
-  .callui.video-on .callbox > h3, .callui.video-on .callbox > .call-sub, .callui.video-on .callbox > .call-enc { position: relative; z-index: 2; background: linear-gradient(180deg, rgba(0,0,0,.55), transparent 70%); padding-top: 14px; margin: 0; }
+  .callui.video-on.remote-live .callbox > h3, .callui.video-on.remote-live .callbox > .call-sub, .callui.video-on.remote-live .callbox > .call-enc { position: relative; z-index: 2; text-shadow:0 1px 6px rgba(0,0,0,.6); margin: 0; }
   .callui.video-on .call-actions { position: relative; z-index: 2; background: linear-gradient(0deg, rgba(0,0,0,.6), transparent 85%); padding: 18px 0 22px; }
   .call-watermark { position: absolute; z-index: 2; pointer-events: none; color: rgba(255,255,255,.3); font-size: 11px; font-weight: 700; white-space: nowrap; text-shadow: 0 1px 2px rgba(0,0,0,.4); transition: top 2s linear, left 2s linear; }
   #callAudio, #callRemoteVideo, #callLocalVideo { -webkit-touch-callout: none; }
@@ -721,6 +725,18 @@ body{background:var(--bg)}
 .onb-dots{display:flex;gap:6px}.onb-dots i{width:8px;height:8px;border-radius:50%;background:var(--line)}.onb-dots i.on{width:24px;border-radius:99px;background:var(--accent)}
 .onb-h{font-family:var(--font-display);font-size:28px;margin:8px 0 0}.onb-p{margin:0;color:var(--muted);line-height:1.5}
 .onb-next{width:100%;padding:14px;margin-top:10px}.onb-skip{background:none;border:0;color:var(--muted);font:inherit;padding:8px;cursor:pointer}
+/* v3e: songs feed */
+.sg-top{display:flex;gap:10px;align-items:center;margin:6px 0 10px}.sg-seg{flex:1;margin:0!important}.sg-create{padding:10px 16px;white-space:nowrap}
+.sg-card{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:14px;margin-bottom:12px;display:flex;flex-direction:column;gap:8px}
+.sg-head{display:flex;gap:10px;align-items:center}.sg-play{flex:none;width:46px;height:46px;border-radius:50%;border:0;background:var(--accent);color:#fff;font-size:16px;cursor:pointer}
+.sg-t{font-family:var(--font-display);font-weight:700;font-size:16px;line-height:1.2}.sg-by{font-size:12.5px;color:var(--muted)}
+.sg-ly{font-size:13.5px;color:var(--muted);line-height:1.5;white-space:pre-line}
+.sg-bar{height:3px;background:var(--line);border-radius:3px;overflow:hidden}.sg-bar i{display:block;height:100%;width:0;background:var(--accent)}
+.sg-act{display:flex;gap:14px;align-items:center;font-size:13px;color:var(--muted)}.sg-act button{background:none;border:0;color:inherit;font:inherit;cursor:pointer;padding:4px 0}.sg-act .liked{color:var(--accent);font-weight:700}
+.sg-voice{font-size:11.5px;font-weight:700;color:#0FA58B;background:color-mix(in srgb,#0FA58B 12%,var(--surface));padding:2px 8px;border-radius:99px}
+#stRec.rec{background:var(--accent);color:#fff;border-color:var(--accent)}
+.vn-btn.rec{background:var(--accent);color:#fff;border-radius:999px;width:auto;padding:0 12px;font-size:13px;font-weight:700}
+.bubble audio{display:block;width:210px;max-width:100%;height:36px}
 </style></head><body>
 <div class="app">
   <header class="topbar">
@@ -784,23 +800,30 @@ body{background:var(--bg)}
     </div>
     <div id="bhajanPanel2" hidden></div>
     <div id="songsPanel">
+    <div class="sg-top"><div class="seg sg-seg" id="songTabs"><button class="on" data-k="hot">Trending</button><button data-k="new">New</button><button data-k="mine">Mine</button></div><button class="btn-grad sg-create" id="stToggle" type="button">+ Create</button></div>
+    <div id="stCreate" hidden>
     <div class="st-card">
-      <h3>🎵 Music Studio</h3>
-      <p class="st-sub">Just type an idea. AI writes the lyrics, and the tune is composed right on your phone. No server, no cost.</p>
-      <textarea id="stPrompt" rows="3" maxlength="300" placeholder="e.g.: a memory of old friendship in the rain, or a thank-you note for Dad..."></textarea>
+      <h3>Create a song</h3>
+      <p class="st-sub">Type an idea. AI writes the lyrics and the tune is made on your phone. Then sing it in your own voice.</p>
+      <textarea id="stPrompt" rows="2" maxlength="300" placeholder="e.g. a memory of old friendship in the rain, or a thank-you note for Dad..."></textarea>
       <div class="st-row"><select id="stGenre"></select><select id="stMood"><option value="">Mood: let AI choose</option><option value="khushi">Happy</option><option value="udaas">Sad</option><option value="pyaar">Romantic</option><option value="josh">Energetic</option><option value="shaanti">Peaceful</option></select></div>
-      <button class="btn-grad" id="stMake" style="width:100%;padding:13px">Create song ✨</button>
+      <button class="btn-grad" id="stMake" style="width:100%;padding:13px">Create song</button>
       <div class="st-note" id="stNote"></div>
     </div>
     <div class="st-card" id="stResult" hidden>
       <div class="st-title" id="stTitle"></div><div class="st-meta" id="stMeta"></div>
       <div class="st-bar"><i id="stBar"></i></div>
-      <div class="st-ctrl"><button class="btn-grad" id="stPlay">▶ Play</button><button class="btn-outline" id="stWav">⬇ WAV</button><button class="btn-outline" id="stPost">📣 Post to feed</button></div>
-      <label class="st-voice"><input type="checkbox" id="stVoice"> Read the lyrics aloud (phone's voice, not a singer)</label>
+      <div class="st-ctrl"><button class="btn-grad" id="stPlay">▶ Play</button><button class="btn-outline" id="stRec">Sing it</button><button class="btn-outline" id="stWav">⬇ WAV</button></div>
+      <div class="st-note" id="stRecNote">Tip: use earphones, tap Sing it, and sing along with the lyrics. Your voice is saved with the song.</div>
+      <audio id="stRecAudio" controls hidden style="width:100%;margin-top:8px"></audio>
+      <label class="st-voice"><input type="checkbox" id="stVoice"> Read the lyrics aloud (phone voice, only if you did not record your own)</label>
+      <div class="st-ctrl"><button class="btn-grad" id="stPublish" type="button">Publish to Songs</button><button class="btn-outline" id="stPost">Share to feed</button></div>
       <div class="st-lyrics" id="stLyrics"></div>
     </div>
-    <div class="section-title">My created songs</div>
+    <div class="section-title">My drafts</div>
     <div id="stLib"></div>
+    </div>
+    <div id="songFeed"></div>
     </div>
   </main>
 
@@ -888,6 +911,7 @@ body{background:var(--bg)}
     </div>
     <div class="convo-input">
       <button class="icon-btn" id="emojiBtn" aria-label="Emoji" title="Emoji">😊</button><button class="icon-btn" id="photoBtn" aria-label="Send photo" title="Send photo">📷</button><input type="file" id="photoInput" accept="image/*" hidden>
+      <button class="icon-btn vn-btn" id="vnBtn" aria-label="Voice note" title="Voice note">🎤</button>
       <button class="icon-btn" id="micBtn" aria-label="Voice input" title="Bol kar bhejein" hidden>🎙️</button>
       <input id="msgInput" maxlength="1000" placeholder="Type a message..." autocomplete="off">
       <button class="send-btn" id="sendBtn" aria-label="Send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7Z" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
@@ -948,8 +972,8 @@ body{background:var(--bg)}
   </div>
   <div class="callui" id="callUI" hidden><div class="callbox">
     <div class="call-video-wrap" id="callVideoWrap">
-      <video id="callRemoteVideo" autoplay playsinline disablePictureInPicture oncontextmenu="return false"></video>
-      <video id="callLocalVideo" autoplay playsinline muted disablePictureInPicture oncontextmenu="return false" hidden></video>
+      <video id="callRemoteVideo" poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" autoplay playsinline disablePictureInPicture oncontextmenu="return false"></video>
+      <video id="callLocalVideo" poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" autoplay playsinline muted disablePictureInPicture oncontextmenu="return false" hidden></video>
       <div class="call-watermark" id="callWatermark" style="top:10%;left:6%"></div>
     </div>
     <div class="call-av" id="callAv">A</div><h3 id="callName">-</h3><div class="call-sub" id="callSub"></div>
@@ -1008,5 +1032,5 @@ body{background:var(--bg)}
   <div class="toast" id="toast"></div>
 </div>
 
-<script src="app.js?v=9d4bdbacf2" defer></script>
+<script src="app.js?v=5a15950fc3" defer></script>
 <script>if("serviceWorker" in navigator && location.protocol.indexOf("http")===0){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});}</script></body></html>
