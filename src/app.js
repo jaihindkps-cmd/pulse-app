@@ -1153,8 +1153,8 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     var hasVideo = stream.getVideoTracks().length > 0;
     if (hasVideo) {
       var v = $("callRemoteVideo");
-      // Fill the screen when the picture has the same shape, otherwise show all of it (no heavy zoom).
-      var fit = function () { if (!v.videoWidth) return; var r = v.videoWidth / v.videoHeight, sr = innerWidth / innerHeight; $("callUI").classList.toggle("remote-contain", Math.abs(r - sr) / sr > 0.3); };
+      // Like WhatsApp: the other person fills the whole screen, only my small picture floats on top.
+      var fit = function () {};
       v.onplaying = function () { $("callUI").classList.add("remote-live"); fit(); }; v.onresize = fit; v.srcObject = stream; v.play().catch(function () {});
     }
     var a = $("callAudio"); a.srcObject = hasVideo ? null : stream; if (!hasVideo) a.play().catch(function () {});

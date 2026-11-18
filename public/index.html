@@ -776,7 +776,7 @@ body{background:var(--bg)}
 #callRoute .i-ear{display:none}#callRoute[data-k="earpiece"] .i-ear{display:block}#callRoute[data-k="earpiece"] .i-spk{display:none}
 .callui .ptt{position:relative;z-index:3;margin:0 16px 10px;width:auto}
 .callui .call-video-wrap{z-index:0}
-#callRemoteVideo{object-fit:cover}.callui.remote-contain #callRemoteVideo{object-fit:contain}
+#callRemoteVideo{object-fit:cover;width:100%;height:100%;position:absolute;inset:0}
 #callLocalVideo{width:27vw;max-width:130px;height:auto;aspect-ratio:3/4;right:12px;top:calc(var(--sa-top,0px) + 74px);border-radius:16px;border:1.5px solid rgba(255,255,255,.5);box-shadow:0 6px 20px rgba(0,0,0,.45);touch-action:none;z-index:4}
 #callLocalVideo.rear{transform:none}
 .callui.video-on:not(.remote-live) #callLocalVideo{width:27vw;height:auto}
@@ -1107,5 +1107,5 @@ body{background:var(--bg)}
   <div class="toast" id="toast"></div>
 </div>
 
-<script src="app.js?v=ea085885b0" defer></script>
+<script src="app.js?v=e933afb731" defer></script>
 <script>if("serviceWorker" in navigator && location.protocol.indexOf("http")===0){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});}</script></body></html>
