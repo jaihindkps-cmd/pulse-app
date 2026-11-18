@@ -281,11 +281,15 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     var key = name; if (name === "discover" && isJobMode()) name = "jobs";
     screens.forEach(function (s) { $("screen-" + s).hidden = s !== name; });
     var scNow = $("screen-" + name); if (scNow) scNow.scrollTop = 0; fitTabbar();
-    document.querySelectorAll(".tab").forEach(function (t) { t.classList.toggle("active", t.getAttribute("data-tab") === key); });
+    document.querySelectorAll(".tab").forEach(function (t) { var k = t.getAttribute("data-tab"); t.classList.toggle("active", k === key || (k === "more" && (key === "nearby" || key === "studio"))); });
+    $("moreSheet").hidden = true;
     $("screenTitle").textContent = titles[name];
     try { if (name === "discover") loadDeck(); if (name === "jobs") loadJobs(); } catch (e) { toast("Could not load this screen. Please try again."); } if (name === "nearby") loadNearby(); else stopNearby(); if (name === "studio") renderLib(); if (name === "chats") { $("chatDot").hidden = true; renderChats(); } if (name === "profile") { renderCircle(); renderJourney(); }
   }
-  document.querySelectorAll(".tab").forEach(function (t) { t.addEventListener("click", function () { if (UID) showTab(t.getAttribute("data-tab")); }); });
+  document.querySelectorAll(".tab").forEach(function (t) { t.addEventListener("click", function () { var k = t.getAttribute("data-tab"); if (!UID) return; if (k === "more") { $("moreSheet").hidden = !$("moreSheet").hidden; return; } showTab(k); }); });
+  $("moreNearby").addEventListener("click", function () { showTab("nearby"); });
+  $("moreStudio").addEventListener("click", function () { showTab("studio"); });
+  document.addEventListener("pointerdown", function (e) { var m = $("moreSheet"); if (!m.hidden && !m.contains(e.target) && !$("tabMore").contains(e.target)) m.hidden = true; });
 
   // ---- feed (realtime) ----
   var postText = $("composerText");
@@ -1928,7 +1932,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     MODE = modeOf(ME);
     var lab = { friends: "Discover", dating: "Discover", marriage: "Matches", jobseeker: "Jobs", recruiter: "Hiring" }[MODE];
     var tb = document.querySelector('.tab[data-tab="discover"]'); tb.lastChild.nodeValue = lab;
-    document.querySelector('.tab[data-tab="nearby"]').style.display = (MODE === "friends" || MODE === "dating") ? "" : "none";
+    $("moreNearby").style.display = (MODE === "friends" || MODE === "dating") ? "" : "none";
     $("mFilterBox").hidden = MODE !== "marriage"; titles.discover = lab; titles.jobs = lab;
     fillProfileForm(); paintStrength();
   }
