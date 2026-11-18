@@ -1,6 +1,7 @@
 // Asli AI: Firebase AI Logic (Gemini Developer API). Client se seedha, koi server nahi.
 // Chalne ke liye Firebase console > AI Logic me "Get started" (Gemini Developer API) karna padta hai.
 import { getAI, getGenerativeModel, GoogleAIBackend } from "firebase/ai";
+import { getLang } from "./i18n.js";
 
 var ai = null, good = null, lastError = null;
 var MODELS = ["gemini-3.8-flash", "gemini-2.5-flash"];
@@ -11,7 +12,9 @@ export function aiWorking() { return good; }
 
 function model(name, system, json) {
   var cfg = { model: name, generationConfig: { temperature: json ? 1 : 0.85, maxOutputTokens: json ? 2200 : 700 } };
-  if (system) cfg.systemInstruction = system;
+  if (system) cfg.systemInstruction = system + (getLang() === "hi"
+    ? "\n\nLanguage rule: unless the user clearly writes in another language or script, answer in simple Hindi written in Devanagari (not Roman letters)."
+    : "\n\nLanguage rule: unless the user clearly writes in another language or script, answer in simple English (not Hinglish in Roman letters).");
   if (json) cfg.generationConfig.responseMimeType = "application/json";
   return getGenerativeModel(ai, cfg);
 }

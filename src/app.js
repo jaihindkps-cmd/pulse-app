@@ -264,9 +264,13 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   // ---- tabs ----
   var titles = { feed: "Pulse", jobs: "Jobs", discover: "Discover", nearby: "Nearby", studio: "Gaana Studio", chats: "Messages", profile: "Profile" };
   var screens = ["feed", "discover", "jobs", "nearby", "studio", "chats", "profile"];
+  // keep floating buttons / scroll padding clear of the tab bar whatever the phone's font scaling is
+  function fitTabbar() { var tb = document.querySelector(".tabbar"); if (tb && tb.offsetHeight) document.documentElement.style.setProperty("--tabbar-h", tb.offsetHeight + "px"); }
+  window.addEventListener("resize", fitTabbar); window.addEventListener("load", fitTabbar); setTimeout(fitTabbar, 600);
   function showTab(name) {
     var key = name; if (name === "discover" && isJobMode()) name = "jobs";
     screens.forEach(function (s) { $("screen-" + s).hidden = s !== name; });
+    var scNow = $("screen-" + name); if (scNow) scNow.scrollTop = 0; fitTabbar();
     document.querySelectorAll(".tab").forEach(function (t) { t.classList.toggle("active", t.getAttribute("data-tab") === key); });
     $("screenTitle").textContent = titles[name];
     try { if (name === "discover") loadDeck(); if (name === "jobs") loadJobs(); } catch (e) { toast("Could not load this screen. Please try again."); } if (name === "nearby") loadNearby(); else stopNearby(); if (name === "studio") renderLib(); if (name === "chats") { $("chatDot").hidden = true; renderChats(); } if (name === "profile") { renderCircle(); renderJourney(); }
@@ -373,7 +377,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   }
   function renderDeck() {
     var deck = $("deck"); deck.innerHTML = ""; topCard = topUser = null;
-    if (!queue.length) { deck.innerHTML = '<div class="deck-empty"><div><div style="font-size:42px;margin-bottom:8px">💫</div><div style="font-weight:700;font-size:16px;color:var(--fg);margin-bottom:4px">Abhi itne hi log</div><div style="font-size:13px">Jaise-jaise naye log judenge, yahan dikhenge. Doston ko Pulse bhejo!</div></div></div>'; return; }
+    if (!queue.length) { deck.innerHTML = '<div class="deck-empty"><div><div style="font-size:42px;margin-bottom:8px">💫</div><div style="font-weight:700;font-size:16px;color:var(--fg);margin-bottom:4px">You have seen everyone for now</div><div style="font-size:13px;margin-bottom:14px">New people show up here as they join. Invite a friend to get things moving.</div><button class="btn-grad" id="deckInvite" type="button">Invite friends</button></div></div>'; var di = $("deckInvite"); if (di) di.addEventListener("click", invite); return; }
     queue.slice(0, 3).reverse().forEach(function (u, i, arr) {
       var top = i === arr.length - 1, depth = arr.length - 1 - i;
       var c = el('<div class="swipe-card" style="background:' + g(u.id) + ';transform:translateY(' + depth * 14 + 'px) scale(' + (1 - depth * 0.05) + ')"><div class="scrim"></div><div class="avatar-big"' + (u.photo && JPEG.test(u.photo) ? ' style="background:center/cover url(' + u.photo + ')"' : "") + '>' + (u.photo && JPEG.test(u.photo) ? "" : ini(u.name)) + '</div><span class="stamp like">Like</span><span class="stamp nope">Nope</span><div class="info"><h3>' + esc(u.name) + (u.age ? ", " + u.age : "") + vBadge(u) + creatorBadge(u) + '</h3><div class="sub">' + esc([u.work, u.city].filter(Boolean).join(" · ") || "Pulse member") + '</div>' + (u.about ? '<p class="about">' + esc(u.about) + '</p>' : '') + '<div class="tags"><span>' + esc(MODE_LABEL[modeOf(u)]) + '</span></div>' + factsFor(u) + '</div></div>');
@@ -605,6 +609,18 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     if (m.id) b.addEventListener("click", function (e) { if (e.target.closest(".chat-img")) return; openMsgActions(b, m); });
     $("convoBody").appendChild(b); $("convoBody").scrollTop = $("convoBody").scrollHeight; return b;
   }
+  function fmtDur(sec) { var mm = Math.floor(sec / 60), ss = sec % 60; return mm + ":" + (ss < 10 ? "0" : "") + ss; }
+  function paintCallLog(c) {
+    var icon = c.mode === "video" ? "🎥" : c.mode === "walkie" ? "📻" : "📞";
+    var label = c.mode === "video" ? "Video call" : c.mode === "walkie" ? "Walkie-talkie" : "Voice call";
+    var state = "", dur = "", miss = false;
+    if (c.ans && c.end) dur = fmtDur(Math.max(0, Math.round((c.end - c.ans) / 1000)));
+    else if (c.ans) state = "";
+    else if (c.end || Date.now() - c.t0 > 60000) { state = c.out ? "No answer" : "Missed"; miss = !c.out; }
+    else state = "Calling...";
+    c.row.className = "call-log" + (miss ? " miss" : "");
+    c.row.innerHTML = '<span class="cl-ic">' + icon + '</span><span>' + label + '</span>' + (state ? '<span class="cl-st">' + state + '</span>' : "") + (dur ? '<span class="cl-dur">' + dur + '</span>' : "") + '<span class="cl-dir">' + (c.out ? "↗" : "↙") + '</span>';
+  }
   // ---- message reactions + reply-to: tap a bubble -> small popover (quick emoji react, or reply) ----
   var msgActionsEl = null, replyDraft = null;
   function closeMsgActions() { if (msgActionsEl) { msgActionsEl.remove(); msgActionsEl = null; } }
@@ -658,9 +674,16 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
       msgUnsub = onSnapshot(query(collection(db, "matches", c.mid, "messages"), orderBy("createdAt", "asc"), limit(200)), function (s) {
         body.innerHTML = "";
         if (s.empty) body.appendChild(el('<div class="sys">You matched! Send the first message 👋</div>'));
-        var med = { state: "off" }, hist = [];
+        var med = { state: "off" }, hist = [], calls = {};
         s.forEach(function (d) {
-          var m = snapData(d); if (m.call && m.call.k === "answer") return;
+          var m = snapData(d);
+          if (m.call) { // call signalling (offer/answer/end) -> ONE compact call-log row per call, never separate bubbles
+            var cid = m.call.id, cc = calls[cid];
+            if (m.call.k === "offer") { var crow = el('<div class="call-log"></div>'); body.appendChild(crow); calls[cid] = { row: crow, mode: m.call.mode || "call", out: m.from === UID, t0: ms(m.createdAt), ans: 0, end: 0 }; }
+            else if (cc && m.call.k === "answer") cc.ans = ms(m.createdAt);
+            else if (cc && m.call.k === "end") cc.end = ms(m.createdAt);
+            return;
+          }
           if (m.med) {
             var k = m.med.k, sys = body.querySelector(".sys"); if (sys) sys.remove();
             if (k === "ask") med = { state: "pending", asker: m.from }; else if (k === "yes" && med.state === "pending" && m.from !== med.asker) med = { state: "on" }; else if (k === "off" || k === "no") med = { state: "off" };
@@ -670,6 +693,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
           hist.push({ from: m.from, text: m.text });
           addBubble({ id: d.id, from: m.from, mine: m.from === UID, text: m.text, img: m.img, at: ms(m.createdAt), warn: m.from !== UID && SCAM_MONEY.test(m.text), reactions: m.reactions, replyTo: m.replyTo });
         });
+        Object.keys(calls).forEach(function (k) { paintCallLog(calls[k]); });
         c.med = med; c.hist = hist; renderMed(); body.scrollTop = body.scrollHeight;
         liveStatus();
       }, function (e) { toast(errMsg(e)); });
@@ -1087,6 +1111,10 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
       });
     });
   }
+  function permMsg(isVideo) {
+    var app = document.documentElement.classList.contains("native-app"), what = isVideo ? "Camera and microphone" : "Microphone";
+    return app ? what + " access is off. Open Settings > Apps > Pulse > Permissions and allow it." : what + " access is blocked. Allow it in your browser's site settings.";
+  }
   var CALL_LABEL = { call: "📞 Voice call", walkie: "📻 Walkie-talkie", video: "🎥 Video call" };
   function startCall(mode) {
     if (!activeChat || activeChat.ai || CALL) return;
@@ -1102,7 +1130,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
         CALL.timeout = setTimeout(function () { if (CALL && CALL.id === id && !CALL.connected) endCall(true, "No answer"); }, 45000);
         return callMsg(c.mid, CALL_LABEL[mode] || CALL_LABEL.call, { k: "offer", id: id, mode: mode, sdp: o.sdp }, true).then(function (r) { bump("cCalls"); return r; });
       });
-    }).catch(function (e) { endCall(false); toast(e && e.name === "NotAllowedError" ? (isVideo ? "Camera/mic permission is needed. Allow it in your browser settings." : "Mic permission is needed. Allow it in your browser settings.") : errMsg(e)); });
+    }).catch(function (e) { endCall(false); toast(e && e.name === "NotAllowedError" ? permMsg(isVideo) : errMsg(e)); });
   }
   function endCall(notify, msg) {
     var c = CALL; if (!c) return; c.ending = true; CALL = null; clearInterval(callTick); clearTimeout(c.timeout); clearTimeout(discoTimer); discoTimer = null; stopWatermark();
@@ -1111,7 +1139,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     if (c.stream) c.stream.getTracks().forEach(function (t) { t.stop(); }); if (c.pc) try { c.pc.close(); } catch (e) {}
     $("callAudio").srcObject = null; $("callRemoteVideo").srcObject = null; $("callLocalVideo").srcObject = null;
     $("callUI").classList.remove("video-on"); callShow(false);
-    if (notify && c.mid) callMsg(c.mid, "📞 Call khatam", { k: "end", id: c.id }, true).catch(function () {});
+    if (notify && c.mid) callMsg(c.mid, "📞 Call ended", { k: "end", id: c.id }, true).catch(function () {});
     if (msg) toast(msg);
   }
   function maybeIncoming(mid, m, other) {
@@ -1136,7 +1164,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
       return Call.makeAnswer(stream, c.offer, onRemote, onState);
     })
       .then(function (a) { c.pc = a.pc; $("callMute").hidden = c.mode === "walkie"; $("ptt").hidden = c.mode !== "walkie"; $("callCam").hidden = !isVideo; return callMsg(c.mid, "📞 Jawab", { k: "answer", id: c.id, sdp: a.sdp }, false); })
-      .catch(function (e) { endCall(true); toast(e && e.name === "NotAllowedError" ? (isVideo ? "Camera/mic permission is needed" : "Mic permission is needed") : errMsg(e)); });
+      .catch(function (e) { endCall(true); toast(e && e.name === "NotAllowedError" ? permMsg(isVideo) : errMsg(e)); });
   });
   $("callEnd").addEventListener("click", function () { endCall(true); });
   $("callMute").addEventListener("click", function () { if (!CALL) return; var on = this.classList.toggle("on"); setMic(!on); this.textContent = on ? "Unmute" : "Mute"; });

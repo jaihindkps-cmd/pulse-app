@@ -1,4 +1,5 @@
-// Do bhasha: English (default) aur Hindi (Hinglish). Original text Hinglish me hai; English ke liye shabdkosh se badalta hai.
+import { HI_BY_EN, EXTRA } from "./i18n_data.js";
+// Two languages: English (default) and Hindi (Devanagari). Source text is a mix of old Hinglish and new English; both are mapped through the tables below.
 // Naye feature English me likhe gaye hain; unke Hindi shabd EN2HI me hain.
 var HI2EN = [
   // --- HTML
@@ -86,6 +87,14 @@ var EN2HI = [
   ["Contact details", "Contact ki jaankari"], ["Account settings", "Account settings"], ["Grant Premium", "Premium do"], ["Remove Premium", "Premium hatao"]
 ];
 
+var MORE_HI = [
+  ["Messages","संदेश"],["Live","लाइव"],["Me","मैं"],["Name","नाम"],["Support Circle","सपोर्ट सर्कल"],["Discover","डिस्कवर"],
+  ["Missed", "मिस्ड"], ["Calling...", "कॉल हो रही है..."],
+  ["Microphone access is off. Open Settings > Apps > Pulse > Permissions and allow it.", "माइक्रोफ़ोन की इजाज़त बंद है। सेटिंग्स > ऐप्स > Pulse > परमिशन्स खोलकर इजाज़त दें।"],
+  ["Camera and microphone access is off. Open Settings > Apps > Pulse > Permissions and allow it.", "कैमरा और माइक्रोफ़ोन की इजाज़त बंद है। सेटिंग्स > ऐप्स > Pulse > परमिशन्स खोलकर इजाज़त दें।"],
+  ["Microphone access is blocked. Allow it in your browser's site settings.", "माइक्रोफ़ोन की इजाज़त ब्लॉक है। ब्राउज़र की साइट सेटिंग्स में इजाज़त दें।"],
+  ["Camera and microphone access is blocked. Allow it in your browser's site settings.", "कैमरा और माइक्रोफ़ोन की इजाज़त ब्लॉक है। ब्राउज़र की साइट सेटिंग्स में इजाज़त दें।"]
+];
 var lang = "en";
 try { lang = localStorage.getItem("pulse_lang") || "en"; } catch (e) {}
 export function getLang() { return lang; }
@@ -93,7 +102,21 @@ export function setLang(l) { try { localStorage.setItem("pulse_lang", l); } catc
 
 var list = null;
 function build() {
-  var src = lang === "en" ? HI2EN : EN2HI.map(function (p) { return p; });
+  var src = [];
+  if (lang === "en") {
+    src = HI2EN.slice();
+    EXTRA.forEach(function (x) { if (x[2]) src.push([x[0], x[2]]); });
+    src.push(["logout ho gaya", "Logged out"]);
+  } else {
+    // Hindi mode = proper Devanagari. Every source string (English-first or old Hinglish) maps to its Hindi text.
+    var dev = {}, seen = {};
+    HI_BY_EN.forEach(function (p) { dev[p[0]] = p[1]; });
+    var add = function (k, v) { if (!k || !v || k === v || seen[k]) return; if (!/[A-Za-zऀ-ॿ]/.test(k) || k.trim().length < 2) return; seen[k] = 1; src.push([k, v]); };
+    HI2EN.forEach(function (p) { var v = dev[p[1]]; if (v) { add(p[0], v); add(p[1], v); } });
+    EN2HI.forEach(function (p) { add(p[0], dev[p[0]] || p[1]); });
+    EXTRA.forEach(function (x) { add(x[0], x[1]); });
+    MORE_HI.forEach(function (x) { add(x[0], x[1]); });
+  }
   list = src.slice().sort(function (a, b) { return b[0].length - a[0].length; });
 }
 export function tr(s) {
