@@ -750,6 +750,50 @@ body{background:var(--bg)}
 .route-sheet[hidden]{display:none}
 .route-sheet button{display:flex;width:100%;align-items:center;gap:10px;padding:13px 14px;border:0;border-radius:12px;background:none;font:inherit;font-size:15px;font-weight:600;color:inherit;text-align:left;cursor:pointer}
 .route-sheet button.on{background:#EEF2FA;color:#D92646}
+
+/* ---- Call UI v4: full-screen, Meet/WhatsApp style ---- */
+.callui .callbox{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:space-between;padding:0;overflow:hidden}
+.callui .call-top{position:relative;z-index:3;display:flex;align-items:center;gap:10px;padding:calc(var(--sa-top,0px) + 14px) 16px 28px;background:linear-gradient(180deg,rgba(0,0,0,.55),transparent);text-align:left}
+.callui .call-top h3{margin:0;font-size:19px;font-weight:700;letter-spacing:0;font-family:var(--font-body);color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.5)}
+.callui .call-top .call-sub{margin:2px 0 0;font-size:13px;min-height:0;color:#CFF7EC;text-shadow:0 1px 4px rgba(0,0,0,.5)}
+.ct-badge{margin-left:auto;font-size:11px;font-weight:800;padding:3px 7px;border-radius:6px;background:rgba(255,255,255,.2);color:#fff}
+.callui .call-mid{position:relative;z-index:1;margin:auto;text-align:center;padding:0 24px}
+.callui .call-mid .call-av{margin:0 auto 18px}
+.callui .call-mid .call-enc{margin:0 auto;font-size:12px;opacity:.55;max-width:280px;line-height:1.4}
+.callui.video-on.remote-live .call-mid{display:none}
+.callui.video-on:not(.remote-live) .call-mid .call-av{width:96px;height:96px;font-size:36px}
+.callui .call-actions{position:relative;z-index:3;margin:0 auto calc(var(--sa-bottom,0px) + 14px);width:calc(100% - 20px);max-width:460px;display:flex;justify-content:space-between;align-items:flex-start;gap:4px;padding:12px 8px 10px;border-radius:30px;background:rgba(18,22,30,.72);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);flex-wrap:nowrap}
+.callui .cbtn{width:auto;min-width:0;height:auto;flex:1 1 0;border:none;background:none!important;display:flex;flex-direction:column;align-items:center;gap:6px;padding:0;font-size:11px!important;border-radius:0}
+.callui .cbtn::before{content:none!important}
+.callui .cbtn[hidden]{display:none}
+.callui .cbtn .ic{width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.14);color:#fff;transition:background .15s,transform .15s}
+.callui .cbtn:active .ic{transform:scale(.92)}
+.callui .cbtn .ic svg{width:24px;height:24px}
+.callui .cbtn .lb{font-weight:600;font-size:11px;color:#E8ECF2;max-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.callui .cbtn.mute.on .ic,.callui .cbtn.fxon .ic{background:#fff;color:#111}
+.callui .cbtn.no .ic{background:#F0405E}.callui .cbtn.ok .ic{background:#12B886}
+.callui .cbtn .sl{display:none}.callui .cbtn.on .sl{display:inline}
+#callRoute .i-ear{display:none}#callRoute[data-k="earpiece"] .i-ear{display:block}#callRoute[data-k="earpiece"] .i-spk{display:none}
+.callui .ptt{position:relative;z-index:3;margin:0 16px 10px;width:auto}
+.callui .call-video-wrap{z-index:0}
+#callRemoteVideo{object-fit:cover}.callui.remote-contain #callRemoteVideo{object-fit:contain}
+#callLocalVideo{width:27vw;max-width:130px;height:auto;aspect-ratio:3/4;right:12px;top:calc(var(--sa-top,0px) + 74px);border-radius:16px;border:1.5px solid rgba(255,255,255,.5);box-shadow:0 6px 20px rgba(0,0,0,.45);touch-action:none;z-index:4}
+#callLocalVideo.rear{transform:none}
+.callui.video-on:not(.remote-live) #callLocalVideo{width:27vw;height:auto}
+.callui.video-on .call-actions{background:rgba(18,22,30,.72);padding:12px 8px 10px}
+.callui.idle .call-top,.callui.idle .call-actions,.callui.idle .fx-tray{opacity:0;pointer-events:none}
+.callui .call-top,.callui .call-actions{transition:opacity .25s}
+.call-watermark{left:12px!important;top:auto!important;bottom:calc(var(--sa-bottom,0px) + 128px);font-size:10px;color:rgba(255,255,255,.28);transition:none;z-index:3}
+.call-fxlayer{position:absolute;inset:0;z-index:5;pointer-events:none;overflow:hidden}
+.fx-flt{position:absolute;bottom:0;font-size:38px;animation:fxUp 2.6s ease-out forwards}
+@keyframes fxUp{0%{transform:translateY(0) scale(.6);opacity:0}12%{opacity:1}100%{transform:translateY(-62vh) scale(1.3);opacity:0}}
+.fx-tray{position:relative;z-index:4;margin:0 10px 8px;padding:8px 6px;border-radius:20px;background:rgba(18,22,30,.78);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);transition:opacity .25s}
+.fx-row{display:flex;gap:8px;overflow-x:auto;padding:5px 6px;scrollbar-width:none}.fx-row::-webkit-scrollbar{display:none}
+.fx-row button{flex:none;border:1.5px solid transparent;background:rgba(255,255,255,.12);color:#fff;border-radius:999px;padding:7px 14px;font:600 13px var(--font-body);cursor:pointer}
+.fx-row button.on{background:#fff;color:#111}
+.fx-row.stk button{font-size:22px;padding:4px 10px}
+#fxStickers button,#fxReact button{font-size:22px;padding:4px 11px;line-height:1.2}
+@media (prefers-reduced-motion:reduce){.fx-flt{animation-duration:.01s}}
 </style></head><body>
 <div class="app">
   <header class="topbar">
@@ -991,13 +1035,27 @@ body{background:var(--bg)}
     <div class="call-video-wrap" id="callVideoWrap">
       <video id="callRemoteVideo" poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" autoplay playsinline disablePictureInPicture oncontextmenu="return false"></video>
       <video id="callLocalVideo" poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" autoplay playsinline muted disablePictureInPicture oncontextmenu="return false" hidden></video>
-      <div class="call-watermark" id="callWatermark" style="top:10%;left:6%"></div>
+      <div class="call-fxlayer" id="callFxLayer"></div>
+      <div class="call-watermark" id="callWatermark"></div>
     </div>
-    <div class="call-av" id="callAv">A</div><h3 id="callName">-</h3><div class="call-sub" id="callSub"></div>
-    <div class="call-enc" id="callEnc">🔒 End-to-end encrypted — directly between your phone and theirs</div>
+    <div class="call-top"><div class="ct-txt"><h3 id="callName">-</h3><div class="call-sub" id="callSub"></div></div><span class="ct-badge" id="callHd" hidden>HD</span></div>
+    <div class="call-mid"><div class="call-av" id="callAv">A</div>
+    <div class="call-enc" id="callEnc">End-to-end encrypted. Screenshots and screen recording are blocked in the app.</div></div>
     <button class="ptt" id="ptt" hidden>🎙 Hold to talk</button>
-    <div class="call-actions"><button class="cbtn ok" id="callAccept" hidden>Accept</button><button class="cbtn mute" id="callMute" hidden>Mute</button><button class="cbtn mute" id="callRoute" hidden>Phone</button><button class="cbtn mute" id="callCam" hidden>Camera off</button><button class="cbtn no" id="callEnd">End</button></div>
-    <div class="route-sheet" id="routeSheet" hidden></div><audio id="callAudio" autoplay playsinline controlsList="nodownload" oncontextmenu="return false"></audio></div></div>
+    <div class="fx-tray" id="fxTray" hidden>
+      <div class="fx-row" id="fxFilters"></div><div class="fx-row" id="fxStickers"></div><div class="fx-row react" id="fxReact"></div>
+    </div>
+    <div class="route-sheet" id="routeSheet" hidden></div>
+    <div class="call-actions">
+      <button class="cbtn ok" id="callAccept" hidden type="button"><i class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></svg></i><b class="lb">Accept</b></button>
+      <button class="cbtn mute" id="callRoute" hidden type="button"><i class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="i-spk"><path d="M4 9h4l5-4v14l-5-4H4zM16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/></svg><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="i-ear"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></svg></i><b class="lb">Phone</b></button>
+      <button class="cbtn mute" id="callCam" hidden type="button"><i class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M3 7h11a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H3zM16 11l5-3v8l-5-3"/><path class="sl" d="M4 4l16 16"/></svg></i><b class="lb">Camera</b></button>
+      <button class="cbtn mute" id="callFlip" hidden type="button"><i class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M4 8V4h4M20 16v4h-4M4 4l5 5a8 8 0 0 1 11 3M20 20l-5-5a8 8 0 0 1-11-3"/></svg></i><b class="lb">Flip</b></button>
+      <button class="cbtn mute" id="callFx" hidden type="button"><i class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8z"/></svg></i><b class="lb">Effects</b></button>
+      <button class="cbtn mute" id="callMute" hidden type="button"><i class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3zM19 11a7 7 0 0 1-14 0M12 18v3"/><path class="sl" d="M4 4l16 16"/></svg></i><b class="lb">Mute</b></button>
+      <button class="cbtn no" id="callEnd" type="button"><i class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z" transform="rotate(135 12 12)"/></svg></i><b class="lb">End</b></button>
+    </div>
+    <audio id="callAudio" autoplay playsinline controlsList="nodownload" oncontextmenu="return false"></audio></div></div>
   <button class="sos-fab" id="sosFab" title="Hold 2s to send a silent safety alert" aria-label="Safety alert">🛡</button>
   <div class="sos-cancel" id="sosCancel">Sending safety alert in <span id="sosCount">3</span>s<button id="sosCancelBtn" type="button">Cancel</button></div>
   <nav class="tabbar">
@@ -1049,5 +1107,5 @@ body{background:var(--bg)}
   <div class="toast" id="toast"></div>
 </div>
 
-<script src="app.js?v=87b6c432eb" defer></script>
+<script src="app.js?v=ea085885b0" defer></script>
 <script>if("serviceWorker" in navigator && location.protocol.indexOf("http")===0){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});}</script></body></html>

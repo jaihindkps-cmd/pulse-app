@@ -10,7 +10,8 @@ import { initAI, chat as aiChat, json as aiJson, aiWorking } from "./ai.js";
 import { buildSong, Player, renderWav, GENRES } from "./music.js";
 import { singLine, voiceList, langOf, singerSupported, stopSinging } from "./singer.js";
 import * as Call from "./call.js";
-import { serviceStart, serviceStop, routeAvailable, routeStart, routeList, routeSet, routeStop, startTone, stopTone, chime } from "./audioroute.js";
+import { serviceStart, serviceStop, routeAvailable, routeStart, routeList, routeSet, routeStop, startTone, stopTone, chime, secureScreen } from "./audioroute.js";
+import { FILTERS, STICKERS, effectsSupported, createEffects } from "./effects.js";
 import { DHAMS, art as dhamArt, photoOrArt, loadPhotos, daily as dailyDham, kindName, kindSym, loadDeityPhotos } from "./dham.js";
 import { tr, getLang, setLang, initI18n } from "./i18n.js";
 
@@ -1125,13 +1126,23 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   function callSetup(name, sub, opts) {
     $("callName").textContent = name; $("callSub").textContent = sub; $("callAv").textContent = (name || "?").charAt(0).toUpperCase();
     $("callAccept").hidden = !opts.incoming; $("callMute").hidden = !!opts.incoming || opts.walkie; $("ptt").hidden = !opts.walkie || !!opts.incoming;
-    $("callMute").classList.remove("on"); $("callMute").textContent = "Mute";
-    $("callRoute").hidden = !!opts.incoming || !routeAvailable(); $("callRoute").textContent = opts.video ? "Speaker" : "Phone"; $("routeSheet").hidden = true;
-    $("callCam").hidden = !opts.video || !!opts.incoming; $("callCam").classList.remove("on"); $("callCam").textContent = "Camera off";
-    $("callUI").classList.toggle("video-on", !!opts.video);
+    $("callMute").classList.remove("on"); lbl("callMute", "Mute");
+    $("callRoute").hidden = !!opts.incoming || !routeAvailable(); setRouteBtn(opts.video ? "speaker" : "earpiece", opts.video ? "Speaker" : "Phone"); $("routeSheet").hidden = true;
+    $("callCam").hidden = !opts.video || !!opts.incoming; $("callCam").classList.remove("on"); lbl("callCam", "Camera");
+    $("callFlip").hidden = $("callFx").hidden = !opts.video || !!opts.incoming; $("callFx").classList.remove("fxon"); $("fxTray").hidden = true;
+    $("callHd").hidden = !opts.video;
+    $("callUI").classList.toggle("video-on", !!opts.video); $("callUI").classList.remove("idle", "remote-contain");
     $("callLocalVideo").hidden = !opts.video; $("callRemoteVideo").hidden = !opts.video;
+    $("callWatermark").textContent = (ME.name || "Pulse") + " · " + UID.slice(0, 6);
+    secureScreen(true); idleKick();
     callShow(true);
   }
+  function lbl(id, t) { var b = $(id).querySelector(".lb"); if (b) b.textContent = t; }
+  function setRouteBtn(kind, t) { $("callRoute").setAttribute("data-k", kind === "earpiece" ? "earpiece" : "speaker"); lbl("callRoute", t); }
+  // Controls fade out after a few quiet seconds in a video call; a tap brings them back.
+  var idleT = null;
+  function idleKick() { var u = $("callUI"); u.classList.remove("idle"); clearTimeout(idleT); if (!u.classList.contains("video-on")) return; idleT = setTimeout(function () { if (CALL && CALL.connected && $("fxTray").hidden && $("routeSheet").hidden) u.classList.add("idle"); }, 5000); }
+  $("callUI").addEventListener("pointerdown", idleKick);
   function callMsg(mid, text, call, touchMatch) {
     var b = writeBatch(db), mref = doc(collection(db, "matches", mid, "messages"));
     b.set(mref, { from: UID, text: text, call: call, createdAt: serverTimestamp() });
@@ -1140,14 +1151,17 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   }
   function onRemote(stream) {
     var hasVideo = stream.getVideoTracks().length > 0;
-    if (hasVideo) { var v = $("callRemoteVideo"); v.onplaying = function () { $("callUI").classList.add("remote-live"); }; v.srcObject = stream; v.play().catch(function () {}); }
+    if (hasVideo) {
+      var v = $("callRemoteVideo");
+      // Fill the screen when the picture has the same shape, otherwise show all of it (no heavy zoom).
+      var fit = function () { if (!v.videoWidth) return; var r = v.videoWidth / v.videoHeight, sr = innerWidth / innerHeight; $("callUI").classList.toggle("remote-contain", Math.abs(r - sr) / sr > 0.3); };
+      v.onplaying = function () { $("callUI").classList.add("remote-live"); fit(); }; v.onresize = fit; v.srcObject = stream; v.play().catch(function () {});
+    }
     var a = $("callAudio"); a.srcObject = hasVideo ? null : stream; if (!hasVideo) a.play().catch(function () {});
   }
   function startWatermark() {
     stopWatermark();
-    var w = $("callWatermark"); w.textContent = (ME.name || "Pulse") + " · " + UID.slice(0, 6);
-    function move() { w.style.top = (8 + Math.random() * 70) + "%"; w.style.left = (4 + Math.random() * 60) + "%"; }
-    move(); wmTimer = setInterval(move, 9000);
+    $("callWatermark").textContent = (ME.name || "Pulse") + " · " + UID.slice(0, 6);
   }
   function stopWatermark() { clearInterval(wmTimer); wmTimer = null; }
   function onState(st) {
@@ -1197,7 +1211,8 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
       callSetup(c.name, "Ringing...", { walkie: mode === "walkie", video: isVideo });
       routeStart(isVideo).then(refreshRouteLabel); startTone("out"); serviceStart(isVideo, "Pulse call with " + c.name);
       if (isVideo) { var lv = $("callLocalVideo"); lv.srcObject = stream; lv.play().catch(function () {}); }
-      return Call.makeOffer(stream, onRemote, onState).then(function (o) {
+      CALL.facing = "user";
+      return Call.makeOffer(stream, onRemote, onState, onFxData).then(function (o) {
         if (!CALL || CALL.id !== id) { o.pc.close(); return; }
         CALL.pc = o.pc; watchCall();
         CALL.timeout = setTimeout(function () { if (CALL && CALL.id === id && !CALL.connected) endCall(true, "No answer"); }, 45000);
@@ -1207,6 +1222,8 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   }
   function endCall(notify, msg) {
     var c = CALL; if (!c) return; c.ending = true; CALL = null; clearInterval(callTick); clearTimeout(c.timeout); clearTimeout(discoTimer); discoTimer = null; stopWatermark();
+    if (c.fx) { try { c.fx.stop(); } catch (e) {} } $("fxTray").hidden = true; clearTimeout(idleT); $("callUI").classList.remove("idle"); $("callFxLayer").innerHTML = "";
+    secureScreen(false);
     Call.releaseWakeLock(); Call.clearMediaSession(); stopTone(); routeStop(); serviceStop(); $("routeSheet").hidden = true; if (c.connected) chime(false);
     if (c.unsub) try { c.unsub(); } catch (e) {}
     if (c.stream) c.stream.getTracks().forEach(function (t) { t.stop(); }); if (c.pc) try { c.pc.close(); } catch (e) {}
@@ -1255,13 +1272,14 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     Call.getMedia(isVideo).then(function (stream) {
       c.stream = stream;
       if (isVideo) { var lv = $("callLocalVideo"); lv.srcObject = stream; lv.hidden = false; lv.play().catch(function () {}); $("callRemoteVideo").hidden = false; $("callUI").classList.add("video-on"); }
-      return Call.makeAnswer(stream, c.offer, onRemote, onState);
+      c.facing = "user";
+      return Call.makeAnswer(stream, c.offer, onRemote, onState, onFxData);
     })
-      .then(function (a) { c.pc = a.pc; $("callMute").hidden = c.mode === "walkie"; $("ptt").hidden = c.mode !== "walkie"; $("callCam").hidden = !isVideo; return callMsg(c.mid, "📞 Jawab", { k: "answer", id: c.id, sdp: a.sdp }, false); })
+      .then(function (a) { c.pc = a.pc; $("callMute").hidden = c.mode === "walkie"; $("ptt").hidden = c.mode !== "walkie"; $("callCam").hidden = !isVideo; $("callFlip").hidden = $("callFx").hidden = !isVideo; return callMsg(c.mid, "📞 Jawab", { k: "answer", id: c.id, sdp: a.sdp }, false); })
       .catch(function (e) { endCall(true); toast(e && e.name === "NotAllowedError" ? permMsg(isVideo) : errMsg(e)); });
   });
   var ROUTE_ICON = { earpiece: "Phone", speaker: "Speaker", bluetooth: "Bluetooth", wired: "Headset" };
-  function refreshRouteLabel() { routeList().then(function (r) { var cur = r.current || "earpiece", d = (r.devices || []).filter(function (x) { return x.kind === cur; })[0]; $("callRoute").textContent = cur === "bluetooth" && d && d.name ? d.name : (ROUTE_ICON[cur] || "Phone"); }); }
+  function refreshRouteLabel() { routeList().then(function (r) { var cur = r.current || "earpiece", d = (r.devices || []).filter(function (x) { return x.kind === cur; })[0]; setRouteBtn(cur, cur === "bluetooth" && d && d.name ? d.name : (ROUTE_ICON[cur] || "Phone")); }); }
   $("callRoute").addEventListener("click", function () {
     var sh = $("routeSheet"); if (!sh.hidden) { sh.hidden = true; return; }
     routeList().then(function (r) {
@@ -1269,15 +1287,57 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
       (r.devices || []).forEach(function (d) {
         var label = d.kind === "earpiece" ? "Phone" : d.kind === "speaker" ? "Speaker" : d.kind === "wired" ? "Wired headset" : "Bluetooth" + (d.name ? ": " + d.name : "");
         var b = el('<button type="button"></button>'); b.textContent = (d.kind === "earpiece" ? "📱 " : d.kind === "speaker" ? "🔊 " : d.kind === "wired" ? "🎧 " : "🎧 ") + label; if (d.kind === cur) b.classList.add("on");
-        b.addEventListener("click", function () { routeSet(d).then(function () { sh.hidden = true; $("callRoute").textContent = d.kind === "bluetooth" && d.name ? d.name : (ROUTE_ICON[d.kind] || "Phone"); }); });
+        b.addEventListener("click", function () { routeSet(d).then(function () { sh.hidden = true; setRouteBtn(d.kind, d.kind === "bluetooth" && d.name ? d.name : (ROUTE_ICON[d.kind] || "Phone")); }); });
         sh.appendChild(b);
       });
       sh.hidden = false;
     });
   });
   $("callEnd").addEventListener("click", function () { endCall(true); });
-  $("callMute").addEventListener("click", function () { if (!CALL) return; var on = this.classList.toggle("on"); setMic(!on); this.textContent = on ? "Unmute" : "Mute"; });
-  $("callCam").addEventListener("click", function () { if (!CALL) return; var off = this.classList.toggle("on"); setCam(!off); this.textContent = off ? "Camera on" : "Camera off"; });
+  $("callMute").addEventListener("click", function () { if (!CALL) return; var on = this.classList.toggle("on"); setMic(!on); lbl("callMute", on ? "Unmute" : "Mute"); });
+  $("callCam").addEventListener("click", function () { if (!CALL) return; var off = this.classList.toggle("on"); setCam(!off); lbl("callCam", off ? "Camera on" : "Camera"); });
+
+  // ---- Effects (filters, face stickers, floating reactions), camera flip ----
+  function previewStream(c) { var lv = $("callLocalVideo"), s = c.fx && c.fx.active() ? new MediaStream([c.fx.track]) : c.stream; lv.srcObject = s; lv.classList.toggle("rear", c.facing === "environment"); lv.play().catch(function () {}); }
+  function applyFx(o) {
+    var c = CALL; if (!c || !c.stream || !effectsSupported()) { toast("Effects are not supported on this device."); return; }
+    if (!c.fx) c.fx = createEffects(c.stream); if (!c.fx) return;
+    c.fx.set(o);
+    var sn = c.pc && Call.videoSender(c.pc), want = c.fx.active() ? c.fx.track : c.fx.raw;
+    if (sn && sn.track !== want) sn.replaceTrack(want).catch(function () {});
+    previewStream(c); paintFxTray();
+  }
+  function paintFxTray() {
+    var c = CALL, st = c && c.fx ? c.fx.state() : { filter: "none", sticker: "none" };
+    var f = $("fxFilters"), s = $("fxStickers"), r = $("fxReact");
+    if (!f.children.length) {
+      FILTERS.forEach(function (x) { var b = el('<button type="button" data-f="' + x.id + '"></button>'); b.textContent = x.name; b.addEventListener("click", function () { applyFx({ filter: x.id }); }); f.appendChild(b); });
+      STICKERS.forEach(function (x) { var b = el('<button type="button" data-s="' + x.id + '"></button>'); b.textContent = x.e; b.addEventListener("click", function () { applyFx({ sticker: x.id }); }); s.appendChild(b); });
+      ["❤️", "😂", "👍", "🔥", "😮", "👏", "🎉"].forEach(function (e) { var b = el('<button type="button"></button>'); b.textContent = e; b.addEventListener("click", function () { sendReaction(e); }); r.appendChild(b); });
+    }
+    Array.prototype.forEach.call(f.children, function (b) { b.classList.toggle("on", b.getAttribute("data-f") === st.filter); });
+    Array.prototype.forEach.call(s.children, function (b) { b.classList.toggle("on", b.getAttribute("data-s") === st.sticker); });
+  }
+  function floatEmoji(e) {
+    var n = el('<span class="fx-flt"></span>'); n.textContent = e; n.style.left = (8 + Math.random() * 78) + "%"; $("callFxLayer").appendChild(n); setTimeout(function () { n.remove(); }, 2700);
+  }
+  function sendReaction(e) { floatEmoji(e); try { if (CALL && CALL.pc && CALL.pc.fx && CALL.pc.fx.readyState === "open") CALL.pc.fx.send(JSON.stringify({ r: e })); } catch (x) {} }
+  function onFxData(d) { try { var m = JSON.parse(d); if (m && typeof m.r === "string" && m.r.length <= 8) floatEmoji(m.r); } catch (e) {} }
+  $("callFx").addEventListener("click", function () { var t = $("fxTray"); t.hidden = !t.hidden; this.classList.toggle("fxon", !t.hidden); if (!t.hidden) paintFxTray(); idleKick(); });
+  $("callFlip").addEventListener("click", function () {
+    var c = CALL; if (!c || !c.stream || c.flipping) return; c.flipping = true;
+    var next = c.facing === "environment" ? "user" : "environment", btn = this;
+    Call.getMedia(true, next).then(function (ns) {
+      var nv = ns.getVideoTracks()[0], old = c.stream.getVideoTracks()[0], wasOff = old && !old.enabled;
+      ns.getAudioTracks().forEach(function (t) { t.stop(); });
+      if (wasOff) nv.enabled = false;
+      var fxState = c.fx ? c.fx.state() : null; if (c.fx) { c.fx.stop(); c.fx = null; }
+      c.stream.removeTrack(old); c.stream.addTrack(nv); if (old) old.stop(); c.facing = next;
+      var sn = c.pc && Call.videoSender(c.pc); if (sn) sn.replaceTrack(nv).catch(function () {});
+      Call.tune(c.pc);
+      if (fxState && (fxState.filter !== "none" || fxState.sticker !== "none")) applyFx(fxState); else previewStream(c);
+    }).catch(function () { toast("Could not switch the camera."); }).then(function () { c.flipping = false; });
+  });
   document.addEventListener("visibilitychange", function () { Call.reacquireWakeLockIfNeeded(); });
   (function () { var p = $("ptt"); function dn(e) { e.preventDefault(); setMic(true); p.classList.add("live"); p.textContent = "🎙 Speaking..."; } function up() { setMic(false); p.classList.remove("live"); p.textContent = "🎙 Hold to talk"; }
     p.addEventListener("pointerdown", dn); p.addEventListener("pointerup", up); p.addEventListener("pointerleave", up); p.addEventListener("pointercancel", up); })();

@@ -13,12 +13,37 @@ export function supported() { return !!(window.RTCPeerConnection && navigator.me
 
 export function getMic() { return getMedia(false); }
 
-export function getMedia(withVideo) {
-  return navigator.mediaDevices.getUserMedia({
-    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-    video: withVideo ? { facingMode: "user", width: { ideal: 480 }, height: { ideal: 640 } } : false
-  });
+// Ask for the best camera the phone offers (4K when it can, else 1080p/720p) -- the browser picks the closest mode and the
+// network later adapts the bitrate. Falls back step by step so a phone without 4K still gets a call.
+export function getMedia(withVideo, facing) {
+  var audio = { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1, sampleRate: 48000 };
+  if (!withVideo) return navigator.mediaDevices.getUserMedia({ audio: audio, video: false });
+  var portrait = !(window.matchMedia && window.matchMedia("(orientation: landscape)").matches), fm = { ideal: facing || "user" };
+  function size(w, h) { return portrait ? { width: { ideal: h }, height: { ideal: w } } : { width: { ideal: w }, height: { ideal: h } }; }
+  var tiers = [[3840, 2160], [1920, 1080], [1280, 720], [640, 480]];
+  function attempt(i) {
+    var v = Object.assign({ facingMode: fm, frameRate: { ideal: 30, max: 60 } }, size(tiers[i][0], tiers[i][1]));
+    return navigator.mediaDevices.getUserMedia({ audio: audio, video: v }).catch(function (e) {
+      if (i + 1 < tiers.length && e && (e.name === "OverconstrainedError" || e.name === "NotReadableError" || e.name === "AbortError")) return attempt(i + 1);
+      throw e;
+    });
+  }
+  return attempt(0);
 }
+
+// Raise the video/audio bitrate ceiling (default WebRTC caps are very low) and keep sharpness over frame rate.
+export function tune(pc) {
+  try {
+    pc.getSenders().forEach(function (sn) {
+      if (!sn.track || !sn.getParameters) return;
+      var pr = sn.getParameters(); if (!pr.encodings || !pr.encodings.length) pr.encodings = [{}];
+      if (sn.track.kind === "video") { pr.encodings[0].maxBitrate = 12000000; pr.encodings[0].maxFramerate = 30; pr.degradationPreference = "maintain-resolution"; try { sn.track.contentHint = "detail"; } catch (e) {} }
+      else { pr.encodings[0].maxBitrate = 96000; }
+      sn.setParameters(pr).catch(function () {});
+    });
+  } catch (e) {}
+}
+export function videoSender(pc) { var r = null; try { pc.getSenders().forEach(function (sn) { if (sn.track && sn.track.kind === "video") r = sn; }); } catch (e) {} return r; }
 
 // ---- Screen Wake Lock: screen ko auto-sleep se roke taaki call ke beech awaaz/video band na ho.
 // Note: phone ka power button manually daba kar lock karne par browser/OS khud call ko suspend kar sakta
@@ -47,6 +72,14 @@ export function clearMediaSession() {
   try { if ("mediaSession" in navigator) { navigator.mediaSession.playbackState = "none"; navigator.mediaSession.metadata = null; } } catch (e) {}
 }
 
+// Opus tuned for clear speech: 48 kHz, ~96 kbps, forward error correction on (survives packet loss), no DTX gaps.
+function hq(sdp) {
+  var m = /a=rtpmap:(\d+) opus\/48000/.exec(sdp); if (!m) return sdp;
+  var pt = m[1], re = new RegExp("a=fmtp:" + pt + " ([^\\r\\n]*)"), add = "minptime=10;useinbandfec=1;usedtx=0;stereo=0;sprop-stereo=0;maxaveragebitrate=96000;maxplaybackrate=48000";
+  if (re.test(sdp)) return sdp.replace(re, function (_, f) { var keep = f.split(";").filter(function (x) { return x && !/^(minptime|useinbandfec|usedtx|stereo|sprop-stereo|maxaveragebitrate|maxplaybackrate)=/.test(x); }); return "a=fmtp:" + pt + " " + keep.concat(add.split(";")).join(";"); });
+  return sdp.replace(new RegExp("(a=rtpmap:" + pt + " opus/48000[^\\r\\n]*)"), "$1\r\na=fmtp:" + pt + " " + add);
+}
+
 function waitIce(pc, ms) {
   return new Promise(function (res) {
     if (pc.iceGatheringState === "complete") return res();
@@ -57,27 +90,30 @@ function waitIce(pc, ms) {
   });
 }
 
-function mk(stream, onTrack, onState) {
+function mk(stream, onTrack, onState, onData) {
   var pc = new RTCPeerConnection(ICE);
+  try { pc.fx = pc.createDataChannel("fx", { negotiated: true, id: 1 }); pc.fx.onmessage = function (e) { if (onData) onData(e.data); }; } catch (e) {}
   stream.getTracks().forEach(function (t) { pc.addTrack(t, stream); });
   pc.ontrack = function (e) { onTrack(e.streams[0] || new MediaStream([e.track])); };
   pc.onconnectionstatechange = function () { onState(pc.connectionState); };
   return pc;
 }
 
-export async function makeOffer(stream, onTrack, onState) {
-  var pc = mk(stream, onTrack, onState);
-  await pc.setLocalDescription(await pc.createOffer());
+export async function makeOffer(stream, onTrack, onState, onData) {
+  var pc = mk(stream, onTrack, onState, onData);
+  var of = await pc.createOffer(); of.sdp = hq(of.sdp); await pc.setLocalDescription(of);
+  tune(pc);
   await waitIce(pc, 5000);
   return { pc: pc, sdp: pc.localDescription.sdp };
 }
 
-export async function makeAnswer(stream, offerSdp, onTrack, onState) {
-  var pc = mk(stream, onTrack, onState);
+export async function makeAnswer(stream, offerSdp, onTrack, onState, onData) {
+  var pc = mk(stream, onTrack, onState, onData);
   await pc.setRemoteDescription({ type: "offer", sdp: offerSdp });
-  await pc.setLocalDescription(await pc.createAnswer());
+  var an = await pc.createAnswer(); an.sdp = hq(an.sdp); await pc.setLocalDescription(an);
+  tune(pc);
   await waitIce(pc, 5000);
   return { pc: pc, sdp: pc.localDescription.sdp };
 }
 
-export function applyAnswer(pc, sdp) { return pc.setRemoteDescription({ type: "answer", sdp: sdp }); }
+export function applyAnswer(pc, sdp) { return pc.setRemoteDescription({ type: "answer", sdp: sdp }).then(function () { tune(pc); }); }

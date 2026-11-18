@@ -207,4 +207,17 @@ public class AudioRoutePlugin extends Plugin {
         }
         call.resolve();
     }
+
+    // FLAG_SECURE: Android blanks this window in screenshots, screen recorders and casting/recents.
+    @PluginMethod
+    public void secure(final PluginCall call) {
+        final boolean on = Boolean.TRUE.equals(call.getBoolean("on", true));
+        getActivity().runOnUiThread(new Runnable() {
+            public void run() {
+                if (on) getActivity().getWindow().setFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE, android.view.WindowManager.LayoutParams.FLAG_SECURE);
+                else getActivity().getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE);
+                call.resolve();
+            }
+        });
+    }
 }

@@ -14,6 +14,7 @@ export function routeStop() { var p = plug(); return p ? p.stop().catch(function
 
 // Foreground service: keeps mic/camera and the connection alive when the app is minimized during a call.
 export function serviceStart(video, title) { var p = plug(); return p ? p.startService({ video: !!video, title: title || "Pulse call" }).catch(function () {}) : Promise.resolve(); }
+export function secureScreen(on) { var p = plug(); return p ? p.secure({ on: !!on }).catch(function () {}) : Promise.resolve(); }
 export function serviceStop() { var p = plug(); return p ? p.stopService().catch(function () {}) : Promise.resolve(); }
 
 // ---- tones ----
