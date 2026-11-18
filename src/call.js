@@ -2,7 +2,12 @@
 // Media (awaaz/video) seedhi dono phone ke beech peer-to-peer jaati hai -- kabhi Pulse ke server se nahi guzarti.
 // WebRTC har connection ko DTLS-SRTP se compulsory encrypt karta hai, isliye ye already end-to-end encrypted hai
 // (Firestore sirf signaling -- offer/answer handshake -- carry karta hai, kabhi actual audio/video nahi).
-var ICE = { iceServers: [{ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] }] };
+// STUN finds the public address; TURN relays the (still encrypted) media when a direct path is blocked, which is common on
+// mobile data (carrier NAT). Without TURN many calls connect but carry no voice.
+var ICE = { iceServers: [
+  { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
+  { urls: ["turn:openrelay.metered.ca:80", "turn:openrelay.metered.ca:443", "turn:openrelay.metered.ca:443?transport=tcp", "turns:openrelay.metered.ca:443?transport=tcp"], username: "openrelayproject", credential: "openrelayproject" }
+] };
 
 export function supported() { return !!(window.RTCPeerConnection && navigator.mediaDevices && navigator.mediaDevices.getUserMedia); }
 
@@ -63,7 +68,7 @@ function mk(stream, onTrack, onState) {
 export async function makeOffer(stream, onTrack, onState) {
   var pc = mk(stream, onTrack, onState);
   await pc.setLocalDescription(await pc.createOffer());
-  await waitIce(pc, 3500);
+  await waitIce(pc, 5000);
   return { pc: pc, sdp: pc.localDescription.sdp };
 }
 
@@ -71,7 +76,7 @@ export async function makeAnswer(stream, offerSdp, onTrack, onState) {
   var pc = mk(stream, onTrack, onState);
   await pc.setRemoteDescription({ type: "offer", sdp: offerSdp });
   await pc.setLocalDescription(await pc.createAnswer());
-  await waitIce(pc, 3500);
+  await waitIce(pc, 5000);
   return { pc: pc, sdp: pc.localDescription.sdp };
 }
 

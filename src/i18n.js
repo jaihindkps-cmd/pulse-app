@@ -88,6 +88,7 @@ var EN2HI = [
 ];
 
 var MORE_HI = [
+  ["Phone","फ़ोन"],["Speaker","स्पीकर"],["Bluetooth","ब्लूटूथ"],["Headset","हेडसेट"],["Wired headset","तार वाला हेडसेट"],
   ["New Journey","नया सफ़र"],["ज़्यादा मैच पाने के लिए प्रोफ़ाइल को Edit सेक्शन में पूरा करें।","ज़्यादा मैच पाने के लिए प्रोफ़ाइल को एडिट सेक्शन में पूरा करें।"],["Edit","एडिट"],
   ["Today's Darshan","आज के दर्शन"],["Add status","स्टेटस जोड़ें"],["Profile strength:","प्रोफ़ाइल की मज़बूती:"],["Complete your profile in the Edit section to get more matches.","ज़्यादा मैच पाने के लिए प्रोफ़ाइल को Edit सेक्शन में पूरा करें।"],["Great — your profile is complete ✅","बढ़िया, आपकी प्रोफ़ाइल पूरी है ✅"],
   ["Trust & Journey","भरोसा और सफ़र"],["Trust &amp; Journey","भरोसा और सफ़र"],["points to the next level","अंक बाकी अगले स्तर तक"],["top level 🎉","सबसे ऊँचा स्तर 🎉"],["Safety Circle: trusted friends who can see a quick ✅ Safe / 🔶 Need check-in from each other — never your live location. Add someone from their chat's Block/Report menu; it only shows once you've added each other.","सेफ्टी सर्कल: भरोसेमंद दोस्त जो एक-दूसरे का ✅ सुरक्षित / 🔶 चेक-इन चाहिए देख सकते हैं, लाइव लोकेशन कभी नहीं। चैट के ब्लॉक/रिपोर्ट मेन्यू से किसी को जोड़ें; दोनों के जोड़ने पर ही दिखता है।"],

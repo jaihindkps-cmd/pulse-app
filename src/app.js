@@ -10,6 +10,7 @@ import { initAI, chat as aiChat, json as aiJson, aiWorking } from "./ai.js";
 import { buildSong, Player, renderWav, GENRES } from "./music.js";
 import { singLine, voiceList, langOf, singerSupported, stopSinging } from "./singer.js";
 import * as Call from "./call.js";
+import { serviceStart, serviceStop, routeAvailable, routeStart, routeList, routeSet, routeStop, startTone, stopTone, chime } from "./audioroute.js";
 import { DHAMS, art as dhamArt, photoOrArt, loadPhotos, daily as dailyDham, kindName, kindSym, loadDeityPhotos } from "./dham.js";
 import { tr, getLang, setLang, initI18n } from "./i18n.js";
 
@@ -1125,6 +1126,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     $("callName").textContent = name; $("callSub").textContent = sub; $("callAv").textContent = (name || "?").charAt(0).toUpperCase();
     $("callAccept").hidden = !opts.incoming; $("callMute").hidden = !!opts.incoming || opts.walkie; $("ptt").hidden = !opts.walkie || !!opts.incoming;
     $("callMute").classList.remove("on"); $("callMute").textContent = "Mute";
+    $("callRoute").hidden = !!opts.incoming || !routeAvailable(); $("callRoute").textContent = opts.video ? "Speaker" : "Phone"; $("routeSheet").hidden = true;
     $("callCam").hidden = !opts.video || !!opts.incoming; $("callCam").classList.remove("on"); $("callCam").textContent = "Camera off";
     $("callUI").classList.toggle("video-on", !!opts.video);
     $("callLocalVideo").hidden = !opts.video; $("callRemoteVideo").hidden = !opts.video;
@@ -1152,7 +1154,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     if (!CALL) return;
     if (st === "connected") {
       clearTimeout(discoTimer); discoTimer = null;
-      if (!CALL.connected) { CALL.connected = true; clearTimeout(CALL.timeout); CALL.t0 = Date.now();
+      if (!CALL.connected) { CALL.connected = true; clearTimeout(CALL.timeout); CALL.t0 = Date.now(); stopTone(); chime(true); refreshRouteLabel();
         if (CALL.mode === "walkie" && !CALL.muteInit) { CALL.muteInit = true; setMic(false); $("ptt").hidden = false; $("callAccept").hidden = true; }
         Call.requestWakeLock(); Call.setMediaSession(CALL.mode === "video" ? "Pulse Video Call" : CALL.mode === "walkie" ? "Pulse Walkie-talkie" : "Pulse Call");
         if (CALL.mode === "video") startWatermark();
@@ -1193,6 +1195,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     Call.getMedia(isVideo).then(function (stream) {
       CALL = { mid: c.mid, id: id, role: "out", mode: mode, stream: stream, name: c.name, peer: c.id };
       callSetup(c.name, "Ringing...", { walkie: mode === "walkie", video: isVideo });
+      routeStart(isVideo).then(refreshRouteLabel); startTone("out"); serviceStart(isVideo, "Pulse call with " + c.name);
       if (isVideo) { var lv = $("callLocalVideo"); lv.srcObject = stream; lv.play().catch(function () {}); }
       return Call.makeOffer(stream, onRemote, onState).then(function (o) {
         if (!CALL || CALL.id !== id) { o.pc.close(); return; }
@@ -1204,7 +1207,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   }
   function endCall(notify, msg) {
     var c = CALL; if (!c) return; c.ending = true; CALL = null; clearInterval(callTick); clearTimeout(c.timeout); clearTimeout(discoTimer); discoTimer = null; stopWatermark();
-    Call.releaseWakeLock(); Call.clearMediaSession();
+    Call.releaseWakeLock(); Call.clearMediaSession(); stopTone(); routeStop(); serviceStop(); $("routeSheet").hidden = true; if (c.connected) chime(false);
     if (c.unsub) try { c.unsub(); } catch (e) {}
     if (c.stream) c.stream.getTracks().forEach(function (t) { t.stop(); }); if (c.pc) try { c.pc.close(); } catch (e) {}
     $("callUI").classList.remove("remote-live"); $("callAudio").srcObject = null; $("callRemoteVideo").srcObject = null; $("callLocalVideo").srcObject = null;
@@ -1221,13 +1224,14 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
       userName(other).then(function (n) {
         if (CALL) return; CALL = { mid: mid, id: offer.id, role: "in", mode: offer.mode, offer: offer.sdp, name: n, peer: other };
         var sub = offer.mode === "walkie" ? "📻 Walkie-talkie incoming" : offer.mode === "video" ? "🎥 Incoming video call" : "📞 Incoming call";
-        callSetup(n, sub, { incoming: true, video: offer.mode === "video" }); try { navigator.vibrate && navigator.vibrate([300, 150, 300]); } catch (e) {}
+        callSetup(n, sub, { incoming: true, video: offer.mode === "video" }); startTone("in");
         watchCall(); CALL.timeout = setTimeout(function () { if (CALL && CALL.id === offer.id && !CALL.connected) endCall(false, "Missed call"); }, 40000);
       });
     }).catch(function () {});
   }
   $("callAccept").addEventListener("click", function () {
-    var c = CALL; if (!c || c.role !== "in") return; this.hidden = true; $("callSub").textContent = "Connecting..."; var isVideo = c.mode === "video";
+    var c = CALL; if (!c || c.role !== "in") return; this.hidden = true; stopTone(); $("callSub").textContent = "Connecting..."; var isVideo = c.mode === "video";
+    routeStart(isVideo).then(refreshRouteLabel); serviceStart(isVideo, "Pulse call with " + c.name); $("callRoute").hidden = !routeAvailable();
     Call.getMedia(isVideo).then(function (stream) {
       c.stream = stream;
       if (isVideo) { var lv = $("callLocalVideo"); lv.srcObject = stream; lv.hidden = false; lv.play().catch(function () {}); $("callRemoteVideo").hidden = false; $("callUI").classList.add("video-on"); }
@@ -1235,6 +1239,21 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     })
       .then(function (a) { c.pc = a.pc; $("callMute").hidden = c.mode === "walkie"; $("ptt").hidden = c.mode !== "walkie"; $("callCam").hidden = !isVideo; return callMsg(c.mid, "📞 Jawab", { k: "answer", id: c.id, sdp: a.sdp }, false); })
       .catch(function (e) { endCall(true); toast(e && e.name === "NotAllowedError" ? permMsg(isVideo) : errMsg(e)); });
+  });
+  var ROUTE_ICON = { earpiece: "Phone", speaker: "Speaker", bluetooth: "Bluetooth", wired: "Headset" };
+  function refreshRouteLabel() { routeList().then(function (r) { var cur = r.current || "earpiece", d = (r.devices || []).filter(function (x) { return x.kind === cur; })[0]; $("callRoute").textContent = cur === "bluetooth" && d && d.name ? d.name : (ROUTE_ICON[cur] || "Phone"); }); }
+  $("callRoute").addEventListener("click", function () {
+    var sh = $("routeSheet"); if (!sh.hidden) { sh.hidden = true; return; }
+    routeList().then(function (r) {
+      sh.innerHTML = ""; var cur = r.current || "earpiece";
+      (r.devices || []).forEach(function (d) {
+        var label = d.kind === "earpiece" ? "Phone" : d.kind === "speaker" ? "Speaker" : d.kind === "wired" ? "Wired headset" : "Bluetooth" + (d.name ? ": " + d.name : "");
+        var b = el('<button type="button"></button>'); b.textContent = (d.kind === "earpiece" ? "📱 " : d.kind === "speaker" ? "🔊 " : d.kind === "wired" ? "🎧 " : "🎧 ") + label; if (d.kind === cur) b.classList.add("on");
+        b.addEventListener("click", function () { routeSet(d).then(function () { sh.hidden = true; $("callRoute").textContent = d.kind === "bluetooth" && d.name ? d.name : (ROUTE_ICON[d.kind] || "Phone"); }); });
+        sh.appendChild(b);
+      });
+      sh.hidden = false;
+    });
   });
   $("callEnd").addEventListener("click", function () { endCall(true); });
   $("callMute").addEventListener("click", function () { if (!CALL) return; var on = this.classList.toggle("on"); setMic(!on); this.textContent = on ? "Unmute" : "Mute"; });
