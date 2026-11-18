@@ -334,6 +334,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
         var p = snapData(d); if (blocked.has(p.uid)) return; n++;
         var liked = (p.likedBy || []).indexOf(UID) >= 0;
         var node = el('<article class="post"><div class="post-head" data-uid="' + esc(p.uid) + '" style="cursor:pointer"><div class="av-sm" style="background:' + g(p.uid) + '">' + ini(p.name) + '</div><div class="who"><div class="name">' + esc(p.name) + creatorBadge(p) + '</div><div class="meta">' + ago(ms(p.createdAt)) + '</div></div></div><p class="post-text">' + esc(p.text) + '</p><div class="post-actions"><button class="act like ' + (liked ? "liked" : "") + '"><svg viewBox="0 0 24 24" fill="' + (liked ? "currentColor" : "none") + '" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-4.3-9.3-8.5C.9 9.4 2.4 6 5.6 6c1.9 0 3.2 1.1 4.4 2.5C11.2 7.1 12.5 6 14.4 6c3.2 0 4.7 3.4 2.9 6.5C19 16.7 12 21 12 21Z"/></svg><span class="cnt">' + (p.likedBy || []).length + '</span></button></div></article>');
+        paintPhoto(node.querySelector(".av-sm"), p.uid);
         node.querySelector(".like").addEventListener("click", function () {
           updateDoc(d.ref, { likedBy: liked ? arrayRemove(UID) : arrayUnion(UID) }).catch(function (e) { toast(errMsg(e)); });
         });
@@ -550,6 +551,14 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     if (nameCache[uid]) return Promise.resolve(nameCache[uid]);
     return getDoc(doc(db, "users", uid)).then(function (s) { nameCache[uid] = s.exists() ? s.data().name : "Pulse member"; return nameCache[uid]; }).catch(function () { return "Pulse member"; });
   }
+  var photoReq = {};
+  function paintPhoto(node, uid) {
+    if (!node || !uid || uid === "saathi") return;
+    function go(p) { if (p && JPEG.test(p)) { node.style.background = "center/cover url(" + p + ")"; node.textContent = ""; } }
+    if (uid === UID) { go(ME && ME.photo); return; }
+    if (!photoReq[uid]) photoReq[uid] = getDoc(doc(db, "users", uid)).then(function (s) { return s.exists() ? s.data().photo || "" : ""; }).catch(function () { return ""; });
+    photoReq[uid].then(go);
+  }
   function listenMatches() {
     firstMatches = true;
     unsubs.push(onSnapshot(query(collection(db, "matches"), where("users", "array-contains", UID)), function (snap) {
@@ -632,7 +641,8 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     shown.forEach(function (c) {
       var r = row({ id: c.id, mid: c.mid, name: nameCache[c.id] || "..." }, c.last ? ((c.lastFrom === UID ? "You: " : "") + c.last) : "You matched! Say hi 👋", c.last ? hm(c.at) : "");
       if (c.unread && !(activeChat && activeChat.mid === c.mid)) { r.querySelector(".prev").classList.add("unread"); r.appendChild(el('<span class="unread-dot">•</span>')); }
-      if (!nameCache[c.id]) userName(c.id).then(function (n) { r.querySelector(".nm").textContent = n; r.querySelector(".av-sm").textContent = n.charAt(0).toUpperCase(); });
+      paintPhoto(r.querySelector(".av-sm"), c.id);
+      if (!nameCache[c.id]) userName(c.id).then(function (n) { r.querySelector(".nm").textContent = n; var av2 = r.querySelector(".av-sm"); if (av2.style.background.indexOf("url(") < 0) av2.textContent = n.charAt(0).toUpperCase(); });
     });
     $("chatDot").hidden = !shown.some(function (c) { return c.unread && !(activeChat && activeChat.mid === c.mid); });
     if (!shown.length) l.appendChild(el('<div class="empty">No chats yet. Swipe in Discover — once you match, the chat opens here.</div>'));
@@ -708,7 +718,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   function openChat(c) {
     closeMsgListener(); if ($("chatMenu")) $("chatMenu").hidden = true; cancelReply(); closeMsgActions(); if (!c.ai && nameCache[c.id]) c.name = nameCache[c.id]; activeChat = c;
     if (!c.ai && (!c.name || c.name === "...")) userName(c.id).then(function (n) { c.name = n; if (activeChat === c) { $("convoName").textContent = n; $("convoAv").textContent = ini(n); } });
-    var av = $("convoAv"); av.textContent = c.ai ? "✦" : ini(c.name); av.style.background = g(c.id);
+    var av = $("convoAv"); av.textContent = c.ai ? "✦" : ini(c.name); av.style.background = g(c.id); if (!c.ai) paintPhoto(av, c.id);
     $("convoName").innerHTML = esc(c.name) + creatorBadge(c) + (c.ai ? '<span class="ai-pill">AI</span>' : ""); $("convoStatus").textContent = c.ai ? "Always online" : "";
     $("moreBtn").hidden = !!c.ai; $("medBar").hidden = true; $("callBtn").hidden = $("videoCallBtn").hidden = $("wtBtn").hidden = $("duetBtn").hidden = $("tlBtn").hidden = !!c.ai;
     $("vnBtn").hidden = !!c.ai; $("micBtn").hidden = !c.ai || !SR_OK; $("saathiVoiceBtn").hidden = !c.ai; if (c.ai) refreshVoiceBtn();
@@ -1304,7 +1314,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
     if (score >= 400) return { name: "Soulful ✨", next: null };
     if (score >= 150) return { name: "Trusted 💎", next: 400 };
     if (score >= 50) return { name: "Connector 🌱", next: 150 };
-    return { name: "Naya Safar 🌼", next: 50 };
+    return { name: "New Journey 🌼", next: 50 };
   }
   function journeyFacts() {
     if (!ME) return "";
@@ -1319,7 +1329,7 @@ import { tr, getLang, setLang, initI18n } from "./i18n.js";
   function renderJourney() {
     var box = $("journeyBox"); if (!box || !ME) return;
     var score = journeyScore(ME), tier = journeyTier(score);
-    box.innerHTML = '<div class="section-title">Trust &amp; Journey</div><div class="ai-note" style="display:flex;align-items:center;gap:12px"><div style="font-size:26px">' + tier.name.split(" ").pop() + '</div><div><b>' + esc(tier.name.split(" ").slice(0, -1).join(" ")) + '</b><div class="st-note" style="margin:2px 0 0">Score ' + score + (tier.next ? " · " + (tier.next - score) + " aur se agla level" : " · top level 🎉") + '</div></div></div>';
+    box.innerHTML = '<div class="section-title">Trust &amp; Journey</div><div class="ai-note" style="display:flex;align-items:center;gap:12px"><div style="font-size:26px">' + tier.name.split(" ").pop() + '</div><div><b>' + esc(tier.name.split(" ").slice(0, -1).join(" ")) + '</b><div class="st-note" style="margin:2px 0 0">Score ' + score + (tier.next ? " · " + (tier.next - score) + " points to the next level" : " · top level 🎉") + '</div></div></div>';
   }
 
   // ---- throttle (spam rokne ke liye) ----

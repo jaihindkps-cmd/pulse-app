@@ -88,6 +88,12 @@ var EN2HI = [
 ];
 
 var MORE_HI = [
+  ["New Journey","नया सफ़र"],["ज़्यादा मैच पाने के लिए प्रोफ़ाइल को Edit सेक्शन में पूरा करें।","ज़्यादा मैच पाने के लिए प्रोफ़ाइल को एडिट सेक्शन में पूरा करें।"],["Edit","एडिट"],
+  ["Today's Darshan","आज के दर्शन"],["Add status","स्टेटस जोड़ें"],["Profile strength:","प्रोफ़ाइल की मज़बूती:"],["Complete your profile in the Edit section to get more matches.","ज़्यादा मैच पाने के लिए प्रोफ़ाइल को Edit सेक्शन में पूरा करें।"],["Great — your profile is complete ✅","बढ़िया, आपकी प्रोफ़ाइल पूरी है ✅"],
+  ["Trust & Journey","भरोसा और सफ़र"],["Trust &amp; Journey","भरोसा और सफ़र"],["points to the next level","अंक बाकी अगले स्तर तक"],["top level 🎉","सबसे ऊँचा स्तर 🎉"],["Safety Circle: trusted friends who can see a quick ✅ Safe / 🔶 Need check-in from each other — never your live location. Add someone from their chat's Block/Report menu; it only shows once you've added each other.","सेफ्टी सर्कल: भरोसेमंद दोस्त जो एक-दूसरे का ✅ सुरक्षित / 🔶 चेक-इन चाहिए देख सकते हैं, लाइव लोकेशन कभी नहीं। चैट के ब्लॉक/रिपोर्ट मेन्यू से किसी को जोड़ें; दोनों के जोड़ने पर ही दिखता है।"],
+  ["Soulful ✨","भावपूर्ण ✨"],["Trusted 💎","भरोसेमंद 💎"],["Connector 🌱","जोड़ने वाला 🌱"],["New Journey 🌼","नया सफ़र 🌼"],["Saathi AI","साथी AI"],
+  ["What is one thing you are grateful for today?","आज आप किस बात के लिए आभारी हैं?"],["What is a small win you had this week?","इस हफ़्ते आपकी कोई छोटी जीत क्या रही?"],["Which skill do you wish you had learned earlier?","कौन सा हुनर आप पहले सीख लेते तो अच्छा होता?"],["What is your go-to comfort food?","आपका पसंदीदा आरामदायक खाना क्या है?"],["Who made you smile recently, and how?","हाल में किसने आपको मुस्कुराया, और कैसे?"],["What is a place you want to visit this year?","इस साल आप कौन सी जगह घूमना चाहते हैं?"],["What advice would you give your younger self?","अपने छोटे रूप को आप क्या सलाह देंगे?"],["What is a song that always lifts your mood?","कौन सा गाना हमेशा आपका मूड अच्छा कर देता है?"],["What is something kind you did for someone lately?","हाल में आपने किसी के लिए क्या अच्छा किया?"],["What is the best meal you ever had?","आपने अब तक का सबसे बढ़िया खाना कौन सा खाया?"],
+  ["What's the best thing that happened to you this week?","इस हफ़्ते आपके साथ सबसे अच्छी बात क्या हुई?"],["Chai or coffee? Defend your answer.","चाय या कॉफ़ी? अपने जवाब की वजह बताइए।"],["What song is stuck in your head right now?","अभी कौन सा गाना आपके दिमाग़ में घूम रहा है?"],["Which city would you move to tomorrow, and why?","कल अगर शहर बदलना हो तो कौन सा, और क्यों?"],["What's a small thing that makes your day better?","कौन सी छोटी बात आपका दिन बना देती है?"],["Describe your weekend in three words.","अपना वीकेंड तीन शब्दों में बताइए।"],["What are you learning at the moment?","अभी आप क्या सीख रहे/रही हैं?"],["Which old movie can you watch again and again?","कौन सी पुरानी फ़िल्म आप बार-बार देख सकते हैं?"],
   ["Female singer","गायिका की आवाज़"],["Male singer","गायक की आवाज़"],["Lyrics: Hindi","बोल: हिंदी"],["Lyrics: English","बोल: अंग्रेज़ी"],["Lyrics: Hinglish","बोल: हिंग्लिश"],["Auto voice","अपने आप चुनें"],["Hear voice","आवाज़ सुनें"],
   ["Sing with the voice above (turn off if you record your own)","ऊपर चुनी आवाज़ में गवाएँ (अपनी आवाज़ रिकॉर्ड करें तो बंद कर दें)"],
   ["Interests (up to 6)","रुचियाँ (अधिकतम 6)"],["Pick up to 6 interests","अधिकतम 6 रुचियाँ चुनें"],["Likes you","आपको पसंद करता/करती है"],["Day 1","पहला दिन"],
@@ -125,10 +131,10 @@ function build() {
     var dev = {}, seen = {};
     HI_BY_EN.forEach(function (p) { dev[p[0]] = p[1]; });
     var add = function (k, v) { if (!k || !v || k === v || seen[k]) return; if (!/[A-Za-zऀ-ॿ]/.test(k) || k.trim().length < 2) return; seen[k] = 1; src.push([k, v]); };
+    MORE_HI.forEach(function (x) { add(x[0], x[1]); });
+    EXTRA.forEach(function (x) { add(x[0], x[1]); });
     HI2EN.forEach(function (p) { var v = dev[p[1]]; if (v) { add(p[0], v); add(p[1], v); } });
     EN2HI.forEach(function (p) { add(p[0], dev[p[0]] || p[1]); });
-    EXTRA.forEach(function (x) { add(x[0], x[1]); });
-    MORE_HI.forEach(function (x) { add(x[0], x[1]); });
   }
   list = src.slice().sort(function (a, b) { return b[0].length - a[0].length; });
 }
