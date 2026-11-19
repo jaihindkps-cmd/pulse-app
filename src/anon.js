@@ -226,9 +226,9 @@ function sigOut(kind, extra) { if (!S) return Promise.resolve(); return addDoc(c
 function media(video) {
   return Call.getMedia(video).then(function (raw) {
     if (!video) return { raw: raw, stream: raw, mask: null };
-    var mk = createMask(raw, { style: S && S.style || "venetian" });
-    if (!mk) { raw.getTracks().forEach(function (t) { t.stop(); }); throw new Error(T("This phone can’t mask video, so only voice calls are available.", "यह फ़ोन वीडियो पर मास्क नहीं लगा सकता, इसलिए सिर्फ़ वॉइस कॉल हो सकती है।")); }
-    return { raw: raw, stream: mk.stream, mask: mk };
+    var fail = function () { raw.getTracks().forEach(function (t) { t.stop(); }); throw new Error(T("The privacy mask could not start on this phone, so only voice calls are available.", "इस फ़ोन पर प्राइवेसी मास्क शुरू नहीं हो पाया, इसलिए सिर्फ़ वॉइस कॉल हो सकती है।")); };
+    var mk = createMask(raw, { style: S && S.style || "venetian" }); if (!mk) return fail();
+    return Promise.race([mk.ready, new Promise(function (_, rj) { setTimeout(function () { rj(new Error("timeout")); }, 25000); })]).then(function () { return { raw: raw, stream: mk.stream, mask: mk }; }, function () { mk.stop(); return fail(); });
   });
 }
 function attempt(video, role, m) { return { video: video, role: role, raw: m.raw, stream: m.stream, mask: m.mask, pc: null, remote: null, t0: Date.now(), stopAdapt: null, timer: null }; }
@@ -320,8 +320,8 @@ function paintMaskTray() {
 }
 function hintTick(a) {
   var h = $("anHint"); if (!a.mask) { h.hidden = true; return; } var i = a.mask.info(), msg = "";
-  if (i === "guide") msg = T("Face tracking isn’t available on this phone — keep your face inside the middle of the picture.", "इस फ़ोन पर फेस ट्रैकिंग नहीं है — चेहरा तस्वीर के बीच में रखो।");
-  else if (i === "lost") msg = T("Face not found — picture is hidden until you’re back in view.", "चेहरा नहीं मिला — वापस आने तक तस्वीर छुपी है।");
+  if (i === "lost") msg = T("Face not found — the picture stays hidden until your face is back in view.", "चेहरा नहीं मिला — चेहरा वापस आने तक तस्वीर छुपी रहेगी।");
+  else if (i === "load" || i === "search") msg = T("Starting privacy mask…", "प्राइवेसी मास्क शुरू हो रहा है…");
   else if (i === "off") msg = T("Your real face is visible right now.", "अभी तुम्हारा असली चेहरा दिख रहा है।");
   h.textContent = msg; h.hidden = !msg;
 }
