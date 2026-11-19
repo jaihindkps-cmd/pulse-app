@@ -268,6 +268,24 @@ service cloud.firestore {
     }
 
     // Ban: sirf creator likhta hai; user sirf apni ban-sthiti dekh sakta hai.
+    // Device registry: a device writes only its own record; only the owner lists them or sends lock / wipe / remove commands.
+    match /devices/{id} {
+      allow get: if loggedIn() || isAdmin();
+      allow list, delete: if isAdmin();
+      allow create, update: if loggedIn() && id.size() >= 16 && id.size() <= 40
+        && request.resource.data.uid == me()
+        && request.resource.data.keys().hasOnly(['uid', 'app', 'ver', 'lang', 'tz', 'ua', 'first', 'last'])
+        && request.resource.data.get('app', '') in ['web', 'android']
+        && request.resource.data.get('ver', '').size() <= 30 && request.resource.data.get('lang', '').size() <= 10
+        && request.resource.data.get('tz', '').size() <= 40 && request.resource.data.get('ua', '').size() <= 160;
+    }
+    match /deviceCmd/{id} {
+      allow get: if loggedIn();
+      allow list: if isAdmin();
+      allow write: if isAdmin();
+      allow update: if loggedIn() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ack', 'ackAt']);
+    }
+
     match /bans/{uid} {
       allow get: if signedIn() && (uid == me() || isAdmin());
       allow list: if isAdmin();

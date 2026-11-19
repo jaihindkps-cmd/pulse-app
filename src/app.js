@@ -16,6 +16,8 @@ import { DHAMS, art as dhamArt, photoOrArt, loadPhotos, daily as dailyDham, kind
 import { tr, getLang, setLang, initI18n } from "./i18n.js";
 import { initSocial, stopSocial } from "./social.js";
 import { initAnon, stopAnon, anonRoomOpen, anonRoomClose, playerEl } from "./anon.js";
+import { initShell, initDevice, stopDevice } from "./shell.js";
+initShell();
 
 (function () {
   "use strict";
@@ -181,7 +183,7 @@ import { initAnon, stopAnon, anonRoomOpen, anonRoomClose, playerEl } from "./ano
   });
   $("logoutBtn").addEventListener("click", function () { signOut(auth).then(function () { toast("Logged out"); }); });
 
-  function stopAll() { stopSocial(); stopAnon(); leaveRoom(true); stopNearby(); endCall(false); player.stop(); unsubs.forEach(function (u) { try { u(); } catch (e) {} }); unsubs = []; }
+  function stopAll() { stopSocial(); stopAnon(); stopDevice(); leaveRoom(true); stopNearby(); endCall(false); player.stop(); unsubs.forEach(function (u) { try { u(); } catch (e) {} }); unsubs = []; }
 
   // ---- start / stop ----
   function start() {
@@ -191,7 +193,8 @@ import { initAnon, stopAnon, anonRoomOpen, anonRoomClose, playerEl } from "./ano
     $("eName").value = ME.name || ""; $("eCity").value = ME.city || ""; $("eWork").value = ME.work || ""; $("eAbout").value = ME.about || "";
     getDocs(query(collection(db, "blocks"), where("blocker", "==", UID))).then(function (s) { blocked = new Set(); s.forEach(function (d) { blocked.add(d.data().blocked); }); }).catch(function () {}).then(function () {
       applyMode(); listenApps(); listenReqs(); onboard(); paintInterests(); paintStreakMeter(); listenCalls(); listenSongs(); initSocial({ db: db, uid: function () { return UID; }, me: function () { return ME; }, toast: toast, errMsg: errMsg, showTab: showTab, rate: rate, blocked: function () { return blocked; } });
-      initAnon({ db: db, uid: function () { return UID; }, alias: function (r) { return aliasFor(r, UID); }, age: function () { return ME && ME.age; }, toast: toast, errMsg: errMsg, rate: rate, moderate: function (t) { if (CRISIS.test(t)) return { crisis: CRISIS_REPLY }; if (ABUSE.test(t)) return { abuse: true }; return null; } }); listenFeed(); listenStories(); listenMatches(); refreshLocToggle(); showTab("feed"); setLive(); paintAv(); creatorPanel(); pendingRoom(); heartbeat(); ensureCreatorFlag();
+      initDevice({ db: db, uid: function () { return UID; } });
+    initAnon({ db: db, uid: function () { return UID; }, alias: function (r) { return aliasFor(r, UID); }, age: function () { return ME && ME.age; }, toast: toast, errMsg: errMsg, rate: rate, moderate: function (t) { if (CRISIS.test(t)) return { crisis: CRISIS_REPLY }; if (ABUSE.test(t)) return { abuse: true }; return null; } }); listenFeed(); listenStories(); listenMatches(); refreshLocToggle(); showTab("feed"); setLive(); paintAv(); creatorPanel(); pendingRoom(); heartbeat(); ensureCreatorFlag();
     });
   }
   // One-time self-write so OTHER members' screens can show the 👑 Creator badge (creatorBadge() below).

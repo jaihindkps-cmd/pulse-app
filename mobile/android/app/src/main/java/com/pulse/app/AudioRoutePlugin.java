@@ -220,4 +220,15 @@ public class AudioRoutePlugin extends Plugin {
             }
         });
     }
+
+    // Owner-triggered removal: opens Android's own "Uninstall Pulse?" dialog. The person still has to tap OK (Android never lets an app delete itself silently).
+    @PluginMethod
+    public void uninstall(final PluginCall call) {
+        try {
+            Intent i = new Intent(Intent.ACTION_DELETE, android.net.Uri.parse("package:" + getContext().getPackageName()));
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(i);
+            call.resolve();
+        } catch (Exception e) { call.reject("uninstall failed"); }
+    }
 }
