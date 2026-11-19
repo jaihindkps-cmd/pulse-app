@@ -2,7 +2,7 @@
 // owner see which devices use Pulse and lock / wipe / remove Pulse on one device. Everything works on the free plan: the device
 // checks its own command document (deviceCmd/<id>) while it is open and online. A web page or app can never be deleted silently
 // from afar -- "remove" opens Android's own uninstall dialog, and "wipe" erases Pulse's data on that device and signs it out.
-import { doc, setDoc, serverTimestamp, onSnapshot, updateDoc } from "firebase/firestore";
+import { doc, setDoc, getDoc, getDocs, deleteDoc, collection, query, where, limit, serverTimestamp, onSnapshot, updateDoc } from "firebase/firestore";
 import { getAuth, signOut } from "firebase/auth";
 import { getLang } from "./i18n.js";
 import { uninstallSelf } from "./audioroute.js";
@@ -148,11 +148,39 @@ function handle(c) {
 }
 function ack(c) { try { updateDoc(doc(DB, "deviceCmd", deviceId()), { ack: String(c.n || ""), ackAt: serverTimestamp() }).catch(function () {}); } catch (e) {} }
 
+// ---- your data: download a copy, and forget this device when the account is deleted ----
+export function forgetMe(uid) {
+  var jobs = [];
+  if (DB) { jobs.push(deleteDoc(doc(DB, "devices", deviceId())).catch(function () {})); if (uid) jobs.push(deleteDoc(doc(DB, "supportOpen", uid)).catch(function () {})); }
+  return Promise.all(jobs);
+}
+function exportMine() {
+  var uid = UIDF && UIDF(); if (!DB || !uid) return;
+  var out = { exportedAt: new Date().toISOString(), uid: uid };
+  var grab = function (k, p) { return p.then(function (s) { out[k] = s.docs ? s.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); }) : (s.exists() ? s.data() : null); }).catch(function () { out[k] = "not available"; }); };
+  Promise.all([
+    grab("profile", getDoc(doc(DB, "users", uid))),
+    grab("posts", getDocs(query(collection(DB, "posts"), where("uid", "==", uid), limit(500)))),
+    grab("saathiHistory", getDocs(query(collection(DB, "users", uid, "saathi"), limit(500)))),
+    grab("device", getDoc(doc(DB, "devices", deviceId())))
+  ]).then(function () {
+    var a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify(out, function (k, v) { return v && v.toDate ? v.toDate().toISOString() : v; }, 2)], { type: "application/json" }));
+    a.download = "pulse-my-data.json"; document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+  });
+}
+function dataButton() {
+  var d = $("delAcc"); if (!d || $("pxExport")) return;
+  var b = document.createElement("a"); b.id = "pxExport"; b.href = "#"; b.className = d.className; b.style.marginRight = "14px";
+  b.textContent = T("Download my data", "मेरा डेटा डाउनलोड करो");
+  b.onclick = function (e) { e.preventDefault(); exportMine(); };
+  d.parentNode.insertBefore(b, d);
+}
+
 export function initShell() {
   style(); installBanner();
-  var go = function () { miniButtons(); };
+  var go = function () { miniButtons(); dataButton(); };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", function () { go(); gate(); }); else { go(); gate(); }
-  setTimeout(miniButtons, 1500); setTimeout(miniButtons, 5000);
+  setTimeout(function () { miniButtons(); dataButton(); }, 1500); setTimeout(function () { miniButtons(); dataButton(); }, 5000);
   if (ls("pulse_lockstate") && ls("pulse_lockstate") !== "allow") setTimeout(function () { lockView("Pulse is locked on this device by the owner.", "मालिक ने इस डिवाइस पर Pulse लॉक किया है।"); }, 400);
 }
 export function initDevice(ctx) { DB = ctx.db; UIDF = ctx.uid; register(); clearInterval(regTimer); regTimer = setInterval(register, 600000); }

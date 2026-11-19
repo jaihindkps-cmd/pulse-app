@@ -31,9 +31,10 @@ fetch("/firebase-config.json").then(function (r) { return r.json(); }).then(func
     root.innerHTML = "Loading…";
     getDocs(query(collection(db, "reports"), orderBy("createdAt", "desc"), limit(50))).then(function (s) {
       if (s.empty) { root.innerHTML = out() + tabs() + "<p>No reports.</p>"; bind(); return; }
+      var cnt = {}; s.docs.forEach(function (d) { var k = d.data().against; if (k) cnt[k] = (cnt[k] || 0) + 1; });
       root.innerHTML = out() + tabs() + s.docs.map(function (d) {
         var r = d.data();
-        return '<div class="c"><b>' + esc(r.reason) + '</b> <small>' + esc(r.createdAt && r.createdAt.toDate ? r.createdAt.toDate().toLocaleString() : "") + '</small><br>against: <code>' + esc(r.against || r.target || "?") + '</code><pre>' + esc(r.log || "") + '</pre><button data-ban="' + esc(r.against || "") + '">Ban user</button> <button data-del="' + d.id + '">Dismiss</button></div>';
+        return '<div class="c"><b>' + esc(r.reason) + '</b> <small>' + esc(r.createdAt && r.createdAt.toDate ? r.createdAt.toDate().toLocaleString() : "") + '</small><br>against: <code>' + esc(r.against || r.target || "?") + '</code>' + (cnt[r.against] > 1 ? ' <b style="color:#c00">reported ' + cnt[r.against] + '×</b>' : '') + '<pre>' + esc(r.log || "") + '</pre><button data-ban="' + esc(r.against || "") + '">Ban user</button> <button data-del="' + d.id + '">Dismiss</button></div>';
       }).join("");
       bind();
     }).catch(function () { root.innerHTML = "<p>Not allowed. Sign in with the owner account.</p>" + out(); bind(); });

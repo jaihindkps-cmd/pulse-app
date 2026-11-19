@@ -16,7 +16,7 @@ import { DHAMS, art as dhamArt, photoOrArt, loadPhotos, daily as dailyDham, kind
 import { tr, getLang, setLang, initI18n } from "./i18n.js";
 import { initSocial, stopSocial } from "./social.js";
 import { initAnon, stopAnon, anonRoomOpen, anonRoomClose, playerEl } from "./anon.js";
-import { initShell, initDevice, stopDevice } from "./shell.js";
+import { initShell, initDevice, stopDevice, forgetMe } from "./shell.js";
 initShell();
 
 (function () {
@@ -1685,7 +1685,7 @@ initShell();
     var u = auth.currentUser, id = UID;
     getDocs(query(collection(db, "posts"), where("uid", "==", id), limit(200))).then(function (s) { return Promise.all(s.docs.map(function (d) { return deleteDoc(d.ref); })); }).catch(function () {})
       .then(function () { return getDocs(query(collection(db, "users", id, "saathi"), limit(300))).then(function (s) { return Promise.all(s.docs.map(function (d) { return deleteDoc(d.ref); })); }); }).catch(function () {})
-      .then(function () { return deleteDoc(doc(db, "presence", id)).catch(function () {}); })
+      .then(function () { return forgetMe(id).then(function () { return deleteDoc(doc(db, "presence", id)); }).catch(function () {}); })
       .then(function () { return deleteDoc(doc(db, "users", id)); })
       .then(function () { return deleteUser(u); })
       .then(function () { toast("Account deleted"); }).catch(function (er) { toast(er && er.code === "auth/requires-recent-login" ? "Please log in again, then delete" : errMsg(er)); });

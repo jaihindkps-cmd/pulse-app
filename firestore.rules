@@ -271,7 +271,8 @@ service cloud.firestore {
     // Device registry: a device writes only its own record; only the owner lists them or sends lock / wipe / remove commands.
     match /devices/{id} {
       allow get: if loggedIn() || isAdmin();
-      allow list, delete: if isAdmin();
+      allow list: if isAdmin();
+      allow delete: if isAdmin() || (loggedIn() && resource.data.uid == me());
       allow create, update: if loggedIn() && id.size() >= 16 && id.size() <= 40
         && request.resource.data.uid == me()
         && request.resource.data.keys().hasOnly(['uid', 'app', 'ver', 'lang', 'tz', 'ua', 'first', 'last'])
