@@ -169,6 +169,7 @@ export function createMask(raw, opts) {
   }
   function loop() {
     if (st.stopped) return;
+    if (st.busy && performance.now() - st.t1 > 4000) { st.busy = false; DET = null; loadDetector().then(function (d) { st.det = d; }, function () {}); } // detector hung: restart it (the last masked frame stays on screen meanwhile)
     step().then(next, next);
     function next() { if (st.stopped) return; if (document.hidden) st.timer = setTimeout(loop, 60); else st.raf = requestAnimationFrame(loop); }
   }

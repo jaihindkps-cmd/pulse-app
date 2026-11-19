@@ -311,13 +311,15 @@ service cloud.firestore {
           && request.resource.data.text is string && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 300
           && request.resource.data.get('audio', '').size() <= 280000;
       }
-      // "Open for private talk" presence: one doc per person (id = uid), alias only.
-      match /open/{u} {
-        allow read: if signedIn();
-        allow create, update: if signedIn() && notBanned() && u == me()
-          && request.resource.data.alias is string && request.resource.data.alias.size() <= 30;
-        allow delete: if signedIn() && u == me();
-      }
+    }
+
+    // "Open for private talk" presence (one doc per person, id = uid): a random alias and the circle they are in. No name, no profile.
+    match /supportOpen/{u} {
+      allow read: if signedIn();
+      allow create, update: if signedIn() && notBanned() && u == me()
+        && request.resource.data.alias is string && request.resource.data.alias.size() <= 30
+        && request.resource.data.get('topic', '').size() <= 40;
+      allow delete: if signedIn() && u == me();
     }
 
     // Private anonymous talk between two support-circle members: request -> accepted -> chat / voice notes / call signalling.

@@ -109,8 +109,9 @@ function waitIce(pc, ms) {
   });
 }
 
-function mk(stream, onTrack, onState, onData) {
-  var pc = new RTCPeerConnection(ICE);
+function mk(stream, onTrack, onState, onData, relay) {
+  // relay=true (private anonymous talks): media goes only through the TURN relay, so the other person never learns your IP address.
+  var pc = new RTCPeerConnection(relay ? { iceServers: ICE.iceServers, iceTransportPolicy: "relay" } : ICE);
   try { pc.fx = pc.createDataChannel("fx", { negotiated: true, id: 1 }); pc.fx.onmessage = function (e) { if (onData) onData(e.data); }; } catch (e) {}
   stream.getTracks().forEach(function (t) { pc.addTrack(t, stream); });
   try {
@@ -123,16 +124,16 @@ function mk(stream, onTrack, onState, onData) {
   return pc;
 }
 
-export async function makeOffer(stream, onTrack, onState, onData) {
-  var pc = mk(stream, onTrack, onState, onData);
+export async function makeOffer(stream, onTrack, onState, onData, relay) {
+  var pc = mk(stream, onTrack, onState, onData, relay);
   var of = await pc.createOffer(); of.sdp = hq(of.sdp); await pc.setLocalDescription(of);
   tune(pc);
   await waitIce(pc, 5000);
   return { pc: pc, sdp: pc.localDescription.sdp };
 }
 
-export async function makeAnswer(stream, offerSdp, onTrack, onState, onData) {
-  var pc = mk(stream, onTrack, onState, onData);
+export async function makeAnswer(stream, offerSdp, onTrack, onState, onData, relay) {
+  var pc = mk(stream, onTrack, onState, onData, relay);
   await pc.setRemoteDescription({ type: "offer", sdp: offerSdp });
   var an = await pc.createAnswer(); an.sdp = hq(an.sdp); await pc.setLocalDescription(an);
   tune(pc);
