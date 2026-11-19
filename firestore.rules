@@ -261,7 +261,8 @@ service cloud.firestore {
     // Report: likh sakte ho, padh nahi (sirf admin console me dikhti hain).
     match /reports/{id} {
       allow create: if signedIn() && request.resource.data.from == me()
-        && request.resource.data.get('reason', '').size() <= 200;
+        && request.resource.data.get('reason', '').size() <= 200
+        && request.resource.data.get('log', '').size() <= 4000;
       // Creator sirf reports padh sakta hai (aur kuch nahi).
       allow read, delete: if isAdmin();
     }

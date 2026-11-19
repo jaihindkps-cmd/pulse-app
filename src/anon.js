@@ -6,6 +6,7 @@ import * as Call from "./call.js";
 import { createMask, maskSupported, MASKS } from "./mask.js";
 import { serviceStart, serviceStop, routeStart, routeStop } from "./audioroute.js";
 import { getLang } from "./i18n.js";
+import { secureScreen } from "./audioroute.js";
 import { disguise, disguiseSupported, VOICES } from "./disguise.js";
 
 var C = null, R = null, S = null, INC = null, OUT = null, G = { unsubs: [] }, REC = null, RES = null, P = { open: false, others: {}, tick: null, cool: {} };
@@ -78,6 +79,7 @@ function watch(q, next, fail) {
 }
 // One-time privacy notice + rules. Nothing private starts until the person has read and agreed to it.
 function consent(go) {
+  if (!adult()) { C.toast(T("Private Talk is for 18+ only.", "प्राइवेट बातचीत सिर्फ़ 18+ के लिए है।")); return; }
   var ok = false; try { ok = localStorage.getItem("pulse_anon_ok") === "1"; } catch (e) {} if (ok) { go(); return; }
   var m = $("anTerms"); if (!m) { m = el('<div id="anTerms" class="an-terms"></div>'); document.body.appendChild(m); }
   var li = function (i, t) { return '<li><span>' + i + '</span><div>' + esc(t) + '</div></li>'; };
@@ -93,6 +95,11 @@ function consent(go) {
   m.hidden = false; $("anTermsNo").onclick = function () { m.hidden = true; };
   $("anTermsOk").onclick = function () { try { localStorage.setItem("pulse_anon_ok", "1"); } catch (e) {} m.hidden = true; go(); };
 }
+// People you block never appear in your list and their requests are ignored. Kept only on this phone.
+function blocked() { try { return JSON.parse(localStorage.getItem("pulse_blocked") || "[]"); } catch (e) { return []; } }
+function isBlocked(u) { return blocked().indexOf(u) >= 0; }
+function block(u) { if (!u) return; var b = blocked(); if (b.indexOf(u) < 0) { b.push(u); try { localStorage.setItem("pulse_blocked", JSON.stringify(b.slice(-200))); } catch (e) {} } }
+function adult() { var a = parseInt(C && C.age && C.age(), 10); return !a || a >= 18; }
 function css() { if ($("anonCss")) return; var s = document.createElement("style"); s.id = "anonCss"; s.textContent = CSS; document.head.appendChild(s); }
 function shell() {
   if ($("anonUI")) return;
@@ -176,7 +183,7 @@ export function anonRoomClose() {
   if (!R) return; R = null;
   if ($("anonUI")) $("anonUI").hidden = true; var l = $("anLock"), m = $("anMic"); if (l) l.remove(); if (m) m.remove();
 }
-function openOthers() { return Object.keys(P.others).filter(function (k) { return k !== uid() && openFresh(P.others[k]); }); }
+function openOthers() { return Object.keys(P.others).filter(function (k) { return k !== uid() && !isBlocked(k) && openFresh(P.others[k]); }); }
 function paintCount() {
   var n = openOthers().length, txt = n ? T("🔒 Private talk · " + n + " open", "🔒 प्राइवेट बातचीत · " + n + " उपलब्ध") : T("🔒 Private talk", "🔒 प्राइवेट बातचीत");
   var b = $("anLockN"); if (b) { b.textContent = n; b.hidden = !n; } var p = $("anPickBtn"); if (p) p.textContent = txt;
@@ -234,7 +241,7 @@ function showResume(id, other, oAlias, myA) {
 function hideResume() { RES = null; var b = $("anRes"); if (b) { b.hidden = true; b.innerHTML = ""; } }
 function reqChange(ch, inbound) {
   var x = dd(ch.doc), id = ch.doc.id, age = Date.now() - ms(x.createdAt), fresh = Date.now() - ms(x.updatedAt || x.createdAt) < 3 * 3600000;
-  if (x.status === "pending" && inbound && ch.type === "added" && age < 120000) showIncoming(id, x);
+  if (x.status === "pending" && inbound && ch.type === "added" && age < 120000) { if (isBlocked(x.from)) updateDoc(ch.doc.ref, { status: "declined", updatedAt: serverTimestamp() }).catch(function () {}); else showIncoming(id, x); }
   else if (x.status === "pending" && !inbound && ch.type === "added" && age > 180000) deleteDoc(ch.doc.ref).catch(function () {});
   else if (x.status === "cancelled" && inbound) { if (INC && INC.id === id) hideIncoming(); deleteDoc(ch.doc.ref).catch(function () {}); }
   else if (x.status === "accepted" && !inbound && OUT && OUT.id === id) { var o = OUT; OUT = null; clearTimeout(o.timer); paintOut(); openSession(id, x.to, x.toAlias, x.fromAlias); }
@@ -246,11 +253,13 @@ function reqChange(ch, inbound) {
 // ---------------------------------------------------------------- private session
 function openSession(rid, other, otherAlias, myAlias) {
   if (S) return; if (!$("anonUI").hidden) $("anonUI").hidden = true; hideResume(); $("anOut").hidden = true;
+  secureScreen(true);
   S = { rid: rid, other: other, oAlias: otherAlias || "Someone", alias: myAlias || "Me", unsubs: [], cur: null, nxt: null, offer: null, mutedL: false };
   $("anSName").textContent = S.oAlias; $("anSMsgs").innerHTML = ""; $("anonSess").hidden = false; $("anSInput").value = "";
   paintMaskTray();
   S.unsubs.push(watch(query(collection(C.db, "supportReq", rid, "msgs"), orderBy("createdAt", "asc"), limit(80)), function (s) {
     var box = $("anSMsgs"); if (!box || !S || S.rid !== rid) return; box.innerHTML = '<div class="an-note">' + esc(T("Say hi. Only aliases are visible here. When the talk ends, this chat is erased. If you feel unsafe or in crisis, call Tele-MANAS 14416 (free, India).", "नमस्ते कहो। यहाँ सिर्फ़ alias दिखते हैं। बातचीत खत्म होते ही चैट मिट जाती है। खुद को असुरक्षित या संकट में महसूस करो तो Tele-MANAS 14416 (मुफ़्त, भारत) पर कॉल करो।")) + '</div>';
+    S.log = s.docs.map(function (d) { var m = dd(d); return (m.from === uid() ? "me: " : "them: ") + (m.audio ? "[voice note]" : String(m.text || "").slice(0, 160)); }).slice(-12);
     s.docs.forEach(function (d) { var m = dd(d), mine = m.from === uid(), b = el('<div class="an-m ' + (mine ? "me" : "") + '"></div>'); if (m.audio) b.appendChild(playerEl(m.audio, m.dur)); else b.textContent = m.text || ""; box.appendChild(b); });
     box.scrollTop = 1e9;
   }, function (e) { C.toast(C.errMsg(e)); }));
@@ -268,12 +277,12 @@ function sessionSend() {
 }
 function sessionSendAudio(url, dur) { if (!S) return; if (!C.rate("anvoice", 4, 60000)) return; return addDoc(collection(C.db, "supportReq", S.rid, "msgs"), { from: uid(), text: "🎤", audio: url, dur: dur, createdAt: serverTimestamp() }); }
 function sessionMenu() {
-  if (!S) return; var n = $("anInc"); n.innerHTML = '<p>' + esc(T("Private talk options", "प्राइवेट बातचीत के विकल्प")) + '</p><div class="an-r"><button type="button" class="an-btn alt" id="anMenuIp">' + esc((RELAY ? "🛰️ " : "⚠️ ") + T("Hide my IP: ", "IP छुपाओ: ") + (RELAY ? T("On", "चालू") : T("Off", "बंद"))) + '</button><button type="button" class="an-btn alt" id="anMenuX">' + esc(T("Close", "बंद")) + '</button><button type="button" class="an-btn red" id="anMenuRep">' + esc(T("Report & end", "रिपोर्ट करो और खत्म")) + '</button><button type="button" class="an-btn" id="anMenuEnd">' + esc(T("End talk", "बातचीत खत्म")) + '</button></div>'; n.hidden = false;
-  $("anMenuX").onclick = function () { n.hidden = true; }; $("anMenuIp").onclick = function () { RELAY = !RELAY; try { localStorage.setItem("pulse_relay", RELAY ? "1" : "0"); } catch (e) {} n.hidden = true; C.toast(RELAY ? T("Your IP address is hidden from the other person (next call).", "दूसरे से तुम्हारा IP छुपा रहेगा (अगली कॉल से)।") : T("Calls are now direct — the other person’s phone can see your IP. Use only if calls won’t connect.", "अब कॉल सीधी होगी — दूसरे के फ़ोन को तुम्हारा IP दिख सकता है। सिर्फ़ तब इस्तेमाल करो जब कॉल न जुड़े।")); }; $("anMenuEnd").onclick = function () { n.hidden = true; sessionEnd(true); };
-  $("anMenuRep").onclick = function () { n.hidden = true; var s = S; if (!s) return; addDoc(collection(C.db, "reports"), { from: uid(), against: s.other, reason: "support-private", rid: s.rid, createdAt: serverTimestamp() }).catch(function () {}); C.toast(T("Reported. Thank you for keeping this safe.", "रिपोर्ट हो गई। सुरक्षित रखने के लिए शुक्रिया।")); sessionEnd(true); };
+  if (!S) return; var n = $("anInc"); n.innerHTML = '<p>' + esc(T("Private talk options", "प्राइवेट बातचीत के विकल्प")) + '</p><div class="an-r"><button type="button" class="an-btn alt" id="anMenuIp">' + esc((RELAY ? "🛰️ " : "⚠️ ") + T("Hide my IP: ", "IP छुपाओ: ") + (RELAY ? T("On", "चालू") : T("Off", "बंद"))) + '</button><button type="button" class="an-btn alt" id="anMenuBlk">' + esc(T("Block & end", "ब्लॉक करो और खत्म")) + '</button><button type="button" class="an-btn alt" id="anMenuX">' + esc(T("Close", "बंद")) + '</button><button type="button" class="an-btn red" id="anMenuRep">' + esc(T("Report & end", "रिपोर्ट करो और खत्म")) + '</button><button type="button" class="an-btn" id="anMenuEnd">' + esc(T("End talk", "बातचीत खत्म")) + '</button></div>'; n.hidden = false;
+  $("anMenuBlk").onclick = function () { n.hidden = true; var s = S; if (!s) return; block(s.other); C.toast(T("Blocked. You will not see each other again.", "ब्लॉक हो गया। आप दोनों दोबारा नहीं दिखोगे।")); sessionEnd(true); }; $("anMenuX").onclick = function () { n.hidden = true; }; $("anMenuIp").onclick = function () { RELAY = !RELAY; try { localStorage.setItem("pulse_relay", RELAY ? "1" : "0"); } catch (e) {} n.hidden = true; C.toast(RELAY ? T("Your IP address is hidden from the other person (next call).", "दूसरे से तुम्हारा IP छुपा रहेगा (अगली कॉल से)।") : T("Calls are now direct — the other person’s phone can see your IP. Use only if calls won’t connect.", "अब कॉल सीधी होगी — दूसरे के फ़ोन को तुम्हारा IP दिख सकता है। सिर्फ़ तब इस्तेमाल करो जब कॉल न जुड़े।")); }; $("anMenuEnd").onclick = function () { n.hidden = true; sessionEnd(true); };
+  $("anMenuRep").onclick = function () { n.hidden = true; var s = S; if (!s) return; addDoc(collection(C.db, "reports"), { from: uid(), against: s.other, reason: "support-private", rid: s.rid, log: (s.log || []).join("\n").slice(0, 3500), createdAt: serverTimestamp() }).catch(function () {}); block(s.other); C.toast(T("Reported and blocked. Thank you for keeping this safe.", "रिपोर्ट और ब्लॉक हो गया। सुरक्षित रखने के लिए शुक्रिया।")); sessionEnd(true); };
 }
 function sessionEnd(notify, note) {
-  if (!S) return; var s = S; S = null; closeCallUi(s); s.unsubs.forEach(function (u) { try { u(); } catch (e) {} });
+  if (!S) return; var s = S; S = null; secureScreen(false); closeCallUi(s); s.unsubs.forEach(function (u) { try { u(); } catch (e) {} });
   $("anonSess").hidden = true; $("anInc").hidden = true;
   if (notify) {
     updateDoc(doc(C.db, "supportReq", s.rid), { status: "ended", endedBy: uid(), updatedAt: serverTimestamp() }).catch(function () {});

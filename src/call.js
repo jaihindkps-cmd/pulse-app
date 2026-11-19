@@ -5,8 +5,8 @@
 // STUN finds the public address; TURN relays the (still encrypted) media when a direct path is blocked, which is common on
 // mobile data (carrier NAT). Without TURN many calls connect but carry no voice.
 var ICE = { iceServers: [
-  { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
-  { urls: ["turn:openrelay.metered.ca:80", "turn:openrelay.metered.ca:443", "turn:openrelay.metered.ca:443?transport=tcp", "turns:openrelay.metered.ca:443?transport=tcp"], username: "openrelayproject", credential: "openrelayproject" }
+  { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302", "stun:stun.cloudflare.com:3478", "stun:stun.nextcloud.com:443"] },
+  { urls: ["turn:openrelay.metered.ca:80", "turn:openrelay.metered.ca:443", "turn:openrelay.metered.ca:443?transport=tcp", "turns:openrelay.metered.ca:443?transport=tcp", "turn:staticauth.openrelay.metered.ca:80", "turn:staticauth.openrelay.metered.ca:443?transport=tcp", "turns:staticauth.openrelay.metered.ca:443?transport=tcp"], username: "openrelayproject", credential: "openrelayproject" }
 ] };
 
 export function supported() { return !!(window.RTCPeerConnection && navigator.mediaDevices && navigator.mediaDevices.getUserMedia); }
