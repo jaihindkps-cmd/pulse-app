@@ -15,6 +15,7 @@ import { FILTERS, STICKERS, effectsSupported, createEffects } from "./effects.js
 import { DHAMS, art as dhamArt, photoOrArt, loadPhotos, daily as dailyDham, kindName, kindSym, loadDeityPhotos } from "./dham.js";
 import { tr, getLang, setLang, initI18n } from "./i18n.js";
 import { initSocial, stopSocial } from "./social.js";
+import { initAnon, stopAnon, anonRoomOpen, anonRoomClose, playerEl } from "./anon.js";
 
 (function () {
   "use strict";
@@ -180,7 +181,7 @@ import { initSocial, stopSocial } from "./social.js";
   });
   $("logoutBtn").addEventListener("click", function () { signOut(auth).then(function () { toast("Logged out"); }); });
 
-  function stopAll() { stopSocial(); leaveRoom(true); stopNearby(); endCall(false); player.stop(); unsubs.forEach(function (u) { try { u(); } catch (e) {} }); unsubs = []; }
+  function stopAll() { stopSocial(); stopAnon(); leaveRoom(true); stopNearby(); endCall(false); player.stop(); unsubs.forEach(function (u) { try { u(); } catch (e) {} }); unsubs = []; }
 
   // ---- start / stop ----
   function start() {
@@ -189,7 +190,8 @@ import { initSocial, stopSocial } from "./social.js";
     $("pName").innerHTML = esc(ME.name) + creatorBadge(ME); $("pHandle").textContent = ME.city || "";
     $("eName").value = ME.name || ""; $("eCity").value = ME.city || ""; $("eWork").value = ME.work || ""; $("eAbout").value = ME.about || "";
     getDocs(query(collection(db, "blocks"), where("blocker", "==", UID))).then(function (s) { blocked = new Set(); s.forEach(function (d) { blocked.add(d.data().blocked); }); }).catch(function () {}).then(function () {
-      applyMode(); listenApps(); listenReqs(); onboard(); paintInterests(); paintStreakMeter(); listenCalls(); listenSongs(); initSocial({ db: db, uid: function () { return UID; }, me: function () { return ME; }, toast: toast, errMsg: errMsg, showTab: showTab, rate: rate, blocked: function () { return blocked; } }); listenFeed(); listenStories(); listenMatches(); refreshLocToggle(); showTab("feed"); setLive(); paintAv(); creatorPanel(); pendingRoom(); heartbeat(); ensureCreatorFlag();
+      applyMode(); listenApps(); listenReqs(); onboard(); paintInterests(); paintStreakMeter(); listenCalls(); listenSongs(); initSocial({ db: db, uid: function () { return UID; }, me: function () { return ME; }, toast: toast, errMsg: errMsg, showTab: showTab, rate: rate, blocked: function () { return blocked; } });
+      initAnon({ db: db, uid: function () { return UID; }, toast: toast, errMsg: errMsg, rate: rate, moderate: function (t) { if (CRISIS.test(t)) return { crisis: CRISIS_REPLY }; if (ABUSE.test(t)) return { abuse: true }; return null; } }); listenFeed(); listenStories(); listenMatches(); refreshLocToggle(); showTab("feed"); setLive(); paintAv(); creatorPanel(); pendingRoom(); heartbeat(); ensureCreatorFlag();
     });
   }
   // One-time self-write so OTHER members' screens can show the 👑 Creator badge (creatorBadge() below).
@@ -1112,12 +1114,15 @@ import { initSocial, stopSocial } from "./social.js";
       body.querySelectorAll(".sc-msg").forEach(function (n) { n.remove(); });
       s.forEach(function (d) {
         var m = snapData(d), mine = m.from === UID;
-        body.appendChild(el('<div class="bubble sc-msg ' + (mine ? "me" : "them") + '" style="max-width:85%"><b style="display:block;font-size:11px;opacity:.7">' + esc(mine ? "Tum" : m.alias || "Koi") + '</b>' + esc(m.text) + '</div>'));
+        var bub = el('<div class="bubble sc-msg ' + (mine ? "me" : "them") + '" style="max-width:85%"><b style="display:block;font-size:11px;opacity:.7">' + esc(mine ? "Tum" : m.alias || "Koi") + '</b><span class="sc-t"></span></div>');
+        if (m.audio) bub.querySelector(".sc-t").appendChild(playerEl(m.audio, m.dur)); else bub.querySelector(".sc-t").textContent = m.text || "";
+        body.appendChild(bub);
       });
       body.scrollTop = 1e9;
     }, function (e) { toast(errMsg(e)); }));
+    anonRoomOpen(t.id, aliasFor(t.id, UID), t.name);
   }
-  $("supportBack").addEventListener("click", function () { $("support").classList.remove("open"); closeSupportRooms(); curSupport = null; });
+  $("supportBack").addEventListener("click", function () { $("support").classList.remove("open"); closeSupportRooms(); curSupport = null; anonRoomClose(); });
   function sendSupportMsg() {
     var inp = $("supportInput"), t = clean(inp.value, 300); if (!t || !curSupport) return;
     if (CRISIS.test(t)) { inp.value = ""; $("supportBody").appendChild(el('<div class="ai-note">' + esc(CRISIS_REPLY) + '</div>')); $("supportBody").scrollTop = 1e9; return; }
