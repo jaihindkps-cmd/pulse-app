@@ -353,7 +353,7 @@ function attachRemote(a, st) { a.remote = st; if (S && (S.nxt === a || S.cur ===
 function attState(a, st) {
   if (!S) return;
   if (st === "connected") { promote(a); }
-  else if (st === "failed" || st === "closed") { if (S.cur === a) endCall(false, T("Connection lost.", "कनेक्शन टूट गया।")); else if (S.nxt === a) { C.toast(T("Could not connect. Try again.", "जुड़ नहीं पाया। फिर कोशिश करो।")); dropNext(); } }
+  else if (st === "failed" || st === "closed") { if (RELAY && !a.t0 && st === "failed") C.toast(T("Could not connect through the private relay. Try again, or turn off “Hide my IP” in ⋯ (then your IP is visible to them).", "प्राइवेट रिले से नहीं जुड़ा। फिर कोशिश करो, या ⋯ में “IP छुपाओ” बंद करो (तब उन्हें तुम्हारा IP दिखेगा)।")); if (S.cur === a) endCall(false, T("Connection lost.", "कनेक्शन टूट गया।")); else if (S.nxt === a) { C.toast(T("Could not connect. Try again.", "जुड़ नहीं पाया। फिर कोशिश करो।")); dropNext(); } }
   else if (st === "disconnected") { setTimeout(function () { if (S && S.cur === a && a.pc && a.pc.connectionState === "disconnected") endCall(false, T("Connection lost.", "कनेक्शन टूट गया।")); }, 9000); }
 }
 function promote(a) {
