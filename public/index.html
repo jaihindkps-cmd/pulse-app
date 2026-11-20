@@ -524,7 +524,7 @@
 
   .mode-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 4px; } .mode-lbl { grid-column: 1 / -1; font-size: 13px; font-weight: 700; color: var(--muted); }
   .mode-grid button { border: 1.5px solid var(--line); background: var(--surface-2); color: var(--fg); border-radius: 14px; padding: 12px 8px; font-weight: 700; font-size: 13px; cursor: pointer; font-family: var(--font-body); display: flex; flex-direction: column; align-items: center; gap: 4px; } .mode-grid button i { font-style: normal; font-size: 22px; } .mode-grid button.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--surface)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
-  .forgot { display: block; text-align: center; font-size: 12.5px; color: var(--accent); margin-top: 10px; } .sub-h { font-weight: 800; font-size: 13px; margin: 8px 0 -2px; color: var(--accent); }
+  .forgot { display: block; min-height: 36px; line-height: 36px; text-align: center; font-size: 12.5px; color: var(--accent); margin-top: 10px; } .sub-h { font-weight: 800; font-size: 13px; margin: 8px 0 -2px; color: var(--accent); }
   .jobs-seg { margin-bottom: 12px; } .jcard { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 14px; margin-bottom: 10px; box-shadow: var(--shadow); } .jcard h4 { margin: 0 0 2px; font-size: 16px; } .jcard .jm { font-size: 12.5px; color: var(--muted); margin-bottom: 8px; } .jcard .jd { font-size: 13.5px; line-height: 1.5; margin-bottom: 10px; } .jcard .jrow { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; } .jcard button { padding: 8px 14px; font-size: 13px; }
   .chip { display: inline-block; font-size: 11.5px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--surface-2); color: var(--muted); margin: 0 4px 4px 0; } .chip.ok { background: #d3f9d8; color: #1b6b2a; } .chip.warn { background: #fff3bf; color: #8a6100; } .chip.no { background: #ffe3e3; color: #b02a2a; } .chip.acc { background: color-mix(in srgb, var(--accent) 14%, var(--surface)); color: var(--accent); }
   .jfilters { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; } .jfilters select, .jfilters input, .jform select, .jform input, .jform textarea { font-family: var(--font-body); font-size: 14px; color: var(--fg); background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 11px 12px; outline: none; width: 100%; box-sizing: border-box; transition: border-color .15s, box-shadow .15s, background .15s; } .jfilters select:focus, .jfilters input:focus, .jform select:focus, .jform input:focus, .jform textarea:focus { border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 3px rgba(217,38,70,.16); } .jform { display: flex; flex-direction: column; gap: 10px; }
@@ -647,7 +647,7 @@ body{background:var(--bg)}
 .auth-card>.auth-sub{display:block}
 #authBtn,#vDone{border-radius:999px;padding:15px!important;font-size:15px;font-family:var(--font-display);font-weight:700}
 #googleBtn{border-radius:999px;font-weight:700}
-.forgot{color:var(--muted);text-decoration:none;font-weight:600;text-align:center;font-size:13px}
+.forgot{display:inline-block;min-height:32px;line-height:32px;color:var(--muted);text-decoration:none;font-weight:600;text-align:center;font-size:13px}
 #langBtn2{background:rgba(255,255,255,.1)!important;border-color:rgba(255,255,255,.2)!important;color:#fff!important}
 @media (min-width:600px){.auth-card{margin-left:auto!important;margin-right:auto!important;width:100%!important}}
 
@@ -1035,7 +1035,7 @@ body{background:var(--bg)}
     <div class="section-title" style="margin-top:0">Post a status</div>
     <div class="st-note">Visible only to people in <b id="storyModeHint"></b> mode — disappears on its own after 24 hours.</div>
     <textarea id="storyText" rows="3" maxlength="150" placeholder="What's on your mind?" class="bh-in" style="margin:10px 0;width:100%"></textarea>
-    <div id="storyPhotoPreview" style="display:none;margin-bottom:10px;position:relative"><img id="storyPhotoImg" style="max-width:100%;border-radius:12px;display:block"><button class="icon-btn" id="storyPhotoRemove" style="position:absolute;top:6px;right:6px">✕</button></div>
+    <div id="storyPhotoPreview" style="display:none;margin-bottom:10px;position:relative"><img id="storyPhotoImg" alt="" style="max-width:100%;border-radius:12px;display:block"><button class="icon-btn" id="storyPhotoRemove" style="position:absolute;top:6px;right:6px">✕</button></div>
     <input type="file" id="storyPhotoInput" accept="image/*" hidden>
     <div class="st-row">
       <button class="btn-outline" id="storyAddPhoto" type="button" style="padding:8px 14px">📷 Photo</button>
@@ -1126,5 +1126,5 @@ body{background:var(--bg)}
   <div class="toast" id="toast"></div>
 </div>
 
-<script src="app.js?v=5fa773cd3e" defer></script>
+<script src="app.js?v=fccb8983dc" defer></script>
 <script>if("serviceWorker" in navigator && location.protocol.indexOf("http")===0){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});}</script></body></html>

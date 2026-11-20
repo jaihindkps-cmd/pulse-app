@@ -1,0 +1,6 @@
+{
+  "name": "pulse-rules-tests",
+  "private": true,
+  "scripts": { "test": "firebase emulators:exec --only firestore --project demo-pulse --config ../../firebase.json \"node rules.test.js\"" },
+  "dependencies": { "@firebase/rules-unit-testing": "^5.0.2", "firebase": "^12.19.0", "firebase-tools": "^15.34.1" }
+}

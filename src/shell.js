@@ -156,7 +156,7 @@ export function forgetMe(uid) {
 }
 function exportMine() {
   var uid = UIDF && UIDF(); if (!DB || !uid) return;
-  var out = { exportedAt: new Date().toISOString(), uid: uid };
+  var out = { exportedAt: new Date().toISOString(), uid: uid, recentErrors: ERRS };
   var grab = function (k, p) { return p.then(function (s) { out[k] = s.docs ? s.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); }) : (s.exists() ? s.data() : null); }).catch(function () { out[k] = "not available"; }); };
   Promise.all([
     grab("profile", getDoc(doc(DB, "users", uid))),
@@ -176,8 +176,14 @@ function dataButton() {
   d.parentNode.insertBefore(b, d);
 }
 
+// Diagnostics: the last few errors stay on this phone only; they are added to "Download my data" so a person can send them to support if they want.
+var ERRS = [];
+window.addEventListener("error", function (e) { ERRS.push({ t: new Date().toISOString(), m: String(e.message || "").slice(0, 200), at: String(e.filename || "").split("/").pop() + ":" + (e.lineno || 0) }); if (ERRS.length > 20) ERRS.shift(); });
+window.addEventListener("unhandledrejection", function (e) { ERRS.push({ t: new Date().toISOString(), m: String((e.reason && e.reason.message) || e.reason || "").slice(0, 200) }); if (ERRS.length > 20) ERRS.shift(); });
+function syncLang() { try { var l = getLang() === "en" ? "en" : "hi"; if (document.documentElement.lang !== l) document.documentElement.lang = l; } catch (e) {} }
+
 export function initShell() {
-  style(); installBanner();
+  style(); installBanner(); syncLang(); setInterval(syncLang, 2000);
   var go = function () { miniButtons(); dataButton(); };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", function () { go(); gate(); }); else { go(); gate(); }
   setTimeout(function () { miniButtons(); dataButton(); }, 1500); setTimeout(function () { miniButtons(); dataButton(); }, 5000);

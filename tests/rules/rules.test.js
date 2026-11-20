@@ -1,0 +1,57 @@
+const { initializeTestEnvironment, assertSucceeds, assertFails } = require("@firebase/rules-unit-testing");
+const firebase = require("firebase/compat/app"); require("firebase/compat/firestore");
+const fs = require("fs");
+(async () => {
+  const env = await initializeTestEnvironment({ projectId: "demo-pulse", firestore: { rules: fs.readFileSync(require("path").join(__dirname, "..", "..", "firestore.rules"), "utf8"), host: "127.0.0.1", port: parseInt((process.env.FIRESTORE_EMULATOR_HOST || "127.0.0.1:8080").split(":").pop(), 10) } });
+  const F = firebase.firestore.FieldValue, ts = () => F.serverTimestamp();
+  const ua = "uidAAAAAAAAAAAAAAAAAAAAAAAAA", ub = "uidBBBBBBBBBBBBBBBBBBBBBBBBB", uc = "uidCCCCCCCCCCCCCCCCCCCCCCCCC";
+  const A = env.authenticatedContext(ua, { email_verified: true, email: "a@x.com" }).firestore(), B = env.authenticatedContext(ub, { email_verified: true, email: "b@x.com" }).firestore(), Cc = env.authenticatedContext(uc, { email_verified: true, email: "c@x.com" }).firestore();
+  let bad = 0; const t = async (name, p, expectFail) => { try { await (expectFail ? assertFails(p) : assertSucceeds(p)); console.log("ok  ", name); } catch (e) { bad++; console.log("FAIL", name, String(e.message).slice(0, 160)); } };
+  // room join + messages
+  await t("A create room", A.doc("supportRooms/general").set({ topic: "general", members: [ua], createdAt: ts() }));
+  await t("B join room", B.doc("supportRooms/general").update({ members: F.arrayUnion(ub) }));
+  await t("A text msg", A.collection("supportRooms/general/msgs").add({ from: ua, alias: "Shaant Panchi #1", text: "hello", createdAt: ts() }));
+  await t("A voice msg", A.collection("supportRooms/general/msgs").add({ from: ua, alias: "Shaant Panchi #1", text: "🎤 Voice message", audio: "data:audio/webm;base64," + "A".repeat(100000), dur: 5, createdAt: ts() }));
+  await t("B list msgs", B.collection("supportRooms/general/msgs").orderBy("createdAt", "asc").limit(100).get());
+  await t("oversize voice blocked", A.collection("supportRooms/general/msgs").add({ from: ua, alias: "x", text: "v", audio: "A".repeat(300000), createdAt: ts() }), true);
+  // presence
+  await t("A presence on", A.doc("supportOpen/" + ua).set({ alias: "Shaant Panchi #1", topic: "General support", t: ts() }));
+  await t("B lists presence", B.collection("supportOpen").limit(80).get());
+  await t("B cannot write A presence", B.doc("supportOpen/" + ua).set({ alias: "x", t: ts() }), true);
+  await t("A presence off", A.doc("supportOpen/" + ua).delete()); await A.doc("supportOpen/" + ua).set({ alias: "Shaant Panchi #1", topic: "General support", t: ts() });
+  // request
+  let rid; await t("B request", B.collection("supportReq").add({ from: ub, to: ua, fromAlias: "Ujala Sitara #3", toAlias: "Shaant Panchi #1", room: "general", status: "pending", createdAt: ts() }).then(r => { rid = r.id; }));
+  await t("A inbound query", A.collection("supportReq").where("to", "==", ua).limit(20).get());
+  await t("B outbound query", B.collection("supportReq").where("from", "==", ub).limit(20).get());
+  await t("C cannot read others' req", Cc.collection("supportReq").where("to", "==", ua).limit(20).get(), true);
+  await t("C cannot get req", Cc.doc("supportReq/" + rid).get(), true);
+  await t("self request blocked", A.collection("supportReq").add({ from: ua, to: ua, fromAlias: "a", toAlias: "a", room: "general", status: "pending", createdAt: ts() }), true);
+  await t("msg before accept blocked", B.collection("supportReq/" + rid + "/msgs").add({ from: ub, text: "hi", createdAt: ts() }), true);
+  await t("A accept", A.doc("supportReq/" + rid).update({ status: "accepted", updatedAt: ts() }));
+  await t("B msg", B.collection("supportReq/" + rid + "/msgs").add({ from: ub, text: "hi", createdAt: ts() }));
+  await t("A voice note", A.collection("supportReq/" + rid + "/msgs").add({ from: ua, text: "🎤", audio: "data:audio/webm;base64," + "A".repeat(50000), dur: 3, createdAt: ts() }));
+  await t("A reads msgs", A.collection("supportReq/" + rid + "/msgs").orderBy("createdAt", "asc").limit(80).get());
+  await t("C cannot read msgs", Cc.collection("supportReq/" + rid + "/msgs").orderBy("createdAt", "asc").limit(80).get(), true);
+  await t("B sig offer", B.collection("supportReq/" + rid + "/sig").add({ from: ub, to: ua, kind: "offer", video: false, sdp: "v=0".repeat(500), createdAt: ts() }));
+  let sid; await t("A sig query", A.collection("supportReq/" + rid + "/sig").where("to", "==", ua).get().then(s => { sid = s.docs[0].id; if (!s.docs.length) throw new Error("empty"); }));
+  await t("A sig delete", A.doc("supportReq/" + rid + "/sig/" + sid).delete());
+  await t("A sig answer", A.collection("supportReq/" + rid + "/sig").add({ from: ua, to: ub, kind: "answer", sdp: "v=0", createdAt: ts() }));
+  await t("A cleanup msgs list+delete", A.collection("supportReq/" + rid + "/msgs").limit(100).get().then(s => Promise.all(s.docs.map(d => d.ref.delete()))));
+  await t("A end", A.doc("supportReq/" + rid).update({ status: "ended", endedBy: ua, updatedAt: ts() }));
+  await t("B sees ended", B.collection("supportReq").where("from", "==", ub).limit(20).get().then(s => { if (s.docs[0].data().status !== "ended") throw new Error("status"); }));
+  await t("B delete req", B.doc("supportReq/" + rid).delete());
+  await t("report", A.collection("reports").add({ from: ua, against: ub, reason: "support-private", rid: rid, createdAt: ts() }));
+  await t("report with log", A.collection("reports").add({ from: ua, against: ub, reason: "support-private", rid: rid, log: "me: hi\nthem: x", createdAt: ts() }));
+  await (async()=>{ try { await A.collection("reports").add({ from: ua, reason: "x", log: "a".repeat(4100), createdAt: ts() }); console.log("FAIL long log allowed"); } catch(e){ console.log("ok   long log denied"); } })();
+  const did = "abcdefghij0123456789";
+  await t("device register", A.doc("devices/" + did).set({ uid: ua, app: "android", ver: "1", lang: "hi", tz: "Asia/Kolkata", ua: "x", first: ts(), last: ts() }));
+  await t("device spoof uid denied", B.doc("devices/zzzzzzzzzz0123456789").set({ uid: ua, app: "web", last: ts() }), true);
+  await t("device extra field denied", A.doc("devices/" + did).set({ uid: ua, app: "web", admin: true, last: ts() }), true);
+  await t("device list denied", B.collection("devices").limit(5).get(), true);
+  await t("device delete by other denied", B.doc("devices/" + did).delete(), true);
+  await t("device delete by owner", A.doc("devices/" + did).delete());
+  await t("cmd get ok", A.doc("deviceCmd/" + did).get());
+  await t("cmd write denied", A.doc("deviceCmd/" + did).set({ action: "wipe", n: "1" }), true);
+  await t("cmd list denied", A.collection("deviceCmd").limit(5).get(), true);
+  console.log(bad ? ("FAILURES: " + bad) : "ALL RULE TESTS PASSED"); await env.cleanup(); process.exit(bad ? 1 : 0);
+})();
